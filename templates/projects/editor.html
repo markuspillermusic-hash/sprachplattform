@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title }} · Sprachplattform{% endblock %}
+{% block content %}
+<section class="editor-shell" aria-labelledby="editor-title">
+  <header class="editor-heading">
+    <a class="back-link" href="{% url 'projects:list' %}">← Alle Hörtexte</a>
+    <form class="project-meta" method="post" action="{% url 'projects:autosave' project.id %}" data-autosave>
+      {% csrf_token %}
+      <div class="field field-title"><label for="{{ project_form.title.id_for_label }}">Projekttitel</label>{{ project_form.title }}</div>
+      <div class="field"><label for="{{ project_form.language.id_for_label }}">Zielsprache</label>{{ project_form.language }}</div>
+      <div class="field"><label for="{{ project_form.level.id_for_label }}">GER-Niveau</label>{{ project_form.level }}</div>
+      <span class="save-status" data-save-status role="status">Gespeichert</span>
+    </form>
+  </header>
+
+  <div class="editor-grid">
+    <section class="script-column" aria-labelledby="script-title">
+      <div class="column-heading"><div><p class="eyebrow">Skript</p><h1 id="script-title">Sprechbeiträge</h1></div><span class="character-count">{{ project.character_count }} Zeichen</span></div>
+
+      {% if segments_with_forms %}
+        <ol class="segment-list">
+          {% for segment, form in segments_with_forms %}
+            <li>
+              <article class="segment-card segment-{{ segment.speaker.color }}">
+                <header class="segment-heading"><span>Beitrag {{ forloop.counter }}</span><strong>{{ segment.speaker.name }}</strong></header>
+                <form method="post" action="{% url 'projects:segment_autosave' project.id segment.id %}" data-autosave>
+                  {% csrf_token %}
+                  <div class="field"><label for="{{ form.speaker.id_for_label }}">Sprecher</label>{{ form.speaker }}</div>
+                  <div class="field"><label for="{{ form.text.id_for_label }}">Sprechtext</label>{{ form.text }}</div>
+                  <div class="segment-settings">
+                    <div class="field"><label for="{{ form.direction.id_for_label }}">Regie</label>{{ form.direction }}</div>
+                    <div class="field"><label for="{{ form.pause_after_ms.id_for_label }}">Pause danach</label>{{ form.pause_after_ms }}</div>
+                    <div class="field"><label for="{{ form.speed.id_for_label }}">Tempo</label>{{ form.speed }}</div>
+                  </div>
+                  <span class="save-status" data-save-status role="status">Gespeichert</span>
+                </form>
+                <div class="segment-actions">
+                  <form method="post" action="{% url 'projects:segment_move' project.id segment.id 'up' %}">{% csrf_token %}<button class="icon-button" type="submit" aria-label="Beitrag nach oben verschieben">↑</button></form>
+                  <form method="post" action="{% url 'projects:segment_move' project.id segment.id 'down' %}">{% csrf_token %}<button class="icon-button" type="submit" aria-label="Beitrag nach unten verschieben">↓</button></form>
+                  <form method="post" action="{% url 'projects:segment_duplicate' project.id segment.id %}">{% csrf_token %}<button class="button button-quiet" type="submit">Duplizieren</button></form>
+                  <form method="post" action="{% url 'projects:segment_delete' project.id segment.id %}" data-confirm="Diesen Beitrag löschen?">{% csrf_token %}<button class="button button-danger" type="submit">Löschen</button></form>
+                </div>
+              </article>
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <div class="empty-state compact"><h2>Noch keine Sprechbeiträge</h2><p>Legen Sie zuerst rechts einen Sprecher an und fügen Sie danach den ersten Beitrag hinzu.</p></div>
+      {% endif %}
+      <form method="post" action="{% url 'projects:segment_add' project.id %}">{% csrf_token %}<button class="button button-secondary button-wide" type="submit">＋ Sprechbeitrag hinzufügen</button></form>
+    </section>
+
+    <aside class="settings-column" aria-labelledby="settings-title">
+      <div class="sidebar-card">
+        <p class="eyebrow">Audioeinstellungen</p><h2 id="settings-title">Sprecher &amp; Stimmen</h2>
+        {% for speaker, form, catalog_voice in speakers_with_forms %}
+          <div class="speaker-row speaker-{{ speaker.color }}">
+            <form method="post" action="{% url 'projects:speaker_autosave' project.id speaker.id %}" data-autosave>
+              {% csrf_token %}
+              <div class="field"><label for="{{ form.name.id_for_label }}">Name</label>{{ form.name }}</div>
+              <div class="field"><label for="{{ form.color.id_for_label }}">Farbe</label>{{ form.color }}</div>
+              <div class="field"><label for="{{ form.voice.id_for_label }}">Stimme</label>{{ form.voice }}{% if form.voice.errors %}<div class="field-errors">{{ form.voice.errors }}</div>{% endif %}</div>
+              {% if catalog_voice.preview_url %}<audio class="voice-preview" controls preload="none" aria-label="Stimmenprobe für {{ speaker.name }}"><source src="{{ catalog_voice.preview_url }}" type="audio/mpeg"></audio>{% endif %}
+              <span class="save-status" data-save-status role="status">Gespeichert</span>
+            </form>
+            <form method="post" action="{% url 'projects:speaker_delete' project.id speaker.id %}" data-confirm="Diesen Sprecher entfernen?">{% csrf_token %}<button class="button button-danger" type="submit">Entfernen</button></form>
+          </div>
+        {% empty %}<p class="muted">Noch keine Sprecher angelegt.</p>{% endfor %}
+
+        <details class="add-speaker" {% if not speakers_with_forms %}open{% endif %}>
+          <summary>Neuen Sprecher anlegen</summary>
+          <form method="post" action="{% url 'projects:speaker_add' project.id %}">
+            {% csrf_token %}
+            <div class="field"><label for="{{ speaker_form.name.id_for_label }}">Name</label>{{ speaker_form.name }}</div>
+            <div class="field"><label for="{{ speaker_form.color.id_for_label }}">Farbe</label>{{ speaker_form.color }}</div>
+            <div class="field"><label for="{{ speaker_form.voice.id_for_label }}">Stimme (optional)</label>{{ speaker_form.voice }}</div>
+            <button class="button button-secondary button-wide" type="submit">Sprecher hinzufügen</button>
+          </form>
+        </details>
+      </div>
+
+      <div class="sidebar-card assistant-card"><p class="eyebrow">KI-Assistent</p><h2>Später verfügbar</h2><p>Die Texterstellung wird nach der stabilen Audiofunktion ergänzt und überschreibt nie ungefragt Ihr Skript.</p></div>
+      <div class="sidebar-card usage-card">
+        <p class="eyebrow">Nutzung diesen Monat</p>
+        <strong>{{ usage_used }} von {{ usage_limit }} Zeichen</strong>
+        <progress value="{{ usage_used }}" max="{{ usage_limit }}">{{ usage_percent }} %</progress>
+        {% if usage_percent >= 100 %}<p class="limit-warning">Ihr Limit ist erreicht.</p>{% elif usage_percent >= 80 %}<p class="limit-warning">Ihr Limit ist fast erreicht.</p>{% endif %}
+      </div>
+
+      {% if latest_jobs %}
+        <div class="sidebar-card job-list"><p class="eyebrow">Audioversionen</p><h2>Letzte Aufträge</h2>
+          <ul>
+            {% for job in latest_jobs %}
+              <li data-job-url="{% url 'generation:status' job.id %}">
+                <div><strong>Version {{ job.version.number }}</strong><span class="status-badge status-{{ job.status }}">{{ job.get_status_display }}</span></div>
+                <small>{{ job.character_count }} Zeichen · ca. {{ job.estimated_cost_eur }} €</small>
+                {% if job.status == 'succeeded' %}
+                  <audio controls preload="none" aria-label="Audioversion {{ job.version.number }}"><source src="{% url 'generation:play' job.audio_asset.id %}" type="audio/mpeg"></audio>
+                  <a class="button button-secondary button-wide" href="{% url 'generation:download' job.audio_asset.id %}">MP3 herunterladen</a>
+                {% elif job.status == 'failed' %}
+                  <p class="job-error">{{ job.error_message }}</p>
+                  <form method="post" action="{% url 'generation:retry' job.id %}">{% csrf_token %}<button class="button button-secondary button-wide" type="submit">Fehlgeschlagene Teile erneut versuchen</button></form>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <div class="generation-card">
+        <strong>Audio erzeugen</strong>
+        <span>Vor dem Start: {{ project.character_count }} Zeichen, geschätzter Verbrauch wird als Version reserviert.</span>
+        <form method="post" action="{% url 'generation:start' project.id %}">{% csrf_token %}<button class="button button-primary button-wide" type="submit" {% if not provider_configured %}disabled aria-describedby="provider-note"{% endif %}>Audio erzeugen</button></form>
+        {% if not provider_configured %}<small id="provider-note">Noch nicht verfügbar: Serverzugang zu ElevenLabs fehlt.</small>{% endif %}
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

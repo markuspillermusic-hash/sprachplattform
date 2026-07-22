@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Meine Hörtexte · Sprachplattform{% endblock %}
+{% block content %}
+<section class="page-shell" aria-labelledby="projects-title">
+  <header class="page-heading">
+    <div><p class="eyebrow">Arbeitsbereich</p><h1 id="projects-title">Meine Hörtexte</h1><p class="lead">Dialoge und Hörtexte bleiben nur in Ihrem persönlichen Bereich sichtbar.</p></div>
+    <a class="button button-primary" href="{% url 'projects:create' %}">Neuen Hörtext erstellen</a>
+  </header>
+
+  {% if projects %}
+    <ul class="project-grid">
+      {% for project in projects %}
+        <li class="project-card">
+          <a class="project-card-main" href="{% url 'projects:editor' project.id %}">
+            <span class="project-language">{{ project.get_language_display }}{% if project.level %} · {{ project.level }}{% endif %}</span>
+            <h2>{{ project.title }}</h2>
+            <span>{{ project.segments.count }} Beiträge · {{ project.character_count }} Zeichen</span>
+            <span>Bearbeitet {{ project.updated_at|date:"d.m.Y, H:i" }}</span>
+          </a>
+          <div class="card-actions">
+            <form method="post" action="{% url 'projects:duplicate' project.id %}">{% csrf_token %}<button class="button button-quiet" type="submit">Duplizieren</button></form>
+            <form method="post" action="{% url 'projects:delete' project.id %}" data-confirm="Dieses Projekt wirklich löschen?">{% csrf_token %}<button class="button button-danger" type="submit">Löschen</button></form>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty-state">
+      <span class="empty-icon" aria-hidden="true">＋</span>
+      <h2>Ihr erster Hörtext beginnt hier.</h2>
+      <p>Starten Sie mit Titel und Zielsprache. Sprecher und einzelne Beiträge folgen direkt im Editor.</p>
+      <a class="button button-primary" href="{% url 'projects:create' %}">Ersten Hörtext anlegen</a>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

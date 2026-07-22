@@ -1,0 +1,229 @@
+from django.contrib import messages
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from django.db.models.deletion import RestrictedError
+from django.db.models import Sum
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
+from django.utils import timezone
+from generation.models import GenerationJob, UsageLedger
+from tts.models import ProviderVoice
+
+from .forms import ProjectCreateForm, ProjectMetaForm, SegmentForm, SpeakerForm
+from .models import Project, ScriptSegment, Speaker
+from .services import duplicate_project, move_segment, next_position
+
+
+def visible_projects(user):
+    queryset = Project.objects.all()
+    if user.is_staff or user.role == user.Role.ADMIN:
+        return queryset
+    return queryset.filter(owner=user)
+
+
+def owned_project(request, project_id):
+    return get_object_or_404(visible_projects(request.user), pk=project_id)
+
+
+@login_required
+def project_list(request):
+    projects = visible_projects(request.user).prefetch_related("segments", "speakers")
+    return render(request, "projects/project_list.html", {"projects": projects})
+
+
+@login_required
+def project_create(request):
+    form = ProjectCreateForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        project = form.save(commit=False)
+        project.owner = request.user
+        project.save()
+        messages.success(request, "Der Hörtext wurde angelegt.")
+        return redirect("projects:editor", project_id=project.pk)
+    return render(request, "projects/project_create.html", {"form": form})
+
+
+@login_required
+def project_editor(request, project_id):
+    project = owned_project(request, project_id)
+    segments = list(project.segments.select_related("speaker"))
+    speakers = list(project.speakers.all())
+    speaker_form_voices = list(ProviderVoice.objects.filter(active=True))
+    month_start = timezone.localdate().replace(day=1)
+    usage_used = UsageLedger.objects.filter(
+        user=request.user,
+        billing_period=month_start,
+    ).aggregate(total=Sum("character_count"))["total"] or 0
+    return render(
+        request,
+        "projects/editor.html",
+        {
+            "project": project,
+            "project_form": ProjectMetaForm(instance=project, prefix="project"),
+            "speaker_form": SpeakerForm(project=project),
+            "speakers_with_forms": [
+                (
+                    speaker,
+                    SpeakerForm(instance=speaker, project=project, prefix=str(speaker.pk)),
+                    next(
+                        (
+                            voice
+                            for voice in speaker_form_voices
+                            if voice.provider == speaker.provider
+                            and voice.model == speaker.model
+                            and voice.voice_id == speaker.voice_id
+                        ),
+                        None,
+                    ),
+                )
+                for speaker in speakers
+            ],
+            "segments_with_forms": [
+                (segment, SegmentForm(instance=segment, project=project, prefix=str(segment.pk)))
+                for segment in segments
+            ],
+            "latest_jobs": GenerationJob.objects.filter(version__project=project).prefetch_related("parts")[:5],
+            "usage_used": usage_used,
+            "usage_limit": request.user.character_limit,
+            "usage_percent": min(100, round(usage_used / request.user.character_limit * 100)) if request.user.character_limit else 100,
+            "provider_configured": bool(settings.ELEVENLABS_API_KEY),
+        },
+    )
+
+
+@require_POST
+@login_required
+def project_autosave(request, project_id):
+    project = owned_project(request, project_id)
+    form = ProjectMetaForm(request.POST, instance=project, prefix="project")
+    if form.is_valid():
+        form.save()
+        return JsonResponse({"status": "saved", "updated_at": project.updated_at.isoformat()})
+    return JsonResponse({"status": "invalid", "errors": form.errors.get_json_data()}, status=422)
+
+
+@require_POST
+@login_required
+def project_duplicate(request, project_id):
+    project = owned_project(request, project_id)
+    copied = duplicate_project(project, owner=request.user)
+    messages.success(request, "Das Projekt wurde vollständig dupliziert.")
+    return redirect("projects:editor", project_id=copied.pk)
+
+
+@require_POST
+@login_required
+def project_delete(request, project_id):
+    project = owned_project(request, project_id)
+    project.delete()
+    messages.success(request, "Das Projekt wurde gelöscht.")
+    return redirect("projects:list")
+
+
+@require_POST
+@login_required
+def speaker_add(request, project_id):
+    project = owned_project(request, project_id)
+    form = SpeakerForm(request.POST, project=project)
+    if form.is_valid():
+        speaker = form.save(commit=False)
+        speaker.project = project
+        speaker.position = next_position(project.speakers)
+        speaker.save()
+        messages.success(request, f"{speaker.name} wurde hinzugefügt.")
+    else:
+        messages.error(request, "Der Sprecher konnte nicht hinzugefügt werden.")
+    return redirect("projects:editor", project_id=project.pk)
+
+
+@require_POST
+@login_required
+def speaker_autosave(request, project_id, speaker_id):
+    project = owned_project(request, project_id)
+    speaker = get_object_or_404(project.speakers, pk=speaker_id)
+    form = SpeakerForm(request.POST, instance=speaker, project=project, prefix=str(speaker.pk))
+    if form.is_valid():
+        form.save()
+        return JsonResponse({"status": "saved"})
+    return JsonResponse({"status": "invalid", "errors": form.errors.get_json_data()}, status=422)
+
+
+@require_POST
+@login_required
+def speaker_delete(request, project_id, speaker_id):
+    project = owned_project(request, project_id)
+    speaker = get_object_or_404(project.speakers, pk=speaker_id)
+    try:
+        speaker.delete()
+        messages.success(request, "Der Sprecher wurde entfernt.")
+    except RestrictedError:
+        messages.error(request, "Dieser Sprecher wird noch in Sprechbeiträgen verwendet.")
+    return redirect("projects:editor", project_id=project.pk)
+
+
+@require_POST
+@login_required
+def segment_add(request, project_id):
+    project = owned_project(request, project_id)
+    speaker = project.speakers.first()
+    if speaker is None:
+        messages.error(request, "Legen Sie zuerst mindestens einen Sprecher an.")
+    else:
+        ScriptSegment.objects.create(
+            project=project,
+            speaker=speaker,
+            position=next_position(project.segments),
+            text="",
+        )
+    return redirect("projects:editor", project_id=project.pk)
+
+
+@require_POST
+@login_required
+def segment_autosave(request, project_id, segment_id):
+    project = owned_project(request, project_id)
+    segment = get_object_or_404(project.segments, pk=segment_id)
+    form = SegmentForm(request.POST, instance=segment, project=project, prefix=str(segment.pk))
+    if form.is_valid():
+        form.save()
+        project.save(update_fields=["updated_at"])
+        return JsonResponse({"status": "saved", "characters": len(segment.text)})
+    return JsonResponse({"status": "invalid", "errors": form.errors.get_json_data()}, status=422)
+
+
+@require_POST
+@login_required
+def segment_duplicate(request, project_id, segment_id):
+    project = owned_project(request, project_id)
+    segment = get_object_or_404(project.segments, pk=segment_id)
+    ScriptSegment.objects.create(
+        project=project,
+        speaker=segment.speaker,
+        position=next_position(project.segments),
+        text=segment.text,
+        direction=segment.direction,
+        speed=segment.speed,
+        pause_after_ms=segment.pause_after_ms,
+    )
+    return redirect("projects:editor", project_id=project.pk)
+
+
+@require_POST
+@login_required
+def segment_delete(request, project_id, segment_id):
+    project = owned_project(request, project_id)
+    get_object_or_404(project.segments, pk=segment_id).delete()
+    return redirect("projects:editor", project_id=project.pk)
+
+
+@require_POST
+@login_required
+def segment_move(request, project_id, segment_id, direction):
+    if direction not in {"up", "down"}:
+        raise PermissionDenied
+    project = owned_project(request, project_id)
+    segment = get_object_or_404(project.segments, pk=segment_id)
+    move_segment(segment, direction)
+    return redirect("projects:editor", project_id=project.pk)

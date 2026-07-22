@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Sprachplattform · Hörtexte für den Unterricht{% endblock %}
+{% block content %}
+<section class="hero" aria-labelledby="page-title">
+  <div>
+    <p class="eyebrow">Interne Sprachwerkstatt</p>
+    <h1 id="page-title">Hörtexte für den Sprachunterricht</h1>
+    {% if request.user.is_authenticated %}
+      <p class="lead">Willkommen, {{ request.user.first_name|default:request.user.username }}. Ihr geschützter Arbeitsbereich ist bereit.</p>
+      <p><a class="button button-primary" href="{% url 'projects:list' %}">Meine Hörtexte öffnen</a></p>
+    {% else %}
+      <p class="lead">Erstellen Sie mehrsprachige Dialoge in einem ruhigen, klar geführten Arbeitsbereich.</p>
+      <p><a class="button button-primary" href="{% url 'accounts:login' %}">Zum persönlichen Bereich</a></p>
+    {% endif %}
+  </div>
+
+  <aside class="status-card" aria-labelledby="status-title">
+    <div class="status-heading"><span class="status-dot" aria-hidden="true"></span><h2 id="status-title">System bereit</h2></div>
+    <dl>
+      <div><dt>Zugang</dt><dd>geschützt</dd></div>
+      <div><dt>Datenbank</dt><dd>verbunden</dd></div>
+      <div><dt>Arbeitsbereich</dt><dd>persönlich</dd></div>
+    </dl>
+  </aside>
+</section>
+
+<section class="principles" aria-labelledby="principles-title">
+  <div class="section-heading"><p class="eyebrow">Leitlinien</p><h2 id="principles-title">Einfach für Lehrkräfte. Solide im Betrieb.</h2></div>
+  <ul class="principle-grid">
+    <li><strong>Ohne Technikbegriffe</strong><span>Eine klare Oberfläche führt Schritt für Schritt zum fertigen Audio.</span></li>
+    <li><strong>Datensparsam</strong><span>Fiktive Unterrichtstexte und geschützte, zeitlich begrenzte Audiodateien.</span></li>
+    <li><strong>Mehrsprachig</strong><span>Vorbereitet für Deutsch, Englisch, Französisch, Spanisch und Italienisch.</span></li>
+  </ul>
+</section>
+{% endblock %}
