@@ -745,7 +745,7 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 - 39 automatisierte Tests, Migrationen, Systemcheck, Abhängigkeitsprüfung und Desktop-/Mobil-Browser-QA sind erfolgreich.
 - Docker und FFmpeg sind auf dem aktuellen Entwicklungsrechner nicht installiert; Compose- und reale Audiokette konnten deshalb nicht end-to-end gestartet werden.
 - ElevenLabs-Key, kuratierte Stimmen, Zielserver, Domain, HTTPS, SMTP, MFA, Backup-Restore und Aufbewahrungsfrist sind weiterhin extern zu bestätigen.
-- Git-Repository und Branch `main` sind vorhanden; ein erster Commit ist noch nicht angelegt.
+- Das Projekt ist im öffentlichen GitHub-Repository `markuspillermusic-hash/sprachplattform` veröffentlicht; `main` ist der Standardbranch.
 - Zieladresse und interner Proxyweg sind festgelegt: `https://sprachplattform.markuspiller.de` leitet an `http://127.0.0.1:8085` weiter.
 
 ## 23. Nächste konkrete Aufgabe
@@ -827,6 +827,7 @@ Ein neuer Arbeitschat soll:
 ### 2026-07-22 – GitHub- und Servervorbereitung
 
 - Ziel-Repository auf `markuspillermusic-hash/sprachplattform` korrigiert.
+- geprüften Initialstand auf dem Standardbranch `main` veröffentlicht.
 - öffentliche Zieladresse `https://sprachplattform.markuspiller.de` festgelegt.
 - Compose-Port ausschließlich an `127.0.0.1:8085` gebunden und Reverse-Proxy-Beispiel angepasst.
 - secret-freie Produktionsumgebungsvorlage und konkrete Serverhinweise ergänzt.
