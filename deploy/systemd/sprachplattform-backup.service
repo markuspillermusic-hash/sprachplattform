@@ -1,0 +1,11 @@
+[Unit]
+Description=Logisches PostgreSQL-Backup der Sprachplattform
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sprachplattform-backup-postgres
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

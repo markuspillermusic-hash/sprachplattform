@@ -1,0 +1,9 @@
+[Unit]
+Description=Abgelaufene Audiodateien der Sprachplattform löschen
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/sprachplattform
+ExecStart=/usr/bin/docker compose --env-file .env exec -T web python manage.py delete_expired_audio

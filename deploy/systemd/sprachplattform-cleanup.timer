@@ -1,0 +1,11 @@
+[Unit]
+Description=Tägliche Aufräumroutine der Sprachplattform
+
+[Timer]
+OnCalendar=*-*-* 02:15:00 Europe/Berlin
+Persistent=true
+RandomizedDelaySec=5m
+Unit=sprachplattform-cleanup.service
+
+[Install]
+WantedBy=timers.target

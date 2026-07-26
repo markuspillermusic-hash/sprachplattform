@@ -23,7 +23,13 @@ Der ElevenLabs-Schlüssel gehört ausschließlich in die Serverumgebung. Er darf
 - monatlich: Nutzungsledger, Fehlerrate und Providerkosten vergleichen
 - vor Updates: Datenbank sichern, Tests ausführen, Migrationen prüfen
 
-Der tägliche Löschbefehl ist auf dem Zielserver per systemd-Timer oder Cron außerhalb des Webcontainers einzuplanen. Ein nicht getesteter Timer gilt nicht als eingerichtet.
+Auf dem Zielserver übernehmen die versionierten systemd-Units unter `deploy/systemd/` die täglichen Aufgaben:
+
+- `sprachplattform-cleanup.timer` löscht abgelaufene Audiodateien gegen 02:15 Uhr.
+- `sprachplattform-backup.timer` erzeugt gegen 02:30 Uhr einen geprüften PostgreSQL-Custom-Dump unter `/var/backups/sprachplattform`.
+- Dumps werden 14 Tage aufbewahrt und durch das anschließende Proxmox-VM-Backup zusätzlich gesichert.
+
+Nach Installation oder Änderung müssen beide Dienste einmal manuell erfolgreich ausgeführt und die Timer mit `systemctl list-timers` geprüft werden.
 
 ## Backup und Wiederherstellung
 

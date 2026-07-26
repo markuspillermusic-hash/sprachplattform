@@ -1,0 +1,11 @@
+[Unit]
+Description=Tägliches PostgreSQL-Backup der Sprachplattform
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Europe/Berlin
+Persistent=true
+RandomizedDelaySec=5m
+Unit=sprachplattform-backup.service
+
+[Install]
+WantedBy=timers.target
