@@ -91,9 +91,9 @@ Weitere Betriebs- und Pilotvorgaben stehen in [docs/operations.md](docs/operatio
 
 ## Zielserver und Reverse Proxy
 
-Die vorgesehene öffentliche Adresse ist `https://sprachplattform.markuspiller.de`. Docker bindet die Webanwendung nur lokal an `127.0.0.1:8085`; der vorhandene Reverse Proxy leitet die Subdomain intern an `http://127.0.0.1:8085` weiter und stellt öffentlich HTTPS bereit.
+Die vorgesehene öffentliche Adresse ist `https://sprachplattform.markuspiller.de`. Auf dem Zielserver bindet Docker die Webanwendung an `192.168.2.21:8085`. Der zentrale Webserver-Container `101` (`192.168.2.11`) lauscht ausschließlich lokal auf `127.0.0.1:8085` und leitet über Nginx an die Anwendungs-VM weiter. Cloudflare verwendet dadurch weiterhin den internen Dienst `http://localhost:8085`.
 
-Für den Server wird `.env.production.example` nach `.env` kopiert. Vor dem Start müssen alle Passwort- und Secret-Platzhalter durch getrennte, zufällige Werte ersetzt werden. Port `8085` darf nicht zusätzlich in der Server-Firewall öffentlich freigegeben werden.
+Für den Server wird `.env.production.example` nach `.env` kopiert. Vor dem Start müssen alle Passwort- und Secret-Platzhalter durch getrennte, zufällige Werte ersetzt werden. Port `8085` ist nur im internen Netz erreichbar und darf weder am Router noch öffentlich in der Firewall freigegeben werden. Das passende Nginx-Beispiel liegt unter `deploy/nginx-sprachplattform.conf.example`.
 
 ## Zielserver: vor Deployment zu klären
 

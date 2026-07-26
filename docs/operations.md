@@ -11,7 +11,7 @@ Dieser Leitfaden beschreibt den vorgesehenen Pilotbetrieb unter `https://sprachp
 5. Mit `docker compose exec web python manage.py createsuperuser` den ersten Admin anlegen. Beim ersten Login wird auch für diesen Account ein persönlicher Passwortwechsel verlangt.
 6. Stimmen mit `python manage.py sync_provider_voices --language de` synchronisieren und anschließend bewusst im Django-Admin freischalten. Für jede Kernsprache wiederholen.
 
-Der Reverse Proxy nimmt `https://sprachplattform.markuspiller.de` an und leitet intern per HTTP an `127.0.0.1:8085` weiter. Der Compose-Port ist ausschließlich an die Loopback-Adresse gebunden und darf nicht öffentlich geöffnet werden.
+Cloudflare leitet `https://sprachplattform.markuspiller.de` an `http://localhost:8085` im zentralen Webserver-Container `101` weiter. Dort nimmt Nginx die Verbindung ausschließlich auf `127.0.0.1:8085` an und leitet sie an `http://192.168.2.21:8085` in der Anwendungs-VM weiter. Dieser Port darf weder am Router noch öffentlich in einer Firewall freigegeben werden.
 
 Der ElevenLabs-Schlüssel gehört ausschließlich in die Serverumgebung. Er darf weder im Browser noch in Git, Logs, Supporttickets oder Screenshots erscheinen.
 

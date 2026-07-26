@@ -1,8 +1,8 @@
 # Briefing: Sprachplattform für KI-generierte Hörtexte
 
 > **Dokumenttyp:** Lebendes Projektbriefing und verbindliche Arbeitsgrundlage  
-> **Stand:** 22. Juli 2026  
-> **Status:** Phasen 0–2 lokal abgeschlossen; Phasen 3–6 technisch vorbereitet; GitHub- und Serverbereitstellung begonnen  
+> **Stand:** 26. Juli 2026
+> **Status:** Phasen 0–2 lokal abgeschlossen; Phasen 3–6 technisch vorbereitet; Serverbereitstellung auf Proxmox läuft
 > **Arbeitsverzeichnis:** `D:\OneDrive\KI\Arbeitsbereich\Sprachplattform`
 
 ## 1. Verwendung dieses Dokuments
@@ -746,7 +746,7 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 - Docker und FFmpeg sind auf dem aktuellen Entwicklungsrechner nicht installiert; Compose- und reale Audiokette konnten deshalb nicht end-to-end gestartet werden.
 - ElevenLabs-Key, kuratierte Stimmen, Zielserver, Domain, HTTPS, SMTP, MFA, Backup-Restore und Aufbewahrungsfrist sind weiterhin extern zu bestätigen.
 - Das Projekt ist im öffentlichen GitHub-Repository `markuspillermusic-hash/sprachplattform` veröffentlicht; `main` ist der Standardbranch.
-- Zieladresse und interner Proxyweg sind festgelegt: `https://sprachplattform.markuspiller.de` leitet an `http://127.0.0.1:8085` weiter.
+- Zieladresse und Proxyweg sind festgelegt: Cloudflare leitet `https://sprachplattform.markuspiller.de` an Nginx im Webserver-Container `101`; dieser leitet von `127.0.0.1:8085` an die Anwendungs-VM `192.168.2.21:8085` weiter.
 
 ## 23. Nächste konkrete Aufgabe
 
@@ -786,7 +786,8 @@ Ein neuer Arbeitschat soll:
 | 2026-07-22 | KI-Vorschläge verwenden ein geschlossenes Schema und explizite Übernahmemodi | Unbekannte Felder werden abgewiesen und vorhandene Arbeit wird nie ungefragt überschrieben. |
 | 2026-07-22 | Noch kein LLM-Anbieter für den Assistenten | Die TTS-Grundfunktion ist zuerst real zu validieren; Anbieter-, Datenschutz- und Kostenentscheidung bleibt offen. |
 | 2026-07-22 | Keine Inline-Skripte; Content-Security-Policy ab lokaler Entwicklung | Reduziert die Angriffsfläche und macht Sicherheitsfehler früh sichtbar. |
-| 2026-07-22 | `sprachplattform.markuspiller.de` mit internem Upstream `127.0.0.1:8085` | Die öffentliche Adresse bleibt verständlich; der Anwendungsport ist nur lokal erreichbar und HTTPS endet am Reverse Proxy. |
+| 2026-07-22 | `sprachplattform.markuspiller.de` als öffentliche Adresse | Die Adresse bleibt verständlich und unabhängig von einzelnen Funktionen. |
+| 2026-07-26 | Eigene Proxmox-VM `105` unter `192.168.2.21` und zentraler Proxy in Webserver-Container `101` | Docker bleibt in einer VM isoliert; Cloudflare kann seinen bestehenden lokalen Dienst `localhost:8085` beibehalten. |
 
 ## 25. Änderungsprotokoll
 
@@ -829,5 +830,11 @@ Ein neuer Arbeitschat soll:
 - Ziel-Repository auf `markuspillermusic-hash/sprachplattform` korrigiert.
 - geprüften Initialstand auf dem Standardbranch `main` veröffentlicht.
 - öffentliche Zieladresse `https://sprachplattform.markuspiller.de` festgelegt.
-- Compose-Port ausschließlich an `127.0.0.1:8085` gebunden und Reverse-Proxy-Beispiel angepasst.
+- Compose-Bind-Adresse konfigurierbar gemacht und auf dem Zielserver auf `192.168.2.21:8085` festgelegt.
 - secret-freie Produktionsumgebungsvorlage und konkrete Serverhinweise ergänzt.
+
+### 2026-07-26 – Proxmox-Bereitstellung
+
+- separate Debian-13-VM `105` mit zwei CPU-Kernen, 4 GB RAM, 32 GB Speicher und statischer Adresse `192.168.2.21` angelegt.
+- Docker Engine, Compose und QEMU-Gastagent aus offiziellen Paketquellen installiert.
+- zentralen Proxyweg über Webserver-Container `101` geklärt und dokumentiert.
