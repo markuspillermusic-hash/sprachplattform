@@ -2,7 +2,7 @@
 
 > **Dokumenttyp:** Lebendes Projektbriefing und verbindliche Arbeitsgrundlage  
 > **Stand:** 26. Juli 2026
-> **Status:** Phasen 0–2 lokal abgeschlossen; Phasen 3–6 technisch vorbereitet; Serverbereitstellung auf Proxmox läuft
+> **Status:** Pilotserver öffentlich und gesichert in Betrieb; reale ElevenLabs-Abnahme steht noch aus
 > **Arbeitsverzeichnis:** `D:\OneDrive\KI\Arbeitsbereich\Sprachplattform`
 
 ## 1. Verwendung dieses Dokuments
@@ -700,23 +700,17 @@ Eine Aufgabe gilt nur als erledigt, wenn:
 - die Änderung visuell beziehungsweise funktional im Browser geprüft wurde, wenn sie die Oberfläche betrifft.
 - dieses Briefing bei geänderten Entscheidungen oder Projektständen aktualisiert wurde.
 
-## 20. Offene Entscheidungen vor dem ersten Server-Deployment
+## 20. Offene Entscheidungen vor dem Pilot
 
-- Betriebssystem und Version des Zielservers.
-- Sind Docker und Docker Compose vorhanden oder zulässig?
-- verfügbare CPU-, RAM- und Speicherressourcen.
-- Domain festgelegt: `sprachplattform.markuspiller.de`; öffentliche HTTPS-Terminierung noch zu prüfen.
-- vorhandener Reverse Proxy und HTTPS-Konfiguration.
-- SSH-/Deploymentweg.
-- vorhandene Backupinfrastruktur.
 - SMTP-Server für spätere Einladungen/Passwortzurücksetzung.
-- gewünschte Aufbewahrungsfrist für Projekte und Audiodateien.
+- endgültig bestätigte Aufbewahrungsfrist für Projekte und Audiodateien; technisch sind zunächst 30 Tage gesetzt.
 - ElevenLabs-Pay-as-you-go-Konto und API-Key vorhanden?
 - gewünschte erste Stimmen je Kernsprache.
+- Admin-MFA vor Freigabe für weitere Nutzer.
 - späterer Text-KI-Anbieter für den Assistenten.
 - visuelle Bezeichnung und eventuelles Logo der Plattform.
 
-Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration eingebracht, niemals in das Briefing oder in Chatnachrichten kopiert.
+Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration eingebracht, niemals in das Briefing oder Git-Repository kopiert.
 
 ## 21. Risiken und Gegenmaßnahmen
 
@@ -741,25 +735,29 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 - Phase 3 ist technisch vorbereitet: providerneutrale Schnittstelle, aktueller ElevenLabs-Text-to-Dialogue-Adapter, paginierter Stimmenimport, administrative Freigabe, Sprachprüfung und gemockte Tests sind vorhanden.
 - Phase 4 ist technisch vorbereitet: unveränderliche Versionen, Nutzungslimits, wiederholbare Teile, Celery-Aufträge, FFmpeg-Zusammenbau, Player, Download, Nutzungsledger und Dateilöschung sind implementiert und mit einem Fake-Provider geprüft.
 - Phase 5 ist teilweise vorbereitet: strikte JSON-Validierung sowie explizites Ergänzen, Ersetzen, Verwerfen und Rückgängigmachen sind vorhanden; LLM-Anbieter, Eingabeoberfläche und echter Modellaufruf sind bewusst offen.
-- Phase 6 ist lokal vorbereitet: CSP und weitere Sicherheitsheader, responsive Browserprüfung, Betriebsleitfaden und Pilotcheckliste liegen vor.
-- 39 automatisierte Tests, Migrationen, Systemcheck, Abhängigkeitsprüfung und Desktop-/Mobil-Browser-QA sind erfolgreich.
-- Docker und FFmpeg sind auf dem aktuellen Entwicklungsrechner nicht installiert; Compose- und reale Audiokette konnten deshalb nicht end-to-end gestartet werden.
-- ElevenLabs-Key, kuratierte Stimmen, Zielserver, Domain, HTTPS, SMTP, MFA, Backup-Restore und Aufbewahrungsfrist sind weiterhin extern zu bestätigen.
+- Phase 6 ist technisch weit fortgeschritten: CSP und weitere Sicherheitsheader, responsive Browserprüfung, Betriebsleitfaden, Pilotcheckliste, öffentlicher HTTPS-Betrieb sowie getestete Sicherung und Wiederherstellung liegen vor.
+- 39 automatisierte Tests, Migrationen, Systemcheck, Abhängigkeitsprüfung und Desktop-/Mobil-Browser-QA sind erfolgreich; dieselben 39 Tests bestehen auch im Produktionscontainer mit Testeinstellungen.
+- Die Anwendung läuft auf Debian 13 in Proxmox-VM `105` mit zwei CPU-Kernen, 4 GB RAM, 32 GB Disk und statischer Adresse `192.168.2.21`.
+- Docker Compose betreibt PostgreSQL 17, Redis 7.4, Gunicorn und Celery; alle Healthchecks sind erfolgreich.
+- `https://sprachplattform.markuspiller.de` liefert über Cloudflare und Nginx in Container `101` öffentlich HTTP 200 mit gültigem TLS und Sicherheitsheadern.
+- Tägliche Audio-Löschung, logische PostgreSQL-Dumps und beide vorhandenen Proxmox-Backuppläne sind eingerichtet. Ein VM-Snapshot wurde erfolgreich gesichert, in eine nicht gestartete Test-VM zurückgespielt, geprüft und anschließend entfernt.
+- Der erste App-Administrator `admin` ist angelegt; sein einmaliges Erstpasswort erzwingt beim ersten Login einen persönlichen Passwortwechsel.
+- ElevenLabs-Key, kuratierte Stimmen, SMTP, MFA und die endgültige Aufbewahrungsfrist sind weiterhin extern zu bestätigen.
 - Das Projekt ist im öffentlichen GitHub-Repository `markuspillermusic-hash/sprachplattform` veröffentlicht; `main` ist der Standardbranch.
 - Zieladresse und Proxyweg sind festgelegt: Cloudflare leitet `https://sprachplattform.markuspiller.de` an Nginx im Webserver-Container `101`; dieser leitet von `127.0.0.1:8085` an die Anwendungs-VM `192.168.2.21:8085` weiter.
 
 ## 23. Nächste konkrete Aufgabe
 
-**Externen Integrationspilot vorbereiten: Zielserver bestätigen, Compose-Stack starten, ElevenLabs-Zugang sicher konfigurieren und die reale Audiokette mit kuratierten Stimmen prüfen.**
+**ElevenLabs-Integrationspilot durchführen: API-Zugang sicher konfigurieren, Stimmen kuratieren und die reale mehrsprachige Audiokette end-to-end abnehmen.**
 
 Ein neuer Arbeitschat soll:
 
 1. `Briefing.md` vollständig lesen.
-2. die noch offenen Serverangaben, Domain, HTTPS, Backupziel, SMTP, Aufbewahrungsfrist und MFA-Entscheidung klären.
-3. Docker Compose auf dem Zielserver starten und Healthchecks, Migrationen sowie `check --deploy` prüfen.
-4. den ElevenLabs-Key ausschließlich als Server-Secret setzen, Stimmen je Kernsprache synchronisieren, akustisch prüfen und administrativ freigeben.
-5. kurze und lange Dialoge mit mehreren Stimmen, Pausen, Retry, Player, Download, Limits und Löschung end-to-end testen.
-6. einen dokumentierten Backup-Restore und Accessibility-Schnelltest durchführen.
+2. den ElevenLabs-Key ausschließlich direkt als Server-Secret setzen.
+3. Stimmen je Kernsprache synchronisieren, akustisch prüfen und administrativ freigeben.
+4. kurze und lange Dialoge mit mehreren Stimmen, Pausen, Retry, Player, Download, Limits und Löschung end-to-end testen.
+5. SMTP, endgültige Aufbewahrungsfrist und MFA-Entscheidung klären.
+6. einen Accessibility-Schnelltest auf der öffentlichen Instanz mit Pilotkonten durchführen.
 7. danach den LLM-Anbieter für Phase 5 auswählen oder den Assistenten weiter deaktiviert lassen.
 
 ## 24. Entscheidungsprotokoll
@@ -788,6 +786,8 @@ Ein neuer Arbeitschat soll:
 | 2026-07-22 | Keine Inline-Skripte; Content-Security-Policy ab lokaler Entwicklung | Reduziert die Angriffsfläche und macht Sicherheitsfehler früh sichtbar. |
 | 2026-07-22 | `sprachplattform.markuspiller.de` als öffentliche Adresse | Die Adresse bleibt verständlich und unabhängig von einzelnen Funktionen. |
 | 2026-07-26 | Eigene Proxmox-VM `105` unter `192.168.2.21` und zentraler Proxy in Webserver-Container `101` | Docker bleibt in einer VM isoliert; Cloudflare kann seinen bestehenden lokalen Dienst `localhost:8085` beibehalten. |
+| 2026-07-26 | Täglicher PostgreSQL-Dump vor den beiden Proxmox-VM-Backups | Der logische, geprüfte Datenbankdump ergänzt die vollständigen VM-Snapshots und wird von ihnen mitgesichert. |
+| 2026-07-26 | Nginx lauscht für die Sprachplattform nur auf `127.0.0.1:8085` | Cloudflared erreicht den Dienst lokal; der zusätzliche Proxyport wird nicht im LAN geöffnet. |
 
 ## 25. Änderungsprotokoll
 
@@ -838,3 +838,8 @@ Ein neuer Arbeitschat soll:
 - separate Debian-13-VM `105` mit zwei CPU-Kernen, 4 GB RAM, 32 GB Speicher und statischer Adresse `192.168.2.21` angelegt.
 - Docker Engine, Compose und QEMU-Gastagent aus offiziellen Paketquellen installiert.
 - zentralen Proxyweg über Webserver-Container `101` geklärt und dokumentiert.
+- Compose-Stack aus PostgreSQL, Redis, Web und Worker produktiv gestartet; Migrationen, Healthchecks, Deploymentcheck und 39 Tests geprüft.
+- Nginx in Container `101` ausschließlich lokal auf Port 8085 ergänzt und die öffentliche HTTPS-Adresse erfolgreich getestet.
+- ersten Administrator mit erzwungenem Erstpasswortwechsel angelegt.
+- tägliche Audio-Löschung und geprüfte PostgreSQL-Dumps per systemd eingerichtet.
+- VM `105` in beide vorhandenen Backuppläne aufgenommen, ein Initialbackup erzeugt und dessen Wiederherstellung in einer temporären VM erfolgreich geprüft.

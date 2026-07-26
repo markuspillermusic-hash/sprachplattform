@@ -91,23 +91,17 @@ Weitere Betriebs- und Pilotvorgaben stehen in [docs/operations.md](docs/operatio
 
 ## Zielserver und Reverse Proxy
 
-Die vorgesehene öffentliche Adresse ist `https://sprachplattform.markuspiller.de`. Auf dem Zielserver bindet Docker die Webanwendung an `192.168.2.21:8085`. Der zentrale Webserver-Container `101` (`192.168.2.11`) lauscht ausschließlich lokal auf `127.0.0.1:8085` und leitet über Nginx an die Anwendungs-VM weiter. Cloudflare verwendet dadurch weiterhin den internen Dienst `http://localhost:8085`.
+Die öffentliche Adresse ist `https://sprachplattform.markuspiller.de`. Auf dem Zielserver bindet Docker die Webanwendung an `192.168.2.21:8085`. Der zentrale Webserver-Container `101` (`192.168.2.11`) lauscht ausschließlich lokal auf `127.0.0.1:8085` und leitet über Nginx an die Anwendungs-VM weiter. Cloudflare verwendet dadurch weiterhin den internen Dienst `http://localhost:8085`.
 
 Für den Server wird `.env.production.example` nach `.env` kopiert. Vor dem Start müssen alle Passwort- und Secret-Platzhalter durch getrennte, zufällige Werte ersetzt werden. Port `8085` ist nur im internen Netz erreichbar und darf weder am Router noch öffentlich in der Firewall freigegeben werden. Das passende Nginx-Beispiel liegt unter `deploy/nginx-sprachplattform.conf.example`.
 
-## Zielserver: vor Deployment zu klären
+## Vor dem Pilotbetrieb noch zu klären
 
-Die lokale Phase 0 setzt Linux und Docker Compose als Pilotannahme. Vor dem ersten Server-Deployment müssen dokumentiert werden:
-
-- Betriebssystem und Version
-- Docker-/Compose-Verfügbarkeit
-- CPU, RAM und freier Speicher
-- konkrete Reverse-Proxy-Software und bestätigte HTTPS-Terminierung
-- SSH-/Deploymentweg
-- Backup- und Wiederherstellungsweg
 - SMTP-Verfügbarkeit
-- gewünschte Audio-Aufbewahrungsfrist
+- endgültige Audio-Aufbewahrungsfrist
+- ElevenLabs-API-Schlüssel und kuratierte Stimmen
+- Admin-MFA
 
 Geheimnisse gehören weder in Tickets noch in dieses Repository oder das Projektbriefing.
 
-Bis Domain und HTTPS-Betrieb feststehen, bleibt HSTS-Preloading bewusst deaktiviert. `manage.py check --deploy` meldet deshalb die erwartete Warnung `security.W021`; eine Aktivierung ist erst nach Prüfung aller betroffenen Subdomains sinnvoll.
+HSTS-Preloading bleibt bewusst deaktiviert. `manage.py check --deploy` meldet deshalb die erwartete Warnung `security.W021`; eine Aktivierung ist erst nach Prüfung aller betroffenen Subdomains sinnvoll.

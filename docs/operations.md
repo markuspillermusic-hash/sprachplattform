@@ -1,6 +1,6 @@
 # Betriebsleitfaden
 
-Dieser Leitfaden beschreibt den vorgesehenen Pilotbetrieb unter `https://sprachplattform.markuspiller.de`. Zielserverdetails und Backupziel sind noch nicht bestätigt; Befehle mit Platzhaltern dürfen erst nach dieser Klärung produktiv verwendet werden.
+Dieser Leitfaden beschreibt den Pilotbetrieb unter `https://sprachplattform.markuspiller.de` auf Proxmox-VM `105`. Die Anwendung läuft unter `/opt/sprachplattform`; Container `101` übernimmt Nginx und den lokalen Cloudflare-Zugang.
 
 ## Erstinbetriebnahme
 
