@@ -9,9 +9,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from generation.models import GenerationJob, UsageLedger
-from tts.models import ProviderVoice
-
-from .forms import ProjectCreateForm, ProjectMetaForm, SegmentForm, SpeakerForm
+from .forms import (
+    ProjectCreateForm,
+    ProjectMetaForm,
+    SegmentForm,
+    SpeakerForm,
+    compatible_voice_queryset,
+)
 from .models import Project, ScriptSegment, Speaker
 from .services import duplicate_project, move_segment, next_position
 
@@ -25,6 +29,14 @@ def visible_projects(user):
 
 def owned_project(request, project_id):
     return get_object_or_404(visible_projects(request.user), pk=project_id)
+
+
+def form_error_summary(form):
+    details = []
+    for field_name, errors in form.errors.items():
+        label = form.fields[field_name].label if field_name in form.fields else "Eingabe"
+        details.extend(f"{label}: {error}" for error in errors)
+    return " ".join(details)
 
 
 @login_required
@@ -50,7 +62,8 @@ def project_editor(request, project_id):
     project = owned_project(request, project_id)
     segments = list(project.segments.select_related("speaker"))
     speakers = list(project.speakers.all())
-    speaker_form_voices = list(ProviderVoice.objects.filter(active=True))
+    speaker_form_voice_queryset = compatible_voice_queryset(project)
+    speaker_form_voices = list(speaker_form_voice_queryset)
     month_start = timezone.localdate().replace(day=1)
     usage_used = UsageLedger.objects.filter(
         user=request.user,
@@ -62,11 +75,19 @@ def project_editor(request, project_id):
         {
             "project": project,
             "project_form": ProjectMetaForm(instance=project, prefix="project"),
-            "speaker_form": SpeakerForm(project=project),
+            "speaker_form": SpeakerForm(
+                project=project,
+                voice_queryset=speaker_form_voice_queryset,
+            ),
             "speakers_with_forms": [
                 (
                     speaker,
-                    SpeakerForm(instance=speaker, project=project, prefix=str(speaker.pk)),
+                    SpeakerForm(
+                        instance=speaker,
+                        project=project,
+                        prefix=str(speaker.pk),
+                        voice_queryset=speaker_form_voice_queryset,
+                    ),
                     next(
                         (
                             voice
@@ -80,6 +101,14 @@ def project_editor(request, project_id):
                 )
                 for speaker in speakers
             ],
+            "voice_preview_data": {
+                str(voice.pk): {
+                    "name": voice.display_name,
+                    "url": voice.preview_url,
+                }
+                for voice in speaker_form_voices
+                if voice.preview_url
+            },
             "segments_with_forms": [
                 (segment, SegmentForm(instance=segment, project=project, prefix=str(segment.pk)))
                 for segment in segments
@@ -134,7 +163,12 @@ def speaker_add(request, project_id):
         speaker.save()
         messages.success(request, f"{speaker.name} wurde hinzugefügt.")
     else:
-        messages.error(request, "Der Sprecher konnte nicht hinzugefügt werden.")
+        details = form_error_summary(form)
+        messages.error(
+            request,
+            "Der Sprecher konnte nicht hinzugefügt werden."
+            + (f" {details}" if details else ""),
+        )
     return redirect("projects:editor", project_id=project.pk)
 
 
