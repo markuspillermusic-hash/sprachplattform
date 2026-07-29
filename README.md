@@ -81,6 +81,12 @@ Provider-Schlüssel werden ausschließlich als Server-Umgebungsvariablen gesetzt
 
 Synchronisierte Stimmen sind zunächst deaktiviert. Sie werden im Django-Admin einzeln geprüft und freigeschaltet. Temporäre Passwörter können dort über die Benutzeraktion **Neue temporäre Passwörter erzeugen** einmalig erstellt werden.
 
+Beim ersten Öffnen der Projektübersicht erhält jedes Benutzerkonto fünf bearbeitbare, klar gekennzeichnete Bahnhofsdialog-Demos für Deutsch, Englisch, Französisch, Spanisch und Italienisch. Bestehende Konten lassen sich idempotent vorbereiten:
+
+```powershell
+.venv\Scripts\python.exe manage.py seed_demo_projects
+```
+
 Die Audioerzeugung wird erst aktiv, wenn `ELEVENLABS_API_KEY` serverseitig gesetzt ist. Alte Dateien werden mit folgendem planbaren Befehl entfernt:
 
 ```powershell

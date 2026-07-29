@@ -17,7 +17,7 @@ from .forms import (
     compatible_voice_queryset,
 )
 from .models import Project, ScriptSegment, Speaker
-from .services import duplicate_project, move_segment, next_position
+from .services import duplicate_project, ensure_demo_projects, move_segment, next_position
 
 
 def visible_projects(user):
@@ -41,6 +41,7 @@ def form_error_summary(form):
 
 @login_required
 def project_list(request):
+    ensure_demo_projects(request.user)
     projects = visible_projects(request.user).prefetch_related("segments", "speakers")
     return render(request, "projects/project_list.html", {"projects": projects})
 

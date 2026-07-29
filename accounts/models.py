@@ -10,4 +10,4 @@ class User(AbstractUser):
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.TEACHER)
     must_change_password = models.BooleanField(default=True)
     character_limit = models.PositiveIntegerField(default=30_000)
-
+    demo_projects_initialized = models.BooleanField(default=False, editable=False)

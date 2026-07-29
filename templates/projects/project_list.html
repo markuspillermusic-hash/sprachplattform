@@ -3,7 +3,7 @@
 {% block content %}
 <section class="page-shell" aria-labelledby="projects-title">
   <header class="page-heading">
-    <div><p class="eyebrow">Arbeitsbereich</p><h1 id="projects-title">Meine Hörtexte</h1><p class="lead">Dialoge und Hörtexte bleiben nur in Ihrem persönlichen Bereich sichtbar.</p></div>
+    <div><p class="eyebrow">Arbeitsbereich</p><h1 id="projects-title">Meine Hörtexte</h1><p class="lead">Dialoge und Hörtexte bleiben nur in Ihrem persönlichen Bereich sichtbar. Die markierten Demos können Sie frei verändern oder duplizieren.</p></div>
     <a class="button button-primary" href="{% url 'projects:create' %}">Neuen Hörtext erstellen</a>
   </header>
 
@@ -13,7 +13,7 @@
         <li class="project-card">
           <a class="project-card-main" href="{% url 'projects:editor' project.id %}">
             <span class="project-language">{{ project.get_language_display }}{% if project.level %} · {{ project.level }}{% endif %}</span>
-            <h2>{{ project.title }}</h2>
+            <h2>{{ project.title }}{% if project.demo_key %} <span class="demo-badge">Demo</span>{% endif %}</h2>
             <span>{{ project.segments.count }} Beiträge · {{ project.character_count }} Zeichen</span>
             <span>Bearbeitet {{ project.updated_at|date:"d.m.Y, H:i" }}</span>
           </a>
