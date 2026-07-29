@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .models import ProviderVoice
+from .models import ProviderVoice, VoiceFavorite
 
 
 class VoiceLanguageFilter(admin.SimpleListFilter):
@@ -89,3 +89,11 @@ class ProviderVoiceAdmin(admin.ModelAdmin):
             f"{updated} ausgewählte {result} deaktiviert.",
             messages.SUCCESS,
         )
+
+
+@admin.register(VoiceFavorite)
+class VoiceFavoriteAdmin(admin.ModelAdmin):
+    list_display = ("user", "voice", "created_at")
+    list_filter = ("voice__provider",)
+    search_fields = ("user__username", "voice__display_name")
+    readonly_fields = ("created_at",)

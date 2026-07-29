@@ -15,6 +15,7 @@ from .forms import (
     SegmentForm,
     SpeakerForm,
     compatible_voice_queryset,
+    user_favorite_voice_ids,
 )
 from .models import Project, ScriptSegment, Speaker
 from .services import duplicate_project, ensure_demo_projects, move_segment, next_position
@@ -63,7 +64,11 @@ def project_editor(request, project_id):
     project = owned_project(request, project_id)
     segments = list(project.segments.select_related("speaker"))
     speakers = list(project.speakers.all())
-    speaker_form_voice_queryset = compatible_voice_queryset(project)
+    favorite_voice_ids = user_favorite_voice_ids(request.user)
+    speaker_form_voice_queryset = compatible_voice_queryset(
+        project,
+        favorite_ids=favorite_voice_ids,
+    )
     speaker_form_voices = list(speaker_form_voice_queryset)
     month_start = timezone.localdate().replace(day=1)
     usage_used = UsageLedger.objects.filter(
@@ -79,6 +84,7 @@ def project_editor(request, project_id):
             "speaker_form": SpeakerForm(
                 project=project,
                 voice_queryset=speaker_form_voice_queryset,
+                favorite_ids=favorite_voice_ids,
             ),
             "speakers_with_forms": [
                 (
@@ -88,6 +94,7 @@ def project_editor(request, project_id):
                         project=project,
                         prefix=str(speaker.pk),
                         voice_queryset=speaker_form_voice_queryset,
+                        favorite_ids=favorite_voice_ids,
                     ),
                     next(
                         (
@@ -156,7 +163,7 @@ def project_delete(request, project_id):
 @login_required
 def speaker_add(request, project_id):
     project = owned_project(request, project_id)
-    form = SpeakerForm(request.POST, project=project)
+    form = SpeakerForm(request.POST, project=project, user=request.user)
     if form.is_valid():
         speaker = form.save(commit=False)
         speaker.project = project
@@ -178,7 +185,13 @@ def speaker_add(request, project_id):
 def speaker_autosave(request, project_id, speaker_id):
     project = owned_project(request, project_id)
     speaker = get_object_or_404(project.speakers, pk=speaker_id)
-    form = SpeakerForm(request.POST, instance=speaker, project=project, prefix=str(speaker.pk))
+    form = SpeakerForm(
+        request.POST,
+        instance=speaker,
+        project=project,
+        prefix=str(speaker.pk),
+        user=request.user,
+    )
     if form.is_valid():
         form.save()
         return JsonResponse({"status": "saved"})

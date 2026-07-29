@@ -4,7 +4,7 @@ from django.urls import reverse
 
 from projects.forms import SegmentForm, SpeakerForm
 from projects.models import Project, ScriptSegment, Speaker
-from tts.models import ProviderVoice
+from tts.models import ProviderVoice, VoiceFavorite
 
 
 class ProjectWorkflowTests(TestCase):
@@ -183,6 +183,33 @@ class ProjectWorkflowTests(TestCase):
             {"name": "Camille", "url": "https://example.com/camille.mp3"},
         )
         self.assertContains(response, 'data-voice-preview-panel')
+
+    def test_editor_prioritizes_and_marks_personal_favorite_voice(self):
+        favorite = ProviderVoice.objects.create(
+            provider="elevenlabs",
+            model="eleven_v3",
+            voice_id="voice-favorite",
+            display_name="Zoé",
+            languages=["fr"],
+            active=True,
+        )
+        other_voice = ProviderVoice.objects.create(
+            provider="elevenlabs",
+            model="eleven_v3",
+            voice_id="voice-other",
+            display_name="Amélie",
+            languages=["fr"],
+            active=True,
+        )
+        VoiceFavorite.objects.create(user=self.teacher, voice=favorite)
+
+        response = self.client.get(reverse("projects:editor", args=[self.project.pk]))
+
+        choices = list(response.context["speaker_form"].fields["voice"].choices)
+        self.assertEqual(choices[1][0].value, favorite.pk)
+        self.assertEqual(choices[1][1], "★ Zoé")
+        self.assertEqual(choices[2][0].value, other_voice.pk)
+        self.assertContains(response, "Stimmen anhören und Favoriten wählen")
 
     def test_segment_autosave_updates_only_owned_segment(self):
         prefix = str(self.segment.pk)
