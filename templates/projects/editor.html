@@ -101,7 +101,7 @@
             {% for job in latest_jobs %}
               <li data-job-url="{% url 'generation:status' job.id %}">
                 <div><strong>Version {{ job.version.number }}</strong><span class="status-badge status-{{ job.status }}">{{ job.get_status_display }}</span></div>
-                <small>{{ job.character_count }} Zeichen · ca. {{ job.estimated_cost_eur }} €</small>
+                <small>{{ job.character_count }} Zeichen · geschätzter Tarifwert ca. {{ job.estimated_cost_eur }} €</small>
                 {% if job.status == 'succeeded' %}
                   <audio controls preload="none" aria-label="Audioversion {{ job.version.number }}"><source src="{% url 'generation:play' job.audio_asset.id %}" type="audio/mpeg"></audio>
                   <a class="button button-secondary button-wide" href="{% url 'generation:download' job.audio_asset.id %}">MP3 herunterladen</a>
@@ -117,7 +117,8 @@
 
       <div class="generation-card">
         <strong>Audio erzeugen</strong>
-        <span>Vor dem Start: {{ project.character_count }} Zeichen, geschätzter Verbrauch wird als Version reserviert.</span>
+        <span>Vor dem Start: {{ project.character_count }} Zeichen werden als Version reserviert.</span>
+        <small>Der Eurobetrag ist ein anteiliger Tarifwert auf Basis der Servereinstellung – keine zusätzliche Einzelabbuchung.</small>
         <form method="post" action="{% url 'generation:start' project.id %}">{% csrf_token %}<button class="button button-primary button-wide" type="submit" {% if not provider_configured %}disabled aria-describedby="provider-note"{% endif %}>Audio erzeugen</button></form>
         {% if not provider_configured %}<small id="provider-note">Noch nicht verfügbar: Serverzugang zu ElevenLabs fehlt.</small>{% endif %}
       </div>

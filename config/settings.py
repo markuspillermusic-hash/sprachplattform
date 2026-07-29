@@ -10,6 +10,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     AUDIO_RETENTION_DAYS=(int, 30),
+    AUDIO_TAIL_FADE_MS=(int, 45),
+    AUDIO_TAIL_PADDING_MS=(int, 80),
 )
 
 env_file = BASE_DIR / ".env"
@@ -89,12 +91,10 @@ CACHES = {
     )
 }
 
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-]
+# Der Zugang wird zusätzlich über Cloudflare beschränkt. Start- und persönliche
+# Passwörter dürfen deshalb frei gewählt werden; das Änderungsgebot beim ersten
+# Login bleibt davon unberührt.
+AUTH_PASSWORD_VALIDATORS = []
 
 LANGUAGE_CODE = "de-de"
 TIME_ZONE = "Europe/Berlin"
@@ -131,6 +131,8 @@ CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 
 AUDIO_STORAGE_ROOT = Path(env("AUDIO_STORAGE_ROOT", default=str(BASE_DIR / "var" / "audio")))
 AUDIO_RETENTION_DAYS = env("AUDIO_RETENTION_DAYS")
+AUDIO_TAIL_FADE_MS = max(0, env("AUDIO_TAIL_FADE_MS"))
+AUDIO_TAIL_PADDING_MS = max(0, env("AUDIO_TAIL_PADDING_MS"))
 ORGANIZATION_MONTHLY_CHARACTER_LIMIT = env.int("ORGANIZATION_MONTHLY_CHARACTER_LIMIT", default=600_000)
 ORGANIZATION_YEARLY_CHARACTER_LIMIT = env.int("ORGANIZATION_YEARLY_CHARACTER_LIMIT", default=7_200_000)
 

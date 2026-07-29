@@ -1,5 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
@@ -14,6 +16,7 @@ from tts.providers.base import SynthesisResult
 from generation.models import AudioAsset, GenerationJob, UsageLedger
 from generation.services import (
     UsageLimitExceeded,
+    assemble_mp3,
     build_generation_parts,
     build_project_snapshot,
     create_generation_job,
@@ -118,7 +121,29 @@ class GenerationPipelineTests(TestCase):
         job.refresh_from_db()
         self.assertEqual(job.status, GenerationJob.Status.SUCCEEDED)
         self.assertEqual(job.provider_request_ids, ["request-1"])
-        self.assertEqual(job.usage_entry.actual_cost_eur, job.estimated_cost_eur)
+        self.assertIsNone(job.actual_cost_eur)
+        self.assertIsNone(job.usage_entry.actual_cost_eur)
+
+    @mock.patch("generation.services.subprocess.run")
+    def test_assembler_fades_and_pads_every_phrase_before_the_configured_pause(self, run):
+        parts = [
+            SimpleNamespace(audio_path="part-1.mp3", pause_after_ms=700),
+            SimpleNamespace(audio_path="part-2.mp3", pause_after_ms=0),
+        ]
+
+        assemble_mp3(
+            parts,
+            "final.mp3",
+            tail_fade_ms=45,
+            tail_padding_ms=80,
+        )
+
+        command = run.call_args.args[0]
+        filter_complex = command[command.index("-filter_complex") + 1]
+        self.assertEqual(filter_complex.count("areverse,afade=t=in:st=0:d=0.045,areverse"), 2)
+        self.assertEqual(filter_complex.count("apad=pad_dur=0.080"), 2)
+        self.assertIn("anullsrc=r=44100:cl=stereo:d=0.700[s0]", filter_complex)
+        run.assert_called_once()
 
 
 class AudioAccessAndCleanupTests(TestCase):
