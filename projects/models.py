@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import Q
 
 
 class Project(models.Model):
@@ -30,11 +31,19 @@ class Project(models.Model):
     title = models.CharField(max_length=160)
     language = models.CharField(max_length=5, choices=Language.choices, default=Language.DE)
     level = models.CharField(max_length=2, choices=Level.choices, blank=True)
+    demo_key = models.CharField(max_length=32, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ("-updated_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("owner", "demo_key"),
+                condition=~Q(demo_key=""),
+                name="unique_owner_demo_project",
+            )
+        ]
 
     def __str__(self):
         return self.title
