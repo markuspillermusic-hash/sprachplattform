@@ -107,16 +107,20 @@ Die Felder für Provider, Modell, Stimmen-ID und Sprachen nicht manuell umschrei
 ## 5. Erste echte Audiogenerierung testen
 
 1. Zur normalen Anwendung wechseln.
-2. Ein deutsches Testprojekt anlegen.
-3. Zwei Sprecher hinzufügen und zwei freigegebene Stimmen auswählen.
-4. Einen kurzen Dialog mit ungefähr 200 bis 400 Zeichen eingeben.
-5. Die Generierung starten.
-6. Wiedergabe und Download prüfen.
-7. Danach einen längeren Text mit mehr als 2.000 Zeichen testen. Damit werden auch Aufteilung und Zusammenbau der Audiodateien geprüft.
+2. Über **Stimmen** den Stimmenkatalog öffnen.
+3. Sprache, Stimmtyp oder Einsatzbereich filtern, Hörproben abspielen und zwei passende Stimmen als persönliche Favoriten markieren.
+4. Ein deutsches Testprojekt anlegen.
+5. Zwei Sprecher hinzufügen. Persönliche Favoriten stehen mit einem Stern ganz oben in der Stimmenauswahl.
+6. Einen kurzen Dialog mit ungefähr 200 bis 400 Zeichen eingeben.
+7. Die Generierung starten.
+8. Wiedergabe und Download prüfen.
+9. Danach einen längeren Text mit mehr als 2.000 Zeichen testen. Damit werden auch Aufteilung und Zusammenbau der Audiodateien geprüft.
 
 Falls ein Test fehlschlägt, in der Verwaltung zuerst den zugehörigen Generierungsauftrag ansehen. Providerfehler sollten dort ohne geheimen API-Schlüssel erscheinen.
 
 Beim Zusammenbau erhält jede TTS-Phrase standardmäßig einen 45 ms langen Ausklang und 80 ms stille Endpolsterung. Damit werden harte Schnitte und Klickgeräusche vermieden. Beide Werte lassen sich über `AUDIO_TAIL_FADE_MS` und `AUDIO_TAIL_PADDING_MS` in der Server-`.env` anpassen.
+
+Der Stimmenkatalog zeigt ausschließlich Stimmen, die zuvor in der Verwaltung freigeschaltet wurden. Favoriten sind persönlich: Jede Lehrkraft pflegt ihre eigene Auswahl, ohne die Freigaben oder Favoriten anderer Konten zu verändern.
 
 ## 6. Betrieb in der Verwaltung kontrollieren
 

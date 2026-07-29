@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Stimmenkatalog · Sprachplattform{% endblock %}
+{% block content %}
+<section class="page-shell voice-catalog" aria-labelledby="voice-catalog-title">
+  <header class="catalog-heading">
+    <div>
+      <p class="eyebrow">Stimmenkatalog</p>
+      <h1 id="voice-catalog-title">Die passende Stimme finden.</h1>
+      <p class="lead">Hören Sie alle freigegebenen Stimmen direkt an und merken Sie Ihre Favoriten für den Hörtext-Editor.</p>
+    </div>
+    <div class="catalog-summary" aria-label="Übersicht">
+      <strong>{{ total_count }}</strong>
+      <span>verfügbare Stimmen</span>
+      <strong>{{ favorite_count }}</strong>
+      <span>persönliche Favoriten</span>
+    </div>
+  </header>
+
+  <form class="voice-filter-panel" method="get" aria-label="Stimmen filtern">
+    <div class="field filter-search">
+      <label for="voice-search">Stimme suchen</label>
+      <input id="voice-search" name="q" type="search" value="{{ filters.q }}" placeholder="Name, Akzent oder Beschreibung">
+    </div>
+    <div class="field">
+      <label for="voice-language">Sprache</label>
+      <select id="voice-language" name="language">
+        <option value="">Alle Sprachen</option>
+        {% for value, label in language_options %}
+          <option value="{{ value }}" {% if filters.language == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="voice-gender">Stimmtyp</label>
+      <select id="voice-gender" name="gender">
+        <option value="">Alle Stimmtypen</option>
+        {% for value, label in gender_options %}
+          <option value="{{ value }}" {% if filters.gender == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="voice-use-case">Einsatz</label>
+      <select id="voice-use-case" name="use_case">
+        <option value="">Alle Einsätze</option>
+        {% for value, label in use_case_options %}
+          <option value="{{ value }}" {% if filters.use_case == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if provider_options|length > 1 %}
+      <div class="field">
+        <label for="voice-provider">Anbieter</label>
+        <select id="voice-provider" name="provider">
+          <option value="">Alle Anbieter</option>
+          {% for value in provider_options %}
+            <option value="{{ value }}" {% if filters.provider == value|lower %}selected{% endif %}>{{ value|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+    <label class="filter-checkbox">
+      <input type="checkbox" name="favorites" value="1" {% if filters.favorites %}checked{% endif %}>
+      Nur meine Favoriten
+    </label>
+    <div class="filter-actions">
+      <button class="button button-primary" type="submit">Auswahl anzeigen</button>
+      <a class="button button-quiet" href="{% url 'tts:catalog' %}">Filter zurücksetzen</a>
+    </div>
+  </form>
+
+  <div class="catalog-result-heading">
+    <p><strong>{{ result_count }}</strong> {% if result_count == 1 %}Stimme{% else %}Stimmen{% endif %} gefunden</p>
+    <p class="muted">Favoriten erscheinen zuerst – auch später in der Stimmenauswahl.</p>
+  </div>
+
+  {% if cards %}
+    <div class="voice-grid">
+      {% for card in cards %}
+        <article class="voice-card{% if card.is_favorite %} is-favorite{% endif %}" data-voice-card="{{ card.voice.pk }}">
+          <header class="voice-card-heading">
+            <div>
+              {% if card.is_favorite %}<span class="favorite-kicker">Persönlicher Favorit</span>{% endif %}
+              <h2>{{ card.voice.display_name }}</h2>
+              <p>{{ card.voice.provider|title }} · {{ card.voice.model }}</p>
+            </div>
+            <form method="post" action="{% url 'tts:favorite_toggle' card.voice.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button
+                class="favorite-button"
+                type="submit"
+                aria-pressed="{{ card.is_favorite|yesno:'true,false' }}"
+                aria-label="{% if card.is_favorite %}{{ card.voice.display_name }} aus Favoriten entfernen{% else %}{{ card.voice.display_name }} als Favorit merken{% endif %}"
+                title="{% if card.is_favorite %}Aus Favoriten entfernen{% else %}Als Favorit merken{% endif %}"
+              >
+                <span aria-hidden="true">{% if card.is_favorite %}★{% else %}☆{% endif %}</span>
+              </button>
+            </form>
+          </header>
+
+          <div class="voice-tags" aria-label="Sprachen und Kategorien">
+            {% for language in card.languages %}<span>{{ language }}</span>{% endfor %}
+            {% if card.gender %}<span>{{ card.gender }}</span>{% endif %}
+            {% if card.use_case %}<span>{{ card.use_case }}</span>{% endif %}
+          </div>
+
+          {% if card.age or card.accent %}
+            <dl class="voice-facts">
+              {% if card.age %}<div><dt>Alter</dt><dd>{{ card.age }}</dd></div>{% endif %}
+              {% if card.accent %}<div><dt>Akzent</dt><dd>{{ card.accent }}</dd></div>{% endif %}
+            </dl>
+          {% endif %}
+
+          <div class="catalog-preview">
+            <span>Hörprobe</span>
+            {% if card.voice.preview_url %}
+              <audio controls preload="none" data-catalog-audio aria-label="Hörprobe: {{ card.voice.display_name }}" src="{{ card.voice.preview_url }}"></audio>
+            {% else %}
+              <p class="muted">Für diese Stimme ist noch keine Hörprobe verfügbar.</p>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <span class="empty-icon" aria-hidden="true">♪</span>
+      <h2>Keine passende Stimme gefunden</h2>
+      <p>Ändern Sie die Filter oder setzen Sie sie zurück, um wieder alle freigegebenen Stimmen zu sehen.</p>
+      <a class="button button-secondary" href="{% url 'tts:catalog' %}">Alle Stimmen anzeigen</a>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

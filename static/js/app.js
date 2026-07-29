@@ -73,6 +73,15 @@
     updatePreview();
   });
 
+  const catalogAudios = document.querySelectorAll('[data-catalog-audio]');
+  catalogAudios.forEach((audio) => {
+    audio.addEventListener('play', () => {
+      catalogAudios.forEach((otherAudio) => {
+        if (otherAudio !== audio) otherAudio.pause();
+      });
+    });
+  });
+
   const activeJobs = document.querySelectorAll('[data-job-url] .status-queued, [data-job-url] .status-running');
   if (activeJobs.length) {
     window.setInterval(async () => {

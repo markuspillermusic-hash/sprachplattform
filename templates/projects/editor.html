@@ -54,6 +54,7 @@
     <aside class="settings-column" aria-labelledby="settings-title">
       <div class="sidebar-card">
         <p class="eyebrow">Audioeinstellungen</p><h2 id="settings-title">Sprecher &amp; Stimmen</h2>
+        <p class="voice-catalog-link"><a href="{% url 'tts:catalog' %}?language={{ project.language }}">Stimmen anhören und Favoriten wählen →</a></p>
         {% for speaker, form, catalog_voice in speakers_with_forms %}
           <div class="speaker-row speaker-{{ speaker.color }}">
             <form method="post" action="{% url 'projects:speaker_autosave' project.id speaker.id %}" data-autosave>

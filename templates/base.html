@@ -21,6 +21,7 @@
     <nav class="account-nav" aria-label="Benutzerkonto">
       {% if request.user.is_authenticated %}
         <a href="{% url 'projects:list' %}">Meine Hörtexte</a>
+        <a href="{% url 'tts:catalog' %}">Stimmen</a>
         <span class="account-name">{{ request.user.username }}</span>
         {% if request.user.is_staff %}<a href="{% url 'admin:index' %}">Verwaltung</a>{% endif %}
         <form method="post" action="{% url 'accounts:logout' %}">

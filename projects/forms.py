@@ -1,20 +1,57 @@
 from django import forms
+from django.db.models import Case, IntegerField, Value, When
+from django.db.models.functions import Lower
 
-from tts.models import ProviderVoice
+from tts.models import ProviderVoice, VoiceFavorite
 
 from .models import Project, ScriptSegment, Speaker
 
 
-def compatible_voice_queryset(project):
+def user_favorite_voice_ids(user):
+    if not user or not user.is_authenticated:
+        return set()
+    return set(
+        VoiceFavorite.objects.filter(
+            user=user,
+            voice__active=True,
+        ).values_list("voice_id", flat=True)
+    )
+
+
+def compatible_voice_queryset(project, *, user=None, favorite_ids=None):
     active_voices = ProviderVoice.objects.filter(active=True).only("pk", "languages")
     if project is None:
-        return ProviderVoice.objects.filter(active=True)
-    compatible_ids = [
-        voice.pk
-        for voice in active_voices
-        if not voice.languages or project.language in voice.languages
-    ]
-    return ProviderVoice.objects.filter(active=True, pk__in=compatible_ids)
+        queryset = ProviderVoice.objects.filter(active=True)
+    else:
+        compatible_ids = [
+            voice.pk
+            for voice in active_voices
+            if not voice.languages or project.language in voice.languages
+        ]
+        queryset = ProviderVoice.objects.filter(active=True, pk__in=compatible_ids)
+
+    favorite_ids = set(
+        user_favorite_voice_ids(user)
+        if favorite_ids is None
+        else favorite_ids
+    )
+    if favorite_ids:
+        queryset = queryset.annotate(
+            favorite_order=Case(
+                When(pk__in=favorite_ids, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+        ).order_by("favorite_order", Lower("display_name"))
+    return queryset
+
+
+class VoiceChoiceField(forms.ModelChoiceField):
+    favorite_ids = frozenset()
+
+    def label_from_instance(self, voice):
+        prefix = "★ " if voice.pk in self.favorite_ids else ""
+        return f"{prefix}{voice.display_name}"
 
 
 class ProjectCreateForm(forms.ModelForm):
@@ -29,7 +66,7 @@ class ProjectMetaForm(ProjectCreateForm):
 
 
 class SpeakerForm(forms.ModelForm):
-    voice = forms.ModelChoiceField(
+    voice = VoiceChoiceField(
         queryset=ProviderVoice.objects.none(),
         required=False,
         label="Freigegebene Stimme",
@@ -41,12 +78,32 @@ class SpeakerForm(forms.ModelForm):
         fields = ("name", "color")
         labels = {"name": "Sprechername", "color": "Farbe"}
 
-    def __init__(self, *args, project=None, voice_queryset=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        project=None,
+        user=None,
+        voice_queryset=None,
+        favorite_ids=None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.project = project or (self.instance.project if self.instance and self.instance.project_id else None)
-        self.fields["voice"].queryset = (
-            voice_queryset if voice_queryset is not None else compatible_voice_queryset(self.project)
+        favorite_ids = set(
+            user_favorite_voice_ids(user)
+            if favorite_ids is None
+            else favorite_ids
         )
+        self.fields["voice"].queryset = (
+            voice_queryset
+            if voice_queryset is not None
+            else compatible_voice_queryset(
+                self.project,
+                user=user,
+                favorite_ids=favorite_ids,
+            )
+        )
+        self.fields["voice"].favorite_ids = favorite_ids
         self.fields["voice"].widget.attrs["data-voice-select"] = "true"
         if self.instance.pk and self.instance.voice_id:
             self.fields["voice"].initial = ProviderVoice.objects.filter(

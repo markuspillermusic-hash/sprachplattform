@@ -1,6 +1,6 @@
 # Sprachplattform
 
-Interne Django-Webanwendung zur Erstellung mehrsprachiger, mehrstimmiger Hörtexte für den Sprachunterricht. Lokal umgesetzt sind Anmeldung, geschützte Projekte, Skripteditor, Stimmenkatalog, Provideradapter, versionierte Hintergrundaufträge, Nutzungslimits und die validierte Grundlage des späteren KI-Assistenten.
+Interne Django-Webanwendung zur Erstellung mehrsprachiger, mehrstimmiger Hörtexte für den Sprachunterricht. Umgesetzt sind Anmeldung, geschützte Projekte, Skripteditor, ein filterbarer Stimmenkatalog mit Hörproben und persönlichen Favoriten, Provideradapter, versionierte Hintergrundaufträge, Nutzungslimits und die validierte Grundlage des späteren KI-Assistenten.
 
 ## Schnellstart mit Docker Compose
 
