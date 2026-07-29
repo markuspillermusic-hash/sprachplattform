@@ -1,6 +1,6 @@
 # Verwaltung und ElevenLabs-Einrichtung
 
-Stand: 27. Juli 2026
+Stand: 30. Juli 2026
 
 Diese Anleitung beschreibt die nächsten Schritte, um die Sprachplattform für einen Pilotbetrieb einsatzbereit zu machen. Sie enthält absichtlich keine Passwörter, API-Schlüssel oder andere Geheimnisse.
 
@@ -59,6 +59,9 @@ Die folgenden Einträge suchen oder ergänzen:
 ELEVENLABS_API_KEY=HIER_DEN_ECHTEN_SCHLUESSEL_EINTRAGEN
 ELEVENLABS_BASE_URL=https://api.elevenlabs.io
 ELEVENLABS_MODEL_ID=eleven_v3
+TTS_ESTIMATED_EUR_PER_1000_CHARACTERS=0.18
+AUDIO_TAIL_FADE_MS=45
+AUDIO_TAIL_PADDING_MS=80
 ```
 
 In Nano speichern:
@@ -113,6 +116,8 @@ Die Felder für Provider, Modell, Stimmen-ID und Sprachen nicht manuell umschrei
 
 Falls ein Test fehlschlägt, in der Verwaltung zuerst den zugehörigen Generierungsauftrag ansehen. Providerfehler sollten dort ohne geheimen API-Schlüssel erscheinen.
 
+Beim Zusammenbau erhält jede TTS-Phrase standardmäßig einen 45 ms langen Ausklang und 80 ms stille Endpolsterung. Damit werden harte Schnitte und Klickgeräusche vermieden. Beide Werte lassen sich über `AUDIO_TAIL_FADE_MS` und `AUDIO_TAIL_PADDING_MS` in der Server-`.env` anpassen.
+
 ## 6. Betrieb in der Verwaltung kontrollieren
 
 Die wichtigsten Bereiche sind:
@@ -128,20 +133,21 @@ Aktuell vorgesehene Standardwerte:
 - Organisationslimit pro Monat: `600.000` Zeichen
 - Organisationslimit pro Jahr: `7.200.000` Zeichen
 - Audio-Aufbewahrung: `30` Tage
-- interne Kostenschätzung: `0,18 EUR` pro 1.000 Zeichen
+- interner Tarifwert: `0,18 EUR` pro 1.000 Zeichen
 
-Die Kostenschätzung dient nur der internen Planung. Nach den ersten Tests müssen die tatsächlichen ElevenLabs-Abrechnungsdaten damit verglichen und der Wert bei Bedarf angepasst werden.
+Der angezeigte Eurobetrag ist ein anteiliger Schätzwert zur internen Planung, keine zusätzliche Einzelabbuchung. Innerhalb des ElevenLabs-Monatskontingents entstehen normalerweise nicht für jeden Auftrag gesonderte Kosten. Nach Tarifwechseln sollte der Wert mit dem effektiven Preis je 1.000 Credits verglichen und bei Bedarf angepasst werden.
 
 ## 7. Pilotbenutzer anlegen
 
 1. In der Verwaltung **Accounts → Users/Benutzer** öffnen.
-2. Einen Benutzer für eine Lehrkraft anlegen.
-3. **Aktiv** einschalten.
-4. **Mitarbeiterstatus** und **Superuserstatus** ausgeschaltet lassen.
-5. Den erzwungenen Passwortwechsel beim ersten Login aktiviert lassen.
-6. Für den ersten Pilot ein vorsichtiges persönliches Monatslimit setzen, zum Beispiel `10.000` Zeichen.
-7. Die Verwaltungsaktion **Neue temporäre Passwörter erzeugen** verwenden.
-8. Das temporäre Passwort nur einmal und über einen sicheren, getrennten Weg an die betreffende Person übermitteln.
+2. **Benutzer hinzufügen** wählen und den Benutzernamen eintragen.
+3. Ein frei gewähltes Startpasswort zweimal eingeben. Es gibt bewusst keine Vorgaben zu Länge, Zeichenarten oder häufig verwendeten Passwörtern.
+4. Rolle und persönliches Monatslimit festlegen, zum Beispiel zunächst `10.000` Zeichen.
+5. Speichern und das Startpasswort sicher an die betreffende Person übermitteln.
+6. Beim ersten Login wird automatisch ein persönliches Passwort verlangt; diese Vorgabe kann beim Anlegen nicht versehentlich abgeschaltet werden.
+7. **Aktiv** eingeschaltet lassen. **Mitarbeiterstatus** und **Superuserstatus** bleiben für Lehrkräfte ausgeschaltet.
+
+Für einen späteren Passwort-Reset steht weiterhin die Verwaltungsaktion **Neue temporäre Passwörter erzeugen** zur Verfügung. Auch dieses Passwort muss beim nächsten Login geändert werden.
 
 Lehrkräfte arbeiten ausschließlich in der normalen Plattform. Die Django-Verwaltung bleibt Administratoren vorbehalten.
 

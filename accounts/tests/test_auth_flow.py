@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
@@ -94,4 +95,34 @@ class TemporaryPasswordTests(TestCase):
 
         self.assertGreaterEqual(len(temporary_password), 14)
         self.assertTrue(user.check_password(temporary_password))
+        self.assertTrue(user.must_change_password)
+
+
+class UserCreationTests(TestCase):
+    def test_passwords_are_freely_selectable(self):
+        validate_password("1")
+
+    def test_admin_created_user_must_change_start_password(self):
+        admin = get_user_model().objects.create_superuser(
+            username="verwaltung",
+            password="admin",
+            email="admin@example.test",
+            must_change_password=False,
+        )
+        self.client.force_login(admin)
+
+        response = self.client.post(
+            reverse("admin:accounts_user_add"),
+            {
+                "username": "neu",
+                "password1": "start",
+                "password2": "start",
+                "role": "teacher",
+                "character_limit": 30_000,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        user = get_user_model().objects.get(username="neu")
+        self.assertTrue(user.check_password("start"))
         self.assertTrue(user.must_change_password)

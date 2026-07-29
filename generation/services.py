@@ -172,16 +172,38 @@ def create_generation_job(project, requested_by):
     return job
 
 
-def assemble_mp3(parts, output_path, ffmpeg_binary="ffmpeg"):
+def assemble_mp3(
+    parts,
+    output_path,
+    ffmpeg_binary="ffmpeg",
+    tail_fade_ms=None,
+    tail_padding_ms=None,
+):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    tail_fade_ms = settings.AUDIO_TAIL_FADE_MS if tail_fade_ms is None else max(0, tail_fade_ms)
+    tail_padding_ms = settings.AUDIO_TAIL_PADDING_MS if tail_padding_ms is None else max(0, tail_padding_ms)
+    tail_fade_seconds = tail_fade_ms / 1000
+    tail_padding_seconds = tail_padding_ms / 1000
     command = [ffmpeg_binary, "-hide_banner", "-loglevel", "error"]
     for part in parts:
         command.extend(["-i", part.audio_path])
     filters = []
     concat_labels = []
     for index, part in enumerate(parts):
-        filters.append(f"[{index}:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo[a{index}]")
+        audio_filter = (
+            f"[{index}:a]aresample=44100,"
+            "aformat=sample_rates=44100:channel_layouts=stereo"
+        )
+        if tail_fade_seconds:
+            # Rückwärts ausblenden vermeidet eine vorherige Laufzeitanalyse der
+            # TTS-Datei und setzt den Fade trotzdem exakt ans Ende der Phrase.
+            audio_filter += (
+                f",areverse,afade=t=in:st=0:d={tail_fade_seconds:.3f},areverse"
+            )
+        if tail_padding_seconds:
+            audio_filter += f",apad=pad_dur={tail_padding_seconds:.3f}"
+        filters.append(f"{audio_filter}[a{index}]")
         concat_labels.append(f"[a{index}]")
         if part.pause_after_ms:
             seconds = part.pause_after_ms / 1000
@@ -236,12 +258,8 @@ def run_generation_job(job_id, provider=None, audio_root=None, assembler=assembl
         )
         job.status = GenerationJob.Status.SUCCEEDED
         job.finished_at = timezone.now()
-        job.actual_cost_eur = job.estimated_cost_eur
         job.provider_request_ids = [item for item in request_ids if item]
-        job.save(update_fields=["status", "finished_at", "actual_cost_eur", "provider_request_ids"])
-        ledger = job.usage_entry
-        ledger.actual_cost_eur = job.actual_cost_eur
-        ledger.save(update_fields=["actual_cost_eur"])
+        job.save(update_fields=["status", "finished_at", "provider_request_ids"])
         return asset
     except (ProviderError, GenerationValidationError) as exc:
         running_part = job.parts.filter(status=GenerationPart.Status.RUNNING).first()

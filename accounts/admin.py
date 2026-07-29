@@ -11,10 +11,24 @@ class SprachplattformUserAdmin(UserAdmin):
         ("Sprachplattform", {"fields": ("role", "must_change_password", "character_limit")}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
-        ("Sprachplattform", {"fields": ("role", "must_change_password", "character_limit")}),
+        (
+            "Sprachplattform",
+            {
+                "fields": ("role", "character_limit"),
+                "description": (
+                    "Das oben vergebene Startpasswort ist frei wählbar. "
+                    "Beim ersten Login muss der Nutzer ein eigenes Passwort festlegen."
+                ),
+            },
+        ),
     )
     list_display = UserAdmin.list_display + ("role", "must_change_password", "character_limit")
     actions = ("issue_temporary_passwords",)
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.must_change_password = True
+        super().save_model(request, obj, form, change)
 
     @admin.action(description="Neue temporäre Passwörter erzeugen")
     def issue_temporary_passwords(self, request, queryset):
