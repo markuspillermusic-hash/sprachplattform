@@ -34,6 +34,45 @@
     });
   });
 
+  const voicePreviewDataElement = document.getElementById('voice-preview-data');
+  let voicePreviewData = {};
+  if (voicePreviewDataElement) {
+    try {
+      voicePreviewData = JSON.parse(voicePreviewDataElement.textContent);
+    } catch (_) {
+      voicePreviewData = {};
+    }
+  }
+
+  document.querySelectorAll('[data-voice-select]').forEach((select) => {
+    const form = select.closest('form');
+    const panel = form?.querySelector('[data-voice-preview-panel]');
+    const audio = panel?.querySelector('[data-voice-preview]');
+    const label = panel?.querySelector('[data-voice-preview-label]');
+    if (!panel || !audio || !label) return;
+
+    const updatePreview = () => {
+      const voice = voicePreviewData[select.value];
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+
+      if (!voice?.url) {
+        panel.hidden = true;
+        return;
+      }
+
+      label.textContent = `Stimmenprobe: ${voice.name}`;
+      audio.src = voice.url;
+      audio.setAttribute('aria-label', `Stimmenprobe: ${voice.name}`);
+      panel.hidden = false;
+      audio.load();
+    };
+
+    select.addEventListener('change', updatePreview);
+    updatePreview();
+  });
+
   const activeJobs = document.querySelectorAll('[data-job-url] .status-queued, [data-job-url] .status-running');
   if (activeJobs.length) {
     window.setInterval(async () => {

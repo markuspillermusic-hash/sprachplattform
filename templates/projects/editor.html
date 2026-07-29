@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ project.title }} · Sprachplattform{% endblock %}
 {% block content %}
+{{ voice_preview_data|json_script:"voice-preview-data" }}
 <section class="editor-shell" aria-labelledby="editor-title">
   <header class="editor-heading">
     <a class="back-link" href="{% url 'projects:list' %}">← Alle Hörtexte</a>
@@ -60,7 +61,10 @@
               <div class="field"><label for="{{ form.name.id_for_label }}">Name</label>{{ form.name }}</div>
               <div class="field"><label for="{{ form.color.id_for_label }}">Farbe</label>{{ form.color }}</div>
               <div class="field"><label for="{{ form.voice.id_for_label }}">Stimme</label>{{ form.voice }}{% if form.voice.errors %}<div class="field-errors">{{ form.voice.errors }}</div>{% endif %}</div>
-              {% if catalog_voice.preview_url %}<audio class="voice-preview" controls preload="none" aria-label="Stimmenprobe für {{ speaker.name }}"><source src="{{ catalog_voice.preview_url }}" type="audio/mpeg"></audio>{% endif %}
+              <div class="voice-preview-panel" data-voice-preview-panel hidden>
+                <span class="voice-preview-label" data-voice-preview-label>Stimmenprobe</span>
+                <audio class="voice-preview" controls preload="none" data-voice-preview></audio>
+              </div>
               <span class="save-status" data-save-status role="status">Gespeichert</span>
             </form>
             <form method="post" action="{% url 'projects:speaker_delete' project.id speaker.id %}" data-confirm="Diesen Sprecher entfernen?">{% csrf_token %}<button class="button button-danger" type="submit">Entfernen</button></form>
@@ -74,6 +78,10 @@
             <div class="field"><label for="{{ speaker_form.name.id_for_label }}">Name</label>{{ speaker_form.name }}</div>
             <div class="field"><label for="{{ speaker_form.color.id_for_label }}">Farbe</label>{{ speaker_form.color }}</div>
             <div class="field"><label for="{{ speaker_form.voice.id_for_label }}">Stimme (optional)</label>{{ speaker_form.voice }}</div>
+            <div class="voice-preview-panel" data-voice-preview-panel hidden>
+              <span class="voice-preview-label" data-voice-preview-label>Stimmenprobe</span>
+              <audio class="voice-preview" controls preload="none" data-voice-preview></audio>
+            </div>
             <button class="button button-secondary button-wide" type="submit">Sprecher hinzufügen</button>
           </form>
         </details>

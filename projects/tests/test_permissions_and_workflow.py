@@ -2,8 +2,9 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from projects.forms import SegmentForm
+from projects.forms import SegmentForm, SpeakerForm
 from projects.models import Project, ScriptSegment, Speaker
+from tts.models import ProviderVoice
 
 
 class ProjectWorkflowTests(TestCase):
@@ -87,6 +88,101 @@ class ProjectWorkflowTests(TestCase):
         )
         self.assertFalse(form.is_valid())
         self.assertIn("speaker", form.errors)
+
+    def test_speaker_form_only_offers_active_voices_for_project_language(self):
+        french_voice = ProviderVoice.objects.create(
+            provider="elevenlabs",
+            model="eleven_v3",
+            voice_id="voice-fr",
+            display_name="Camille",
+            languages=["fr"],
+            preview_url="https://example.com/camille.mp3",
+            active=True,
+        )
+        ProviderVoice.objects.create(
+            provider="elevenlabs",
+            model="eleven_v3",
+            voice_id="voice-de",
+            display_name="Hanna",
+            languages=["de"],
+            active=True,
+        )
+        ProviderVoice.objects.create(
+            provider="elevenlabs",
+            model="eleven_v3",
+            voice_id="voice-fr-inactive",
+            display_name="Inaktiv",
+            languages=["fr"],
+            active=False,
+        )
+
+        form = SpeakerForm(project=self.project)
+
+        self.assertEqual(list(form.fields["voice"].queryset), [french_voice])
+        self.assertEqual(form.fields["voice"].widget.attrs["data-voice-select"], "true")
+
+    def test_speaker_can_be_added_with_compatible_voice(self):
+        voice = ProviderVoice.objects.create(
+            provider="elevenlabs",
+            model="eleven_v3",
+            voice_id="voice-fr",
+            display_name="Camille",
+            languages=["fr"],
+            active=True,
+        )
+
+        response = self.client.post(
+            reverse("projects:speaker_add", args=[self.project.pk]),
+            {"name": "Camille", "color": "berry", "voice": voice.pk},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("projects:editor", args=[self.project.pk]),
+            fetch_redirect_response=False,
+        )
+        speaker = self.project.speakers.get(name="Camille")
+        self.assertEqual(speaker.voice_id, "voice-fr")
+        self.assertEqual(speaker.provider, "elevenlabs")
+
+    def test_speaker_error_message_includes_validation_detail(self):
+        german_voice = ProviderVoice.objects.create(
+            provider="elevenlabs",
+            model="eleven_v3",
+            voice_id="voice-de",
+            display_name="Hanna",
+            languages=["de"],
+            active=True,
+        )
+
+        response = self.client.post(
+            reverse("projects:speaker_add", args=[self.project.pk]),
+            {"name": "Hanna", "color": "forest", "voice": german_voice.pk},
+            follow=True,
+        )
+
+        self.assertContains(response, "Der Sprecher konnte nicht hinzugefügt werden.")
+        self.assertContains(response, "Freigegebene Stimme:")
+        self.assertFalse(self.project.speakers.filter(name="Hanna").exists())
+
+    def test_editor_exposes_preview_data_for_compatible_voices(self):
+        voice = ProviderVoice.objects.create(
+            provider="elevenlabs",
+            model="eleven_v3",
+            voice_id="voice-fr",
+            display_name="Camille",
+            languages=["fr"],
+            preview_url="https://example.com/camille.mp3",
+            active=True,
+        )
+
+        response = self.client.get(reverse("projects:editor", args=[self.project.pk]))
+
+        self.assertEqual(
+            response.context["voice_preview_data"][str(voice.pk)],
+            {"name": "Camille", "url": "https://example.com/camille.mp3"},
+        )
+        self.assertContains(response, 'data-voice-preview-panel')
 
     def test_segment_autosave_updates_only_owned_segment(self):
         prefix = str(self.segment.pk)

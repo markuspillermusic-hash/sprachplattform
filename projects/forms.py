@@ -5,6 +5,18 @@ from tts.models import ProviderVoice
 from .models import Project, ScriptSegment, Speaker
 
 
+def compatible_voice_queryset(project):
+    active_voices = ProviderVoice.objects.filter(active=True).only("pk", "languages")
+    if project is None:
+        return ProviderVoice.objects.filter(active=True)
+    compatible_ids = [
+        voice.pk
+        for voice in active_voices
+        if not voice.languages or project.language in voice.languages
+    ]
+    return ProviderVoice.objects.filter(active=True, pk__in=compatible_ids)
+
+
 class ProjectCreateForm(forms.ModelForm):
     class Meta:
         model = Project
@@ -29,10 +41,13 @@ class SpeakerForm(forms.ModelForm):
         fields = ("name", "color")
         labels = {"name": "Sprechername", "color": "Farbe"}
 
-    def __init__(self, *args, project=None, **kwargs):
+    def __init__(self, *args, project=None, voice_queryset=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.project = project or (self.instance.project if self.instance and self.instance.project_id else None)
-        self.fields["voice"].queryset = ProviderVoice.objects.filter(active=True)
+        self.fields["voice"].queryset = (
+            voice_queryset if voice_queryset is not None else compatible_voice_queryset(self.project)
+        )
+        self.fields["voice"].widget.attrs["data-voice-select"] = "true"
         if self.instance.pk and self.instance.voice_id:
             self.fields["voice"].initial = ProviderVoice.objects.filter(
                 provider=self.instance.provider,
