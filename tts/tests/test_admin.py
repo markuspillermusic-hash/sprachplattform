@@ -2,7 +2,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from tts.models import ProviderVoice
+from tts.models import ProviderVoice, TTSConfiguration
+from tts.providers import get_tts_provider, tts_provider_is_configured
 
 
 class ProviderVoiceAdminTests(TestCase):
@@ -57,3 +58,39 @@ class ProviderVoiceAdminTests(TestCase):
         self.assertNotContains(response, "Hanna")
         self.assertContains(response, "<audio", html=False)
         self.assertContains(response, "https://example.com/camille.mp3")
+
+
+class TTSConfigurationAdminTests(TestCase):
+    def setUp(self):
+        self.admin = get_user_model().objects.create_superuser(
+            username="tts-config-admin",
+            password="Test-Passphrase-123!",
+            must_change_password=False,
+        )
+        self.client.force_login(self.admin)
+
+    def test_admin_encrypts_key_and_provider_prefers_database_configuration(self):
+        response = self.client.post(
+            reverse("admin:tts_ttsconfiguration_add"),
+            {
+                "name": "ElevenLabs Schule",
+                "active": "on",
+                "model": "eleven_v3",
+                "estimated_eur_per_1000_characters": "0.1800",
+                "api_key": "sk_elevenlabs-test-9876",
+                "_save": "Speichern",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        configuration = TTSConfiguration.objects.get()
+        self.assertNotIn("sk_elevenlabs-test", configuration.encrypted_api_key)
+        self.assertEqual(configuration.api_key_hint, "…9876")
+        self.assertTrue(tts_provider_is_configured())
+        self.assertEqual(get_tts_provider().api_key, "sk_elevenlabs-test-9876")
+
+        change = self.client.get(
+            reverse("admin:tts_ttsconfiguration_change", args=[configuration.pk])
+        )
+        self.assertContains(change, "…9876")
+        self.assertNotContains(change, "sk_elevenlabs-test-9876")

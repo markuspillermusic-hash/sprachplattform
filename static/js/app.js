@@ -99,4 +99,15 @@
       }
     }, 5000);
   }
+
+  document.querySelectorAll('[data-assistant-prompt]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const form = button.closest('.assistant-chat, form')?.querySelector('form[data-assistant-submit]')
+        || button.closest('form[data-assistant-submit]');
+      const input = form?.querySelector('[data-assistant-instruction]');
+      if (!input) return;
+      input.value = button.dataset.assistantPrompt;
+      input.focus();
+    });
+  });
 })();

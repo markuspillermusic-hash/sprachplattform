@@ -40,6 +40,14 @@ class GenerationJob(models.Model):
     character_count = models.PositiveIntegerField()
     estimated_cost_eur = models.DecimalField(max_digits=10, decimal_places=4)
     actual_cost_eur = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    provider_credit_count = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
+    usage_event = models.OneToOneField(
+        "usage_control.UsageEvent",
+        on_delete=models.PROTECT,
+        related_name="generation_job",
+        null=True,
+        blank=True,
+    )
     provider_request_ids = models.JSONField(default=list)
     error_message = models.CharField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -65,6 +73,7 @@ class GenerationPart(models.Model):
     pause_after_ms = models.PositiveIntegerField(default=0)
     audio_path = models.CharField(max_length=500, blank=True)
     provider_request_id = models.CharField(max_length=160, blank=True)
+    provider_credit_count = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
     error_message = models.CharField(max_length=500, blank=True)
 
     class Meta:
@@ -95,6 +104,7 @@ class UsageLedger(models.Model):
     character_count = models.PositiveIntegerField()
     estimated_cost_eur = models.DecimalField(max_digits=10, decimal_places=4)
     actual_cost_eur = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    provider_credit_count = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
     billing_period = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
 

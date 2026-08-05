@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.db import transaction
 
 from .models import ProviderVoice
@@ -13,7 +12,7 @@ def sync_provider_voices(language=None):
     for voice in voices:
         catalog_voice, _ = ProviderVoice.objects.update_or_create(
             provider="elevenlabs",
-            model=settings.ELEVENLABS_MODEL_ID,
+            model=provider.model_id,
             voice_id=voice.voice_id,
             defaults={
                 "display_name": voice.name,
@@ -24,4 +23,3 @@ def sync_provider_voices(language=None):
         )
         synced.append(catalog_voice)
     return synced
-

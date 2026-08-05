@@ -4,6 +4,7 @@ from django.utils import timezone
 
 from projects.models import ScriptSegment, Speaker
 from projects.services import next_position
+from tts.models import ProviderVoice, VoiceFavorite
 
 from .models import AssistantProposal
 from .schema import validate_script_proposal
@@ -39,14 +40,40 @@ def editable_project_snapshot(project):
     }
 
 
-def create_proposal(project, created_by, payload):
+def create_proposal(project, created_by, payload, *, conversation=None):
     if project.owner_id != created_by.pk and not (created_by.is_staff or created_by.role == created_by.Role.ADMIN):
         raise PermissionDenied
     return AssistantProposal.objects.create(
         project=project,
         created_by=created_by,
+        conversation=conversation,
         payload=validate_script_proposal(payload),
     )
+
+
+def assign_compatible_voices(project, user):
+    voices = [
+        voice
+        for voice in ProviderVoice.objects.filter(active=True).order_by("display_name")
+        if not voice.languages or project.language in voice.languages
+    ]
+    if not voices:
+        return []
+    favorite_ids = set(
+        VoiceFavorite.objects.filter(user=user, voice__active=True).values_list("voice_id", flat=True)
+    )
+    voices.sort(key=lambda voice: (voice.pk not in favorite_ids, voice.display_name.casefold()))
+    assigned = []
+    for index, speaker in enumerate(project.speakers.order_by("position", "name")):
+        if speaker.voice_id:
+            continue
+        voice = voices[index % len(voices)]
+        speaker.provider = voice.provider
+        speaker.model = voice.model
+        speaker.voice_id = voice.voice_id
+        speaker.save(update_fields=["provider", "model", "voice_id"])
+        assigned.append(voice)
+    return assigned
 
 
 def _replace_with_snapshot(project, snapshot):
@@ -128,6 +155,9 @@ def apply_proposal(proposal, mode):
     proposal.save(
         update_fields=["previous_snapshot", "applied_snapshot", "status", "apply_mode", "applied_at"]
     )
+    assign_compatible_voices(project, proposal.created_by)
+    proposal.applied_snapshot = editable_project_snapshot(project)
+    proposal.save(update_fields=["applied_snapshot"])
     return project
 
 

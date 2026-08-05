@@ -1,13 +1,59 @@
 {% extends "base.html" %}
 {% block title %}Neuen Hörtext erstellen · Sprachplattform{% endblock %}
 {% block content %}
-<section class="auth-layout" aria-labelledby="create-title">
-  <div class="auth-intro"><p class="eyebrow">Neues Projekt</p><h1 id="create-title">Womit möchten Sie beginnen?</h1><p class="lead">Titel und Sprache reichen aus. Alles Weitere bleibt später änderbar.</p></div>
-  <form class="form-card" method="post" novalidate>
-    {% csrf_token %}
-    {% for field in form %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}</div>{% endfor %}
-    <button class="button button-primary button-wide" type="submit">Projekt anlegen</button>
-    <a class="button button-quiet button-wide" href="{% url 'projects:list' %}">Abbrechen</a>
-  </form>
+<section class="page-shell create-flow" aria-labelledby="create-title">
+  <header class="create-heading">
+    <a class="back-link" href="{% url 'projects:list' %}">← Alle Hörtexte</a>
+    <p class="eyebrow">Neues Projekt</p>
+    <h1 id="create-title">Wie möchten Sie beginnen?</h1>
+    <p class="lead">Sie können direkt losschreiben oder sich in wenigen Schritten einen vollständigen Entwurf erstellen lassen.</p>
+  </header>
+
+  <div class="creation-choice-grid" aria-label="Erstellungsart wählen">
+    <a class="creation-choice{% if selected_mode == 'manual' %} is-selected{% endif %}" href="?mode=manual">
+      <span class="choice-number" aria-hidden="true">1</span>
+      <strong>Hörtext selbst erstellen</strong>
+      <span>Titel und Sprache festlegen, danach frei im Editor schreiben.</span>
+    </a>
+    <a class="creation-choice{% if selected_mode == 'assistant' %} is-selected{% endif %}" href="?mode=assistant">
+      <span class="choice-number" aria-hidden="true">2</span>
+      <strong>Mit KI-Unterstützung erstellen</strong>
+      <span>Ein paar Angaben machen und sofort einen bearbeitbaren Entwurf erhalten.</span>
+    </a>
+  </div>
+
+  {% if selected_mode == 'manual' %}
+    <form class="form-card create-form-card" method="post" novalidate>
+      {% csrf_token %}<input type="hidden" name="mode" value="manual">
+      <p class="eyebrow">Selbst erstellen</p><h2>Die wichtigsten Angaben</h2>
+      {% for field in form %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}</div>{% endfor %}
+      <button class="button button-primary button-wide" type="submit">Projekt anlegen</button>
+    </form>
+  {% elif selected_mode == 'assistant' %}
+    <form class="assistant-brief-card" method="post" novalidate>
+      {% csrf_token %}<input type="hidden" name="mode" value="assistant">
+      <div class="assistant-brief-intro">
+        <div><p class="eyebrow">KI-Unterstützung</p><h2>Was möchten Sie hören?</h2></div>
+        <p>Die Pflichtangaben reichen für einen ersten Entwurf. Details können Sie anschließend im Gespräch ändern.</p>
+      </div>
+      {% if not assistant_configured %}
+        <div class="assistant-notice" role="status">
+          <strong>Der KI-Assistent ist noch nicht eingerichtet.</strong>
+          <span>{% if request.user.is_staff %}{% if assistant_configuration %}<a href="{% url 'admin:script_assistant_assistantconfiguration_change' assistant_configuration.id %}">OpenAI-API jetzt in der Verwaltung hinterlegen →</a>{% else %}<a href="{% url 'admin:script_assistant_assistantconfiguration_add' %}">OpenAI-API jetzt in der Verwaltung hinterlegen →</a>{% endif %}{% else %}Bitte wenden Sie sich an die Administration.{% endif %}</span>
+        </div>
+      {% endif %}
+      <div class="assistant-core-fields">
+        {% for field in assistant_form %}
+          {% if field.name == 'vocabulary' %}<details class="assistant-optional"><summary>Optionale Lernziele und Rollen</summary>{% endif %}
+          <div class="field field-{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}</div>
+          {% if field.name == 'additional_instructions' %}</details>{% endif %}
+        {% endfor %}
+      </div>
+      <button class="button button-primary button-wide" type="submit" {% if not assistant_configured %}disabled{% endif %}>Entwurf erstellen</button>
+      <p class="form-help">Der Entwurf wird nicht automatisch als fertiger Hörtext übernommen. Sie prüfen ihn zuerst und können Änderungen wünschen.</p>
+    </form>
+  {% else %}
+    <div class="empty-state compact choice-prompt"><h2>Wählen Sie einen Einstieg</h2><p>Beide Wege führen in denselben Editor und bleiben jederzeit vollständig bearbeitbar.</p></div>
+  {% endif %}
 </section>
 {% endblock %}

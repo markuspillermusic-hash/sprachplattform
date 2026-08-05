@@ -43,6 +43,7 @@ class SynthesisResult:
     audio: bytes
     content_type: str
     provider_request_id: str = ""
+    provider_credit_count: Decimal | None = None
 
 
 class TTSProvider(ABC):

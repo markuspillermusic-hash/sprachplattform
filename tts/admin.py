@@ -1,7 +1,111 @@
+from django import forms
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .models import ProviderVoice, VoiceFavorite
+from .models import ProviderVoice, TTSConfiguration, VoiceFavorite
+from .providers.base import ProviderError
+from .providers.elevenlabs import ElevenLabsProvider
+
+
+class TTSConfigurationForm(forms.ModelForm):
+    api_key = forms.CharField(
+        label="ElevenLabs-API-Schlüssel",
+        required=False,
+        strip=True,
+        widget=forms.PasswordInput(
+            attrs={"autocomplete": "new-password", "placeholder": "sk_…"},
+            render_value=False,
+        ),
+        help_text="Leer lassen, um den gespeicherten Schlüssel beizubehalten.",
+    )
+    clear_api_key = forms.BooleanField(
+        label="Gespeicherten Schlüssel entfernen",
+        required=False,
+    )
+
+    class Meta:
+        model = TTSConfiguration
+        fields = (
+            "name",
+            "active",
+            "model",
+            "base_url",
+            "estimated_eur_per_1000_characters",
+        )
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self.cleaned_data.get("clear_api_key"):
+            instance.set_api_key("")
+        elif self.cleaned_data.get("api_key"):
+            instance.set_api_key(self.cleaned_data["api_key"])
+        if commit:
+            instance.save()
+        return instance
+
+
+@admin.register(TTSConfiguration)
+class TTSConfigurationAdmin(admin.ModelAdmin):
+    form = TTSConfigurationForm
+    list_display = ("name", "active", "model", "configured", "updated_at")
+    readonly_fields = ("base_url", "api_key_hint", "updated_at")
+    actions = ("test_elevenlabs_connection",)
+    fieldsets = (
+        (
+            "ElevenLabs",
+            {
+                "fields": (
+                    "name",
+                    "active",
+                    "model",
+                    "base_url",
+                    "estimated_eur_per_1000_characters",
+                    "api_key",
+                    "clear_api_key",
+                    "api_key_hint",
+                    "updated_at",
+                ),
+                "description": (
+                    "Der Schlüssel wird verschlüsselt gespeichert und nach dem Sichern nicht erneut angezeigt. "
+                    "Der serverseitige Umgebungswert bleibt nur als Übergangslösung verfügbar."
+                ),
+            },
+        ),
+    )
+
+    def has_add_permission(self, request):
+        return not TTSConfiguration.objects.exists()
+
+    @admin.display(boolean=True, description="Schlüssel hinterlegt")
+    def configured(self, configuration):
+        return bool(configuration.encrypted_api_key)
+
+    @admin.action(description="ElevenLabs-Verbindung für Auswahl prüfen")
+    def test_elevenlabs_connection(self, request, queryset):
+        for configuration in queryset:
+            if not configuration.is_configured:
+                self.message_user(
+                    request,
+                    "Die ElevenLabs-Anbindung ist nicht aktiv oder enthält noch keinen API-Schlüssel.",
+                    level=messages.ERROR,
+                )
+                continue
+            provider = ElevenLabsProvider(
+                api_key=configuration.get_api_key(),
+                base_url=configuration.base_url,
+                model_id=configuration.model,
+                estimated_eur_per_1000_characters=configuration.estimated_eur_per_1000_characters,
+            )
+            try:
+                provider.test_connection()
+            except (ProviderError, ValueError) as exc:
+                self.message_user(request, str(exc), level=messages.ERROR)
+            else:
+                self.message_user(
+                    request,
+                    f"ElevenLabs ist erreichbar; das Modell {configuration.model} ist ausgewählt.",
+                    level=messages.SUCCESS,
+                )
 
 
 class VoiceLanguageFilter(admin.SimpleListFilter):

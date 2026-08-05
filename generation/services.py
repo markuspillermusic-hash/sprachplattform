@@ -13,7 +13,15 @@ from django.utils import timezone
 
 from projects.models import Project
 from tts.providers import get_tts_provider
-from tts.providers.base import DialogueInput, ProviderError
+from tts.providers.base import DialogueInput, ProviderError, ProviderTemporaryError
+from usage_control.models import UsageEvent
+from usage_control.services import (
+    QuotaConfigurationError,
+    QuotaExceeded,
+    commit_usage,
+    release_usage,
+    reserve_usage,
+)
 
 from .models import AudioAsset, GenerationJob, GenerationPart, ProjectVersion, UsageLedger
 
@@ -147,16 +155,32 @@ def create_generation_job(project, requested_by):
         snapshot=snapshot,
         created_by=requested_by,
     )
-    rate = settings.TTS_ESTIMATED_EUR_PER_1000_CHARACTERS
+    tts_provider = get_tts_provider("elevenlabs")
+    rate = tts_provider.estimated_rate
     estimated_cost = (Decimal(character_count) / Decimal(1000) * rate).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    try:
+        usage_event = reserve_usage(
+            user=requested_by,
+            provider=UsageEvent.Provider.ELEVENLABS,
+            feature=UsageEvent.Feature.AUDIO,
+            model=tts_provider.model_id,
+            estimated_cost=estimated_cost,
+            currency="EUR",
+            character_count=character_count,
+        )
+    except (QuotaExceeded, QuotaConfigurationError) as exc:
+        raise UsageLimitExceeded(str(exc)) from exc
     job = GenerationJob.objects.create(
         version=version,
         requested_by=requested_by,
         provider="elevenlabs",
-        model=settings.ELEVENLABS_MODEL_ID,
+        model=tts_provider.model_id,
         character_count=character_count,
         estimated_cost_eur=estimated_cost,
+        usage_event=usage_event,
     )
+    usage_event.reference = f"generation:{job.pk}"
+    usage_event.save(update_fields=("reference", "updated_at"))
     GenerationPart.objects.bulk_create(
         [GenerationPart(job=job, position=index, **part) for index, part in enumerate(parts, start=1)]
     )
@@ -170,6 +194,76 @@ def create_generation_job(project, requested_by):
         billing_period=month_start,
     )
     return job
+
+
+@transaction.atomic
+def ensure_generation_reservation(job):
+    job = GenerationJob.objects.select_for_update().select_related("requested_by", "usage_event").get(pk=job.pk)
+    if job.usage_event_id and job.usage_event.status != UsageEvent.Status.RELEASED:
+        return job.usage_event
+    try:
+        event = reserve_usage(
+            user=job.requested_by,
+            provider=UsageEvent.Provider.ELEVENLABS,
+            feature=UsageEvent.Feature.AUDIO,
+            model=job.model,
+            estimated_cost=job.estimated_cost_eur,
+            currency="EUR",
+            character_count=job.character_count,
+            reference=f"generation:{job.pk}:retry",
+        )
+    except (QuotaExceeded, QuotaConfigurationError) as exc:
+        raise UsageLimitExceeded(str(exc)) from exc
+    job.usage_event = event
+    job.save(update_fields=("usage_event",))
+    return event
+
+
+def _provider_usage_for_job(job):
+    successful_parts = job.parts.filter(status=GenerationPart.Status.SUCCEEDED)
+    characters = successful_parts.aggregate(total=Sum("character_count"))["total"] or 0
+    credits = successful_parts.aggregate(total=Sum("provider_credit_count"))["total"]
+    cost_per_character = (
+        job.estimated_cost_eur / Decimal(job.character_count)
+        if job.character_count
+        else Decimal("0")
+    )
+    estimated = (Decimal(characters) * cost_per_character).quantize(
+        Decimal("0.0001"),
+        rounding=ROUND_HALF_UP,
+    )
+    if credits is None:
+        return characters, None, estimated, None
+    actual = (Decimal(credits) * cost_per_character).quantize(
+        Decimal("0.0001"),
+        rounding=ROUND_HALF_UP,
+    )
+    return characters, credits, estimated, actual
+
+
+def _finalize_generation_usage(job, *, release_if_empty=False):
+    if not job.usage_event_id:
+        return
+    characters, credits, estimated_cost, actual_cost = _provider_usage_for_job(job)
+    if release_if_empty and characters == 0:
+        release_usage(job.usage_event, reference=f"generation:{job.pk}:released")
+        return
+    commit_usage(
+        job.usage_event,
+        estimated_cost=estimated_cost,
+        actual_cost=actual_cost,
+        character_count=characters,
+        provider_credit_count=credits or 0,
+        provider_request_id=(job.provider_request_ids or [""])[0],
+        reference=f"generation:{job.pk}",
+    )
+    job.provider_credit_count = credits
+    job.actual_cost_eur = actual_cost
+    job.save(update_fields=("provider_credit_count", "actual_cost_eur"))
+    UsageLedger.objects.filter(job=job).update(
+        provider_credit_count=credits,
+        actual_cost_eur=actual_cost,
+    )
 
 
 def assemble_mp3(
@@ -243,7 +337,8 @@ def run_generation_job(job_id, provider=None, audio_root=None, assembler=assembl
             part.status = GenerationPart.Status.SUCCEEDED
             part.audio_path = str(part_path)
             part.provider_request_id = result.provider_request_id
-            part.save(update_fields=["status", "audio_path", "provider_request_id"])
+            part.provider_credit_count = result.provider_credit_count
+            part.save(update_fields=["status", "audio_path", "provider_request_id", "provider_credit_count"])
             request_ids.append(result.provider_request_id)
 
         parts = list(job.parts.all())
@@ -260,6 +355,7 @@ def run_generation_job(job_id, provider=None, audio_root=None, assembler=assembl
         job.finished_at = timezone.now()
         job.provider_request_ids = [item for item in request_ids if item]
         job.save(update_fields=["status", "finished_at", "provider_request_ids"])
+        _finalize_generation_usage(job)
         return asset
     except (ProviderError, GenerationValidationError) as exc:
         running_part = job.parts.filter(status=GenerationPart.Status.RUNNING).first()
@@ -271,6 +367,8 @@ def run_generation_job(job_id, provider=None, audio_root=None, assembler=assembl
         job.finished_at = timezone.now()
         job.error_message = str(exc)[:500]
         job.save(update_fields=["status", "finished_at", "error_message"])
+        if not isinstance(exc, ProviderTemporaryError):
+            _finalize_generation_usage(job, release_if_empty=True)
         raise
     except Exception:
         safe_message = "Die Audioerzeugung ist wegen eines internen Verarbeitungsfehlers fehlgeschlagen."
@@ -283,4 +381,5 @@ def run_generation_job(job_id, provider=None, audio_root=None, assembler=assembl
         job.finished_at = timezone.now()
         job.error_message = safe_message
         job.save(update_fields=["status", "finished_at", "error_message"])
+        _finalize_generation_usage(job, release_if_empty=True)
         raise

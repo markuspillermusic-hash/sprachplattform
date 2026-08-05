@@ -31,7 +31,11 @@ class ElevenLabsProviderTests(SimpleTestCase):
             return httpx.Response(
                 200,
                 content=b"fake-mp3",
-                headers={"content-type": "audio/mpeg", "request-id": "req-123"},
+                headers={
+                    "content-type": "audio/mpeg",
+                    "request-id": "req-123",
+                    "character-cost": "17.5",
+                },
             )
 
         provider = self.provider_with_handler(handler)
@@ -48,6 +52,7 @@ class ElevenLabsProviderTests(SimpleTestCase):
         self.assertEqual(captured["headers"]["xi-api-key"], "test-key-never-log")
         self.assertEqual(result.audio, b"fake-mp3")
         self.assertEqual(result.provider_request_id, "req-123")
+        self.assertEqual(result.provider_credit_count, Decimal("17.5"))
 
     def test_voice_catalog_extracts_verified_languages(self):
         def handler(request):
@@ -107,6 +112,19 @@ class ElevenLabsProviderTests(SimpleTestCase):
 
         self.assertEqual(estimate.characters, 250)
         self.assertEqual(estimate.estimated_cost_eur, Decimal("0.0500"))
+
+    def test_connection_check_uses_account_endpoint_without_generation(self):
+        captured = {}
+
+        def handler(request):
+            captured["method"] = request.method
+            captured["path"] = request.url.path
+            return httpx.Response(200, json={"user_id": "school"})
+
+        provider = self.provider_with_handler(handler)
+
+        self.assertTrue(provider.test_connection())
+        self.assertEqual(captured, {"method": "GET", "path": "/v1/user"})
 
     def test_http_error_does_not_expose_api_key_or_response_body(self):
         provider = self.provider_with_handler(

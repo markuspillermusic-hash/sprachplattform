@@ -1,5 +1,4 @@
 from django.contrib import messages
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models.deletion import RestrictedError
@@ -9,6 +8,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from generation.models import GenerationJob, UsageLedger
+from script_assistant.forms import AssistantBriefForm
+from script_assistant.models import AssistantConfiguration, AssistantProposal
+from script_assistant.providers import AssistantProviderError, AssistantProviderNotConfigured
+from script_assistant.schema import ProposalValidationError
+from script_assistant.workflows import begin_assisted_project
+from usage_control.services import QuotaExceeded
+from tts.providers import tts_provider_is_configured
 from .forms import (
     ProjectCreateForm,
     ProjectMetaForm,
@@ -49,14 +55,44 @@ def project_list(request):
 
 @login_required
 def project_create(request):
-    form = ProjectCreateForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
+    assistant_configuration = AssistantConfiguration.objects.order_by("pk").first()
+    selected_mode = request.POST.get("mode") or request.GET.get("mode", "")
+    if request.method == "POST" and not selected_mode and "title" in request.POST:
+        selected_mode = "manual"
+    form = ProjectCreateForm(request.POST or None) if selected_mode == "manual" else ProjectCreateForm()
+    assistant_form = (
+        AssistantBriefForm(request.POST or None)
+        if selected_mode == "assistant"
+        else AssistantBriefForm(initial={"level": Project.Level.A2})
+    )
+    if request.method == "POST" and selected_mode == "manual" and form.is_valid():
         project = form.save(commit=False)
         project.owner = request.user
         project.save()
         messages.success(request, "Der Hörtext wurde angelegt.")
         return redirect("projects:editor", project_id=project.pk)
-    return render(request, "projects/project_create.html", {"form": form})
+    if request.method == "POST" and selected_mode == "assistant" and assistant_form.is_valid():
+        brief = dict(assistant_form.cleaned_data)
+        brief["creation_mode"] = "new"
+        try:
+            conversation = begin_assisted_project(request.user, brief)
+        except (AssistantProviderError, AssistantProviderNotConfigured, ProposalValidationError, QuotaExceeded) as exc:
+            messages.error(request, str(exc))
+        else:
+            return redirect("script_assistant:conversation", conversation_id=conversation.pk)
+    return render(
+        request,
+        "projects/project_create.html",
+        {
+            "form": form,
+            "assistant_form": assistant_form,
+            "selected_mode": selected_mode,
+            "assistant_configuration": assistant_configuration,
+            "assistant_configured": bool(
+                assistant_configuration and assistant_configuration.is_configured
+            ),
+        },
+    )
 
 
 @login_required
@@ -75,6 +111,10 @@ def project_editor(request, project_id):
         user=request.user,
         billing_period=month_start,
     ).aggregate(total=Sum("character_count"))["total"] or 0
+    last_applied_proposal = project.assistant_proposals.filter(
+        status=AssistantProposal.Status.APPLIED,
+    ).first()
+    assistant_configuration = AssistantConfiguration.objects.order_by("pk").first()
     return render(
         request,
         "projects/editor.html",
@@ -125,7 +165,12 @@ def project_editor(request, project_id):
             "usage_used": usage_used,
             "usage_limit": request.user.character_limit,
             "usage_percent": min(100, round(usage_used / request.user.character_limit * 100)) if request.user.character_limit else 100,
-            "provider_configured": bool(settings.ELEVENLABS_API_KEY),
+            "provider_configured": tts_provider_is_configured(),
+            "assistant_configuration": assistant_configuration,
+            "assistant_configured": bool(
+                assistant_configuration and assistant_configuration.is_configured
+            ),
+            "last_applied_proposal": last_applied_proposal,
         },
     )
 

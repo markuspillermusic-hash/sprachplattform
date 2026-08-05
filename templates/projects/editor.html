@@ -88,7 +88,19 @@
         </details>
       </div>
 
-      <div class="sidebar-card assistant-card"><p class="eyebrow">KI-Assistent</p><h2>Später verfügbar</h2><p>Die Texterstellung wird nach der stabilen Audiofunktion ergänzt und überschreibt nie ungefragt Ihr Skript.</p></div>
+      <div class="sidebar-card assistant-card">
+        <p class="eyebrow">KI-Assistent</p><h2>Text gemeinsam weiterentwickeln</h2>
+        {% if assistant_configured %}
+          <p>Ein neuer Vorschlag bleibt getrennt von diesem Hörtext, bis Sie ihn ausdrücklich übernehmen.</p>
+          <a class="button button-secondary button-wide" href="{% url 'script_assistant:project_revision' project.id %}">Mit KI überarbeiten</a>
+          {% if last_applied_proposal %}
+            <form method="post" action="{% url 'script_assistant:undo' last_applied_proposal.id %}">{% csrf_token %}<button class="button button-quiet button-wide" type="submit">Letzte KI-Übernahme rückgängig</button></form>
+          {% endif %}
+        {% else %}
+          <p>Der KI-Assistent muss zuerst von der Administration mit OpenAI verbunden werden.</p>
+          {% if request.user.is_staff %}{% if assistant_configuration %}<a class="button button-secondary button-wide" href="{% url 'admin:script_assistant_assistantconfiguration_change' assistant_configuration.id %}">KI-Anbindung einrichten</a>{% else %}<a class="button button-secondary button-wide" href="{% url 'admin:script_assistant_assistantconfiguration_add' %}">KI-Anbindung einrichten</a>{% endif %}{% endif %}
+        {% endif %}
+      </div>
       <div class="sidebar-card usage-card">
         <p class="eyebrow">Nutzung diesen Monat</p>
         <strong>{{ usage_used }} von {{ usage_limit }} Zeichen</strong>

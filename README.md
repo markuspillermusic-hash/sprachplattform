@@ -1,6 +1,6 @@
 # Sprachplattform
 
-Interne Django-Webanwendung zur Erstellung mehrsprachiger, mehrstimmiger Hörtexte für den Sprachunterricht. Umgesetzt sind Anmeldung, geschützte Projekte, Skripteditor, ein filterbarer Stimmenkatalog mit Hörproben und persönlichen Favoriten, Provideradapter, versionierte Hintergrundaufträge, Nutzungslimits und die validierte Grundlage des späteren KI-Assistenten.
+Interne Django-Webanwendung zur Erstellung mehrsprachiger, mehrstimmiger Hörtexte für den Sprachunterricht. Umgesetzt sind Anmeldung, geschützte Projekte, Skripteditor, ein filterbarer Stimmenkatalog mit Hörproben und persönlichen Favoriten, Provideradapter, versionierte Hintergrundaufträge, Nutzungslimits sowie ein geführter KI-Assistent für neue und bestehende Hörtexte.
 
 ## Schnellstart mit Docker Compose
 
@@ -68,7 +68,8 @@ docker compose exec web python manage.py check --deploy
 - eigenes Django-User-Modell als migrationssichere Grundlage für Rollen, Erstpasswortwechsel und Nutzungslimits
 - serverseitiger ElevenLabs-Adapter mit administrativ freigegebenem Stimmenkatalog
 - unveränderliche Projektversionen, wiederholbare Generierungsteile und geschützte Audioassets
-- streng validierte, explizit anzunehmende oder rückgängig zu machende KI-Vorschläge; LLM-Anbieter noch offen
+- geführte OpenAI-Texterstellung mit streng validierten, explizit anzunehmenden oder rückgängig zu machenden KI-Vorschlägen
+- verschlüsselte OpenAI-Zugangsdaten, administrativer Verbindungstest und Token-Protokoll je KI-Gespräch
 
 Provider-Schlüssel werden ausschließlich als Server-Umgebungsvariablen gesetzt. Die `.env`-Datei ist bewusst von Git und Docker-Buildkontext ausgeschlossen.
 
@@ -80,6 +81,8 @@ Provider-Schlüssel werden ausschließlich als Server-Umgebungsvariablen gesetzt
 ```
 
 Synchronisierte Stimmen sind zunächst deaktiviert. Sie werden im Django-Admin einzeln geprüft und freigeschaltet. Temporäre Passwörter können dort über die Benutzeraktion **Neue temporäre Passwörter erzeugen** einmalig erstellt werden.
+
+Die KI-Funktionen werden unter **Verwaltung → KI-Anbindung** eingerichtet. Dort wird der OpenAI-API-Schlüssel einmalig eingegeben, ein Modell ausgewählt und die Verbindung über die Listenaktion geprüft. Der Schlüssel wird verschlüsselt gespeichert und danach nur noch mit seinen letzten vier Zeichen angezeigt. Eine genaue Anleitung steht in [docs/ki-assistent-einrichtung.md](docs/ki-assistent-einrichtung.md).
 
 Beim ersten Öffnen der Projektübersicht erhält jedes Benutzerkonto fünf bearbeitbare, klar gekennzeichnete Bahnhofsdialog-Demos für Deutsch, Englisch, Französisch, Spanisch und Italienisch. Bestehende Konten lassen sich idempotent vorbereiten:
 
@@ -95,6 +98,10 @@ Die Audioerzeugung wird erst aktiv, wenn `ELEVENLABS_API_KEY` serverseitig geset
 
 Weitere Betriebs- und Pilotvorgaben stehen in [docs/operations.md](docs/operations.md) und [docs/pilot-checklist.md](docs/pilot-checklist.md).
 
+## Kontingente und Monitoring
+
+Die Plattform reserviert Nutzung vor Anbieteraufrufen und gleicht sie anschlieÃŸend mit den tatsÃ¤chlichen OpenAI-Tokens beziehungsweise ElevenLabs-Credits ab. Anbieterbudgets werden dynamisch Ã¼ber ihre Restlaufzeit verteilt; individuelle Grenzen werden im Benutzerkonto gepflegt. Die Einrichtung ist in [docs/kontingente-und-monitoring.md](docs/kontingente-und-monitoring.md) beschrieben.
+
 ## Zielserver und Reverse Proxy
 
 Die öffentliche Adresse ist `https://sprachplattform.markuspiller.de`. Auf dem Zielserver bindet Docker die Webanwendung an `192.168.2.21:8085`. Der zentrale Webserver-Container `101` (`192.168.2.11`) lauscht ausschließlich lokal auf `127.0.0.1:8085` und leitet über Nginx an die Anwendungs-VM weiter. Cloudflare verwendet dadurch weiterhin den internen Dienst `http://localhost:8085`.
@@ -108,6 +115,6 @@ Für den Server wird `.env.production.example` nach `.env` kopiert. Vor dem Star
 - ElevenLabs-API-Schlüssel und kuratierte Stimmen
 - Admin-MFA
 
-Geheimnisse gehören weder in Tickets noch in dieses Repository oder das Projektbriefing.
+Geheimnisse gehören weder in Tickets noch in dieses Repository oder das Projektbriefing. Da der OpenAI-Schlüssel mit `DJANGO_SECRET_KEY` verschlüsselt wird, muss dieser Wert bei Serverumzügen und Wiederherstellungen unverändert bleiben oder über `SECRET_KEY_FALLBACKS` verfügbar sein.
 
 HSTS-Preloading bleibt bewusst deaktiviert. `manage.py check --deploy` meldet deshalb die erwartete Warnung `security.W021`; eine Aktivierung ist erst nach Prüfung aller betroffenen Subdomains sinnvoll.

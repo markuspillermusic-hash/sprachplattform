@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}KI-Entwurf prüfen · Sprachplattform{% endblock %}
+{% block content %}
+<section class="page-shell assistant-workspace" aria-labelledby="assistant-title">
+  <header class="assistant-page-heading">
+    <a class="back-link" href="{% url 'projects:editor' conversation.project.id %}">← Zum bisherigen Hörtext</a>
+    <p class="eyebrow">KI-Unterstützung</p>
+    <h1 id="assistant-title">Entwurf prüfen und verfeinern.</h1>
+    <p class="lead">Noch ist nichts überschrieben. Übernehmen Sie den Entwurf erst, wenn er zu Ihrer Unterrichtsidee passt.</p>
+  </header>
+
+  <div class="assistant-workspace-grid">
+    <section class="assistant-preview" aria-labelledby="preview-title">
+      <div class="assistant-preview-heading">
+        <div><p class="eyebrow">Vorschau</p><h2 id="preview-title">{{ proposal.payload.title }}</h2></div>
+        <span class="status-badge">{{ proposal.payload.language|upper }} · {{ proposal.payload.level }}</span>
+      </div>
+      <div class="assistant-speaker-list" aria-label="Vorgesehene Sprecher">
+        {% for speaker in proposal.payload.speakers %}<span>{{ speaker.name }}</span>{% endfor %}
+      </div>
+      <ol class="assistant-segment-preview">
+        {% for segment in proposal.payload.segments %}
+          <li><strong>{{ segment.speaker }}</strong><p>{{ segment.text }}</p>{% if segment.direction %}<small>{{ segment.direction }}</small>{% endif %}</li>
+        {% endfor %}
+      </ol>
+      <div class="assistant-primary-actions">
+        <form method="post" action="{% url 'script_assistant:apply' conversation.id %}">{% csrf_token %}<button class="button button-primary" type="submit">Entwurf übernehmen und bearbeiten</button></form>
+        <form method="post" action="{% url 'script_assistant:discard' conversation.id %}" data-confirm="Diesen KI-Entwurf wirklich verwerfen?">{% csrf_token %}<button class="button button-danger" type="submit">Verwerfen</button></form>
+      </div>
+    </section>
+
+    <aside class="assistant-chat" aria-labelledby="chat-title">
+      <p class="eyebrow">Gespräch</p><h2 id="chat-title">Was soll sich ändern?</h2>
+      <div class="assistant-messages" aria-live="polite">
+        {% for item in conversation.messages.all %}
+          <div class="assistant-message message-{{ item.role }}"><span>{% if item.role == 'user' %}Sie{% else %}KI-Assistent{% endif %}</span><p>{{ item.content }}</p></div>
+        {% endfor %}
+      </div>
+      <div class="assistant-quick-actions" aria-label="Schnelle Änderungswünsche">
+        <button type="button" data-assistant-prompt="Bitte formuliere den Hörtext einfacher und passe ihn an ein niedrigeres Sprachniveau an.">Einfacher</button>
+        <button type="button" data-assistant-prompt="Bitte gestalte den Hörtext sprachlich anspruchsvoller.">Anspruchsvoller</button>
+        <button type="button" data-assistant-prompt="Bitte kürze den Hörtext deutlich, ohne den Kern der Situation zu verlieren.">Kürzer</button>
+        <button type="button" data-assistant-prompt="Bitte verlängere den Hörtext mit natürlichen zusätzlichen Gesprächsschritten.">Länger</button>
+        <button type="button" data-assistant-prompt="Bitte formuliere den Hörtext natürlicher und alltagsnäher.">Natürlicher</button>
+        <button type="button" data-assistant-prompt="Bitte ergänze sinnvolle Zahlen, Uhrzeiten oder Datumsangaben.">Zahlen &amp; Zeiten</button>
+      </div>
+      <form method="post" action="{% url 'script_assistant:refine' conversation.id %}" data-assistant-submit>
+        {% csrf_token %}
+        <div class="field"><label for="{{ refinement_form.instruction.id_for_label }}">{{ refinement_form.instruction.label }}</label>{{ refinement_form.instruction }}{% if refinement_form.instruction.errors %}<div class="field-errors">{{ refinement_form.instruction.errors }}</div>{% endif %}</div>
+        <button class="button button-secondary button-wide" type="submit">Entwurf überarbeiten</button>
+      </form>
+      <small class="assistant-usage">Bisher {{ conversation.input_tokens|add:conversation.output_tokens }} Text-Tokens · Modell {{ conversation.model }}</small>
+    </aside>
+  </div>
+</section>
+{% endblock %}

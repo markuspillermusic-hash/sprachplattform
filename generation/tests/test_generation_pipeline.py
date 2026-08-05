@@ -82,6 +82,7 @@ class GenerationPipelineTests(TestCase):
         self.assertEqual(job.version.snapshot["segments"][0]["text"], original_text)
         self.assertEqual(job.parts.count(), 1)
         self.assertEqual(UsageLedger.objects.get(job=job).character_count, len(original_text))
+        self.assertEqual(job.usage_event.status, "reserved")
 
     def test_user_limit_is_enforced_before_job_creation(self):
         self.user.character_limit = 5
@@ -123,6 +124,8 @@ class GenerationPipelineTests(TestCase):
         self.assertEqual(job.provider_request_ids, ["request-1"])
         self.assertIsNone(job.actual_cost_eur)
         self.assertIsNone(job.usage_entry.actual_cost_eur)
+        job.usage_event.refresh_from_db()
+        self.assertEqual(job.usage_event.status, "committed")
 
     @mock.patch("generation.services.subprocess.run")
     def test_assembler_fades_and_pads_every_phrase_before_the_configured_pause(self, run):

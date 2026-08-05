@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 import httpx
 
@@ -89,6 +89,16 @@ class ElevenLabsProvider(TTSProvider):
                 break
         return voices
 
+    def test_connection(self):
+        try:
+            response = self.client.get("/v1/user", headers=self._headers())
+        except httpx.TimeoutException:
+            raise ProviderTemporaryError("Die ElevenLabs-Verbindung hat zu lange gedauert.") from None
+        except httpx.RequestError:
+            raise ProviderTemporaryError("ElevenLabs ist derzeit nicht erreichbar.") from None
+        self._raise_safe(response)
+        return True
+
     def estimate_usage(self, script):
         characters = sum(len(item.text) for item in script)
         cost = (Decimal(characters) / Decimal(1000) * self.estimated_rate).quantize(
@@ -137,10 +147,19 @@ class ElevenLabsProvider(TTSProvider):
         except httpx.RequestError:
             raise ProviderTemporaryError("Die Verbindung zu ElevenLabs ist vorübergehend gestört.") from None
         self._raise_safe(response)
+        try:
+            provider_credit_count = (
+                Decimal(response.headers["character-cost"])
+                if response.headers.get("character-cost")
+                else None
+            )
+        except (InvalidOperation, ValueError):
+            provider_credit_count = None
         return SynthesisResult(
             audio=response.content,
             content_type=response.headers.get("content-type", "audio/mpeg"),
             provider_request_id=response.headers.get("request-id", response.headers.get("xi-request-id", "")),
+            provider_credit_count=provider_credit_count,
         )
 
     def get_job_result(self, provider_job_id):

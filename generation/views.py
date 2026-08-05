@@ -7,11 +7,18 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
+from usage_control.services import release_usage
+from tts.providers import tts_provider_is_configured
 
 from projects.views import owned_project, visible_projects
 
 from .models import AudioAsset, GenerationJob
-from .services import GenerationValidationError, UsageLimitExceeded, create_generation_job
+from .services import (
+    GenerationValidationError,
+    UsageLimitExceeded,
+    create_generation_job,
+    ensure_generation_reservation,
+)
 from .tasks import generate_audio
 
 
@@ -19,7 +26,7 @@ from .tasks import generate_audio
 @login_required
 def start_generation(request, project_id):
     project = owned_project(request, project_id)
-    if not settings.ELEVENLABS_API_KEY:
+    if not tts_provider_is_configured():
         messages.error(request, "Der ElevenLabs-Zugang ist noch nicht serverseitig konfiguriert.")
         return redirect("projects:editor", project_id=project.pk)
     try:
@@ -34,6 +41,8 @@ def start_generation(request, project_id):
         job.error_message = "Die Hintergrundverarbeitung ist vorübergehend nicht erreichbar."
         job.finished_at = timezone.now()
         job.save(update_fields=["status", "error_message", "finished_at"])
+        if job.usage_event_id:
+            release_usage(job.usage_event, reference=f"generation:{job.pk}:queue-failed")
         messages.error(request, job.error_message)
     else:
         messages.success(request, "Die Audioerzeugung wurde gestartet.")
@@ -51,6 +60,11 @@ def retry_generation(request, job_id):
     if job.status != GenerationJob.Status.FAILED:
         messages.error(request, "Nur fehlgeschlagene Aufträge können erneut gestartet werden.")
     else:
+        try:
+            ensure_generation_reservation(job)
+        except UsageLimitExceeded as exc:
+            messages.error(request, str(exc))
+            return redirect("projects:editor", project_id=job.version.project_id)
         job.status = GenerationJob.Status.QUEUED
         job.error_message = ""
         job.finished_at = None
