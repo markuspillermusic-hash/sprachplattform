@@ -8,6 +8,7 @@ from tts.models import ProviderVoice, VoiceFavorite
 
 from .models import AssistantProposal
 from .schema import validate_script_proposal
+from .voice_casting import default_speaker_profile, match_voices_to_profiles
 
 
 def editable_project_snapshot(project):
@@ -51,7 +52,7 @@ def create_proposal(project, created_by, payload, *, conversation=None):
     )
 
 
-def assign_compatible_voices(project, user):
+def assign_compatible_voices(project, user, speaker_profiles=None):
     voices = [
         voice
         for voice in ProviderVoice.objects.filter(active=True).order_by("display_name")
@@ -62,17 +63,43 @@ def assign_compatible_voices(project, user):
     favorite_ids = set(
         VoiceFavorite.objects.filter(user=user, voice__active=True).values_list("voice_id", flat=True)
     )
-    voices.sort(key=lambda voice: (voice.pk not in favorite_ids, voice.display_name.casefold()))
+    profiles_by_name = {
+        profile["name"]: profile
+        for profile in (speaker_profiles or [])
+        if isinstance(profile, dict) and profile.get("name")
+    }
+    ordered_speakers = list(project.speakers.order_by("position", "name"))
+    profiles = [
+        profiles_by_name.get(speaker.name, default_speaker_profile(speaker.name))
+        for speaker in ordered_speakers
+        if not speaker.voice_id
+    ]
+    matches = match_voices_to_profiles(
+        voices,
+        profiles,
+        project_language=project.language,
+        favorite_ids=favorite_ids,
+    )
     assigned = []
-    for index, speaker in enumerate(project.speakers.order_by("position", "name")):
+    warnings = []
+    for speaker in ordered_speakers:
         if speaker.voice_id:
             continue
-        voice = voices[index % len(voices)]
+        match = matches.get(speaker.name)
+        if match is None:
+            continue
+        voice = match.voice
         speaker.provider = voice.provider
         speaker.model = voice.model
         speaker.voice_id = voice.voice_id
         speaker.save(update_fields=["provider", "model", "voice_id"])
         assigned.append(voice)
+        if match.mismatches:
+            warnings.append(
+                f"Für {speaker.name} war keine vollständig passende aktive Stimme verfügbar "
+                f"({', '.join(match.mismatches)}); gewählt wurde {voice.display_name}."
+            )
+    project._voice_assignment_warnings = warnings
     return assigned
 
 
@@ -155,7 +182,7 @@ def apply_proposal(proposal, mode):
     proposal.save(
         update_fields=["previous_snapshot", "applied_snapshot", "status", "apply_mode", "applied_at"]
     )
-    assign_compatible_voices(project, proposal.created_by)
+    assign_compatible_voices(project, proposal.created_by, proposal.payload.get("speakers"))
     proposal.applied_snapshot = editable_project_snapshot(project)
     proposal.save(update_fields=["applied_snapshot"])
     return project

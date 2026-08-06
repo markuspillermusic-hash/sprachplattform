@@ -10,6 +10,7 @@ from .models import AssistantConversation, AssistantProposal
 from .providers import AssistantProviderError, AssistantProviderNotConfigured
 from .schema import ProposalValidationError
 from .services import apply_proposal, discard_proposal, undo_proposal
+from .voice_casting import profile_for_display
 from .workflows import begin_project_revision, refine_conversation
 from usage_control.services import QuotaExceeded
 
@@ -34,6 +35,9 @@ def conversation_detail(request, conversation_id):
         {
             "conversation": conversation,
             "proposal": proposal,
+            "speaker_profiles": [
+                profile_for_display(profile) for profile in proposal.payload.get("speakers", [])
+            ],
             "refinement_form": AssistantRefinementForm(),
         },
     )
@@ -49,7 +53,15 @@ def conversation_refine(request, conversation_id):
         return render(
             request,
             "script_assistant/conversation.html",
-            {"conversation": conversation, "proposal": proposal, "refinement_form": form},
+            {
+                "conversation": conversation,
+                "proposal": proposal,
+                "speaker_profiles": [
+                    profile_for_display(profile)
+                    for profile in (proposal.payload.get("speakers", []) if proposal else [])
+                ],
+                "refinement_form": form,
+            },
             status=422,
         )
     try:
@@ -80,6 +92,8 @@ def conversation_apply(request, conversation_id):
         request,
         "Der KI-Entwurf wurde übernommen. Sie können Text und Stimmen jetzt frei bearbeiten.",
     )
+    for warning in getattr(project, "_voice_assignment_warnings", []):
+        messages.warning(request, warning)
     return redirect("projects:editor", project_id=project.pk)
 
 

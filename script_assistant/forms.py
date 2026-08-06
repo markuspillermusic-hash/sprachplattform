@@ -18,8 +18,22 @@ class AssistantBriefForm(forms.Form):
         (180, "etwa 3 Minuten"),
     )
     SPEAKER_CHOICES = tuple((count, str(count)) for count in range(1, 5))
+    ENGLISH_ACCENT_CHOICES = (
+        ("unspecified", "Automatisch passend auswählen"),
+        ("british", "Britisches Englisch"),
+        ("american", "Amerikanisches Englisch"),
+        ("australian", "Australisches Englisch"),
+        ("irish", "Irisches Englisch"),
+    )
 
     language = forms.ChoiceField(choices=Project.Language.choices, label="Zielsprache")
+    english_accent = forms.ChoiceField(
+        choices=ENGLISH_ACCENT_CHOICES,
+        label="Englischer Akzent",
+        initial="unspecified",
+        required=False,
+        help_text="Bei Englisch kann die Aussprache gezielt festgelegt werden.",
+    )
     level = forms.ChoiceField(choices=Project.Level.choices, label="GER-Niveau", initial=Project.Level.A2)
     format = forms.ChoiceField(choices=FORMAT_CHOICES, label="Art des Hörtexts", initial="dialogue")
     topic = forms.CharField(
@@ -59,6 +73,18 @@ class AssistantBriefForm(forms.Form):
         required=False,
         widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Optional: Kundin und Verkäufer, zwei Jugendliche …"}),
     )
+    voice_preferences = forms.CharField(
+        label="Stimmenwünsche",
+        max_length=1_000,
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "rows": 2,
+                "placeholder": "Optional: Lehrerin erwachsen und ruhig; Schüler jugendlich und locker …",
+            }
+        ),
+        help_text="Die KI übersetzt diese Wünsche in Alter, Rolle, Geschlecht, Akzent und Stimmstil.",
+    )
     additional_instructions = forms.CharField(
         label="Was ist sonst noch wichtig?",
         max_length=2_000,
@@ -70,6 +96,8 @@ class AssistantBriefForm(forms.Form):
         cleaned = super().clean()
         if cleaned.get("format") == "monologue":
             cleaned["speaker_count"] = 1
+        if cleaned.get("language") != Project.Language.EN:
+            cleaned["english_accent"] = "unspecified"
         return cleaned
 
 

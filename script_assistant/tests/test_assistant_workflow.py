@@ -63,6 +63,7 @@ class AssistantWorkflowTests(TestCase):
         return {
             "mode": "assistant",
             "language": "fr",
+            "english_accent": "british",
             "level": "A2",
             "format": "dialogue",
             "topic": "Zwei Freunde verabreden sich für das Kino.",
@@ -71,6 +72,7 @@ class AssistantWorkflowTests(TestCase):
             "vocabulary": "film, billet",
             "grammar_focus": "",
             "speaker_roles": "zwei Freunde",
+            "voice_preferences": "junge, natürliche Stimmen",
             "additional_instructions": "",
         }
 
@@ -86,6 +88,7 @@ class AssistantWorkflowTests(TestCase):
             fetch_redirect_response=False,
         )
         self.assertEqual(project.segments.count(), 0)
+        self.assertEqual(conversation.brief["english_accent"], "unspecified")
         preview = self.client.get(reverse("script_assistant:conversation", args=[conversation.pk]))
         self.assertContains(preview, "Au cinéma")
         self.assertContains(preview, "Entwurf übernehmen und bearbeiten")
@@ -107,6 +110,16 @@ class AssistantWorkflowTests(TestCase):
         self.assertEqual(usage.status, UsageEvent.Status.COMMITTED)
         self.assertEqual(usage.input_tokens, 100)
         self.assertEqual(usage.output_tokens, 200)
+
+    @patch("script_assistant.workflows.get_script_assistant_provider", return_value=FakeProvider())
+    def test_english_accent_is_kept_in_assistant_brief(self, provider):
+        form_data = self.assistant_form_data()
+        form_data["language"] = "en"
+        form_data["english_accent"] = "american"
+
+        self.client.post(reverse("projects:create"), form_data)
+
+        self.assertEqual(AssistantConversation.objects.get().brief["english_accent"], "american")
 
     @patch("script_assistant.workflows.get_script_assistant_provider", return_value=FakeProvider())
     def test_foreign_user_cannot_open_conversation(self, provider):

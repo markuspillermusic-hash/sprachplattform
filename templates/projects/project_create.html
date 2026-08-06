@@ -45,7 +45,7 @@
       <div class="assistant-core-fields">
         {% for field in assistant_form %}
           {% if field.name == 'vocabulary' %}<details class="assistant-optional"><summary>Optionale Lernziele und Rollen</summary>{% endif %}
-          <div class="field field-{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}</div>
+          <div class="field field-{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small class="form-help">{{ field.help_text }}</small>{% endif %}{% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}</div>
           {% if field.name == 'additional_instructions' %}</details>{% endif %}
         {% endfor %}
       </div>

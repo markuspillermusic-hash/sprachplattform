@@ -7,6 +7,7 @@ from script_assistant.models import AssistantProposal
 from script_assistant.providers import AssistantProviderNotConfigured, get_script_assistant_provider
 from script_assistant.schema import ProposalValidationError, validate_script_proposal
 from script_assistant.services import apply_proposal, create_proposal, undo_proposal
+from tts.models import ProviderVoice, VoiceFavorite
 
 
 def valid_payload():
@@ -14,7 +15,26 @@ def valid_payload():
         "title": "Au cinéma",
         "language": "fr",
         "level": "A2",
-        "speakers": [{"name": "Élodie"}, {"name": "Thomas"}],
+        "speakers": [
+            {
+                "name": "Élodie",
+                "role": "Freundin",
+                "role_type": "conversation",
+                "gender": "female",
+                "age_group": "young_adult",
+                "accent": "unspecified",
+                "voice_style": "casual",
+            },
+            {
+                "name": "Thomas",
+                "role": "Freund",
+                "role_type": "conversation",
+                "gender": "male",
+                "age_group": "young_adult",
+                "accent": "unspecified",
+                "voice_style": "casual",
+            },
+        ],
         "segments": [
             {
                 "speaker": "Élodie",
@@ -43,6 +63,16 @@ class ProposalSchemaTests(TestCase):
             validate_script_proposal(payload)
         self.assertIn("unbekannte Felder", str(raised.exception))
         self.assertIn("unbekannter Sprecher", str(raised.exception))
+
+    def test_legacy_speaker_names_receive_safe_casting_defaults(self):
+        payload = valid_payload()
+        payload["speakers"] = [{"name": "Élodie"}, {"name": "Thomas"}]
+
+        normalized = validate_script_proposal(payload)
+
+        self.assertEqual(normalized["speakers"][0]["age_group"], "unspecified")
+        self.assertEqual(normalized["speakers"][0]["accent"], "unspecified")
+        self.assertEqual(normalized["speakers"][0]["voice_style"], "neutral")
 
     def test_provider_choice_remains_explicitly_open(self):
         with self.assertRaises(AssistantProviderNotConfigured):
@@ -96,3 +126,96 @@ class ProposalApplicationTests(TestCase):
     def test_foreign_user_cannot_create_proposal(self):
         with self.assertRaises(PermissionDenied):
             create_proposal(self.project, self.other, valid_payload())
+
+    def test_casting_prefers_matching_age_role_gender_and_british_accent_over_favorite(self):
+        unsuitable_favorite = ProviderVoice.objects.create(
+            provider="elevenlabs",
+            model="eleven_v3",
+            voice_id="deep-american-adult",
+            display_name="Deep American Adult",
+            languages=["en"],
+            labels={
+                "age": "middle_aged",
+                "accent": "american",
+                "gender": "male",
+                "use_case": "social_media",
+                "descriptive": "deep",
+            },
+            active=True,
+        )
+        teacher_voice = ProviderVoice.objects.create(
+            provider="elevenlabs",
+            model="eleven_v3",
+            voice_id="british-teacher",
+            display_name="British Teacher",
+            languages=["en"],
+            labels={
+                "age": "middle_aged",
+                "accent": "british",
+                "gender": "female",
+                "use_case": "informative_educational",
+                "descriptive": "professional",
+            },
+            active=True,
+        )
+        student_voice = ProviderVoice.objects.create(
+            provider="elevenlabs",
+            model="eleven_v3",
+            voice_id="british-student",
+            display_name="British Student",
+            languages=["en"],
+            labels={
+                "age": "young",
+                "accent": "british",
+                "gender": "male",
+                "use_case": "conversational",
+                "descriptive": "casual",
+            },
+            active=True,
+        )
+        VoiceFavorite.objects.create(user=self.user, voice=unsuitable_favorite)
+        payload = valid_payload()
+        payload.update(title="At school", language="en", level="B1")
+        payload["speakers"] = [
+            {
+                "name": "Ms Taylor",
+                "role": "teacher",
+                "role_type": "teacher",
+                "gender": "female",
+                "age_group": "adult",
+                "accent": "british",
+                "voice_style": "professional",
+            },
+            {
+                "name": "Ben",
+                "role": "student",
+                "role_type": "student",
+                "gender": "male",
+                "age_group": "teen",
+                "accent": "british",
+                "voice_style": "casual",
+            },
+        ]
+        payload["segments"] = [
+            {
+                "speaker": "Ms Taylor",
+                "text": "Have you finished your homework?",
+                "direction": "friendly",
+                "pause_after_ms": 500,
+                "speed": 1,
+            },
+            {
+                "speaker": "Ben",
+                "text": "Yes, I have.",
+                "direction": "friendly",
+                "pause_after_ms": 500,
+                "speed": 1,
+            },
+        ]
+
+        proposal = create_proposal(self.project, self.user, payload)
+        apply_proposal(proposal, AssistantProposal.ApplyMode.REPLACE)
+
+        speakers = {speaker.name: speaker for speaker in self.project.speakers.all()}
+        self.assertEqual(speakers["Ms Taylor"].voice_id, teacher_voice.voice_id)
+        self.assertEqual(speakers["Ben"].voice_id, student_voice.voice_id)

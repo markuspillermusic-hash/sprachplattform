@@ -1,6 +1,14 @@
 from copy import deepcopy
 
 from projects.models import Project, ScriptSegment
+from .voice_casting import (
+    ACCENTS,
+    AGE_GROUPS,
+    GENDERS,
+    ROLE_TYPES,
+    VOICE_STYLES,
+    default_speaker_profile,
+)
 
 
 class ProposalValidationError(ValueError):
@@ -40,12 +48,30 @@ def validate_script_proposal(payload):
         if not isinstance(speaker, dict):
             errors.append(f"speakers[{index}]: muss ein Objekt sein")
             continue
-        _unknown_keys(speaker, {"name"}, f"speakers[{index}]", errors)
+        _unknown_keys(
+            speaker,
+            {"name", "role", "role_type", "gender", "age_group", "accent", "voice_style"},
+            f"speakers[{index}]",
+            errors,
+        )
         name = speaker.get("name")
         if not isinstance(name, str) or not name.strip() or len(name.strip()) > 80:
             errors.append(f"speakers[{index}].name: ungültig")
         else:
             speaker_names.append(name.strip())
+        role = speaker.get("role", "")
+        if not isinstance(role, str) or len(role.strip()) > 120:
+            errors.append(f"speakers[{index}].role: ungültig")
+        if speaker.get("role_type", "other") not in ROLE_TYPES:
+            errors.append(f"speakers[{index}].role_type: ungültig")
+        if speaker.get("gender", "unspecified") not in GENDERS:
+            errors.append(f"speakers[{index}].gender: ungültig")
+        if speaker.get("age_group", "unspecified") not in AGE_GROUPS:
+            errors.append(f"speakers[{index}].age_group: ungültig")
+        if speaker.get("accent", "unspecified") not in ACCENTS:
+            errors.append(f"speakers[{index}].accent: ungültig")
+        if speaker.get("voice_style", "neutral") not in VOICE_STYLES:
+            errors.append(f"speakers[{index}].voice_style: ungültig")
     if len(set(speaker_names)) != len(speaker_names):
         errors.append("speakers: Namen müssen eindeutig sein")
 
@@ -92,6 +118,18 @@ def validate_script_proposal(payload):
     normalized = deepcopy(payload)
     normalized["title"] = title.strip()
     normalized["level"] = level
-    normalized["speakers"] = [{"name": name} for name in speaker_names]
+    normalized_speakers = []
+    for speaker, name in zip(speakers, speaker_names):
+        profile = default_speaker_profile(name)
+        profile.update(
+            role=speaker.get("role", "").strip(),
+            role_type=speaker.get("role_type", "other"),
+            gender=speaker.get("gender", "unspecified"),
+            age_group=speaker.get("age_group", "unspecified"),
+            accent=speaker.get("accent", "unspecified"),
+            voice_style=speaker.get("voice_style", "neutral"),
+        )
+        normalized_speakers.append(profile)
+    normalized["speakers"] = normalized_speakers
     normalized["segments"] = normalized_segments
     return normalized

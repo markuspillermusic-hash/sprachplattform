@@ -2,11 +2,13 @@ from django.conf import settings
 from django.db import transaction
 
 from projects.models import Project
+from tts.models import ProviderVoice
 
 from .models import AssistantConversation, AssistantMessage, AssistantProposal
 from .providers import get_script_assistant_provider
 from .schema import validate_script_proposal
 from .services import create_proposal, discard_proposal, editable_project_snapshot
+from .voice_casting import default_speaker_profile, profile_from_voice
 from usage_control.models import UsageEvent
 from usage_control.services import (
     calculate_token_cost,
@@ -91,10 +93,22 @@ def _brief_message(brief):
         announcement="Durchsage",
         story="Erzählung",
     ).get(brief["format"], brief["format"])
-    return (
+    summary = (
         f"{format_label} auf {language}, Niveau {brief['level']}, "
         f"etwa {brief['duration_seconds']} Sekunden: {brief['topic']}"
     )
+    accent = brief.get("english_accent")
+    if brief.get("language") == Project.Language.EN and accent not in (None, "", "unspecified"):
+        accent_label = {
+            "british": "britisches Englisch",
+            "american": "amerikanisches Englisch",
+            "australian": "australisches Englisch",
+            "irish": "irisches Englisch",
+        }.get(accent, accent)
+        summary += f" Aussprache: {accent_label}."
+    if brief.get("voice_preferences"):
+        summary += f" Stimmenwünsche: {brief['voice_preferences']}"
+    return summary
 
 
 def _assistant_message(payload):
@@ -106,11 +120,24 @@ def _assistant_message(payload):
 
 def project_payload(project):
     snapshot = editable_project_snapshot(project)
+    voice_ids = [item["voice_id"] for item in snapshot["speakers"] if item.get("voice_id")]
+    voices = {
+        (voice.provider, voice.model, voice.voice_id): voice
+        for voice in ProviderVoice.objects.filter(voice_id__in=voice_ids)
+    }
+    speaker_profiles = []
+    for item in snapshot["speakers"]:
+        voice = voices.get((item["provider"], item["model"], item["voice_id"]))
+        speaker_profiles.append(
+            profile_from_voice(item["name"], voice)
+            if voice
+            else default_speaker_profile(item["name"])
+        )
     return {
         "title": snapshot["title"],
         "language": snapshot["language"],
         "level": snapshot["level"] or Project.Level.A2,
-        "speakers": [{"name": item["name"]} for item in snapshot["speakers"]],
+        "speakers": speaker_profiles,
         "segments": [
             {
                 "speaker": item["speaker"],

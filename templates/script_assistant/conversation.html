@@ -16,7 +16,12 @@
         <span class="status-badge">{{ proposal.payload.language|upper }} · {{ proposal.payload.level }}</span>
       </div>
       <div class="assistant-speaker-list" aria-label="Vorgesehene Sprecher">
-        {% for speaker in proposal.payload.speakers %}<span>{{ speaker.name }}</span>{% endfor %}
+        {% for speaker in speaker_profiles %}
+          <span title="{{ speaker.gender_label }}, {{ speaker.age_group_label }}, {{ speaker.accent_label }}, {{ speaker.voice_style_label }}">
+            {{ speaker.name }}{% if speaker.role %} · {{ speaker.role }}{% endif %}<br>
+            <small>{{ speaker.age_group_label }} · {{ speaker.gender_label }}{% if proposal.payload.language == 'en' %} · {{ speaker.accent_label }}{% endif %}</small>
+          </span>
+        {% endfor %}
       </div>
       <ol class="assistant-segment-preview">
         {% for segment in proposal.payload.segments %}
@@ -43,6 +48,8 @@
         <button type="button" data-assistant-prompt="Bitte verlängere den Hörtext mit natürlichen zusätzlichen Gesprächsschritten.">Länger</button>
         <button type="button" data-assistant-prompt="Bitte formuliere den Hörtext natürlicher und alltagsnäher.">Natürlicher</button>
         <button type="button" data-assistant-prompt="Bitte ergänze sinnvolle Zahlen, Uhrzeiten oder Datumsangaben.">Zahlen &amp; Zeiten</button>
+        <button type="button" data-assistant-prompt="Bitte verwende für alle Rollen britisches Englisch und wähle dazu passende Stimmprofile.">Britisches Englisch</button>
+        <button type="button" data-assistant-prompt="Bitte verwende für alle Rollen amerikanisches Englisch und wähle dazu passende Stimmprofile.">Amerikanisches Englisch</button>
       </div>
       <form method="post" action="{% url 'script_assistant:refine' conversation.id %}" data-assistant-submit>
         {% csrf_token %}

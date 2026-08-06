@@ -6,6 +6,7 @@ import httpx
 from projects.models import Project, ScriptSegment
 
 from .base import AssistantProviderError, AssistantProviderResult, ScriptAssistantProvider
+from ..voice_casting import ACCENTS, AGE_GROUPS, GENDERS, ROLE_TYPES, VOICE_STYLES
 
 
 SCRIPT_SCHEMA = {
@@ -20,8 +21,24 @@ SCRIPT_SCHEMA = {
             "maxItems": 10,
             "items": {
                 "type": "object",
-                "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 80}},
-                "required": ["name"],
+                "properties": {
+                    "name": {"type": "string", "minLength": 1, "maxLength": 80},
+                    "role": {"type": "string", "maxLength": 120},
+                    "role_type": {"type": "string", "enum": list(ROLE_TYPES)},
+                    "gender": {"type": "string", "enum": list(GENDERS)},
+                    "age_group": {"type": "string", "enum": list(AGE_GROUPS)},
+                    "accent": {"type": "string", "enum": list(ACCENTS)},
+                    "voice_style": {"type": "string", "enum": list(VOICE_STYLES)},
+                },
+                "required": [
+                    "name",
+                    "role",
+                    "role_type",
+                    "gender",
+                    "age_group",
+                    "accent",
+                    "voice_style",
+                ],
                 "additionalProperties": False,
             },
         },
@@ -52,6 +69,11 @@ SYSTEM_PROMPT = """Du erstellst didaktisch geeignete Hörtexte für den Sprachun
 Halte Zielsprache, GER-Niveau, Situation, Rollen, gewünschte Länge und Lernziele genau ein.
 Schreibe natürlich, altersneutral und ohne Erklärtext außerhalb des verlangten Schemas.
 Jeder Sprechername muss eindeutig sein und jeder Beitrag muss einen vorhandenen Sprecher verwenden.
+Beschreibe für jeden Sprecher zusätzlich Rolle, den passenden kanonischen role_type, Geschlecht, Altersgruppe, Akzent und gewünschten Stimmstil.
+Leite die Altersgruppe sinnvoll aus der Rolle ab: Eine Lehrkraft ist in der Regel erwachsen, ein Schulkind oder Schüler je nach Kontext Kind oder jugendlich. Vermeide dadurch unplausible Alters- und Stimmkontraste.
+Berufe und soziale Rollen bestimmen kein Geschlecht. Übernimm ausdrückliche Wünsche und eindeutige Figurenangaben; verwende sonst "unspecified".
+Wenn english_accent im Briefing british, american, australian oder irish ist, übernimm diesen Akzent für alle englischsprachigen Rollen, sofern kein rollenbezogener Wunsch widerspricht.
+Wähle keine konkreten Produktnamen oder voice_ids. Die Plattform ordnet den Profilen anschließend passende verfügbare Stimmen zu.
 Schätze die Länge mit etwa 130 gesprochenen Wörtern pro Minute.
 Regieanweisungen dürfen nur aus der vorgegebenen Auswahlliste stammen; nutze im Zweifel den leeren Wert.
 Wenn ein vorhandener Entwurf und ein Änderungswunsch übergeben werden, überarbeite den Entwurf vollständig und bewahre alles, was nicht geändert werden soll."""

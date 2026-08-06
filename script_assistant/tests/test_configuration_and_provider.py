@@ -98,6 +98,11 @@ class OpenAIProviderTests(TestCase):
         self.assertEqual(captured["authorization"], "Bearer sk-provider-test")
         self.assertFalse(captured["body"]["store"])
         self.assertTrue(captured["body"]["text"]["format"]["strict"])
+        speaker_schema = captured["body"]["text"]["format"]["schema"]["properties"]["speakers"]["items"]
+        self.assertIn("age_group", speaker_schema["required"])
+        self.assertIn("role_type", speaker_schema["required"])
+        self.assertIn("accent", speaker_schema["required"])
+        self.assertIn("voice_style", speaker_schema["required"])
         self.assertNotIn("_user_id", captured["body"]["input"])
         self.assertIn("safety_identifier", captured["body"])
 

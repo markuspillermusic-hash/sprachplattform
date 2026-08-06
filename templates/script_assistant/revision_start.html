@@ -11,6 +11,8 @@
       <button type="button" data-assistant-prompt="Bitte kürze den Hörtext deutlich.">Kürzer</button>
       <button type="button" data-assistant-prompt="Bitte verlängere den Hörtext sinnvoll.">Länger</button>
       <button type="button" data-assistant-prompt="Bitte formuliere den Hörtext natürlicher und alltagsnäher.">Natürlicher</button>
+      <button type="button" data-assistant-prompt="Bitte verwende für alle Rollen britisches Englisch und wähle dazu passende Stimmprofile.">Britisches Englisch</button>
+      <button type="button" data-assistant-prompt="Bitte verwende für alle Rollen amerikanisches Englisch und wähle dazu passende Stimmprofile.">Amerikanisches Englisch</button>
     </div>
     <div class="field"><label for="{{ form.instruction.id_for_label }}">{{ form.instruction.label }}</label>{{ form.instruction }}{% if form.instruction.errors %}<div class="field-errors">{{ form.instruction.errors }}</div>{% endif %}</div>
     <button class="button button-primary button-wide" type="submit">Neuen Entwurf erstellen</button>

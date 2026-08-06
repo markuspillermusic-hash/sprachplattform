@@ -199,6 +199,7 @@ dd { margin: 0; font-weight: 700; text-align: right; }
 .assistant-preview-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
 .assistant-speaker-list { margin: 0 0 1.2rem; display: flex; flex-wrap: wrap; gap: 0.45rem; }
 .assistant-speaker-list span { padding: 0.35rem 0.65rem; border-radius: 999px; color: var(--brand-dark); background: #e7f2ed; font-size: 0.8rem; font-weight: 750; }
+.assistant-speaker-list small { color: var(--muted); font-size: 0.72rem; font-weight: 550; }
 .assistant-segment-preview { margin: 0; padding: 0; display: grid; gap: 0.8rem; list-style: none; }
 .assistant-segment-preview li { padding: 1rem; border-left: 0.28rem solid var(--brand); border-radius: 0.7rem; background: var(--paper); }
 .assistant-segment-preview strong { color: var(--brand-dark); font-size: 0.84rem; }

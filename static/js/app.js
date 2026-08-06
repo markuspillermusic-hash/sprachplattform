@@ -110,4 +110,17 @@
       input.focus();
     });
   });
+
+  const assistantLanguage = document.querySelector('.assistant-brief-card [name="language"]');
+  const accentField = document.querySelector('.assistant-brief-card .field-english_accent');
+  if (assistantLanguage && accentField) {
+    const accentSelect = accentField.querySelector('select');
+    const updateAccentVisibility = () => {
+      const isEnglish = assistantLanguage.value === 'en';
+      accentField.hidden = !isEnglish;
+      if (!isEnglish && accentSelect) accentSelect.value = 'unspecified';
+    };
+    assistantLanguage.addEventListener('change', updateAccentVisibility);
+    updateAccentVisibility();
+  }
 })();
