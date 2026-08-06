@@ -124,7 +124,7 @@ class ElevenLabsProviderTests(SimpleTestCase):
         provider = self.provider_with_handler(handler)
 
         self.assertTrue(provider.test_connection())
-        self.assertEqual(captured, {"method": "GET", "path": "/v1/models"})
+        self.assertEqual(captured, {"method": "GET", "path": "/v2/voices"})
 
     def test_http_error_does_not_expose_api_key_or_response_body(self):
         provider = self.provider_with_handler(

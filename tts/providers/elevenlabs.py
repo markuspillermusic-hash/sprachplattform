@@ -91,7 +91,11 @@ class ElevenLabsProvider(TTSProvider):
 
     def test_connection(self):
         try:
-            response = self.client.get("/v1/models", headers=self._headers())
+            response = self.client.get(
+                "/v2/voices",
+                params={"page_size": 1, "include_total_count": "false"},
+                headers=self._headers(),
+            )
         except httpx.TimeoutException:
             raise ProviderTemporaryError("Die ElevenLabs-Verbindung hat zu lange gedauert.") from None
         except httpx.RequestError:
