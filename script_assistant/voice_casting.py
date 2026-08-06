@@ -76,6 +76,10 @@ def default_speaker_profile(name):
     }
 
 
+def persistent_speaker_accent(value):
+    return value if value in {"british", "american", "australian", "irish"} else ""
+
+
 def _plain(value):
     normalized = unicodedata.normalize("NFKD", str(value or ""))
     return "".join(character for character in normalized if not unicodedata.combining(character)).casefold()

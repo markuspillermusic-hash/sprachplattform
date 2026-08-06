@@ -62,6 +62,7 @@
               <div class="field"><label for="{{ form.name.id_for_label }}">Name</label>{{ form.name }}</div>
               <div class="field"><label for="{{ form.color.id_for_label }}">Farbe</label>{{ form.color }}</div>
               <div class="field"><label for="{{ form.voice.id_for_label }}">Stimme</label>{{ form.voice }}{% if form.voice.errors %}<div class="field-errors">{{ form.voice.errors }}</div>{% endif %}</div>
+              {% if form.accent %}<div class="field"><label for="{{ form.accent.id_for_label }}">Akzent</label>{{ form.accent }}<small class="field-help">{{ form.accent.help_text }}</small></div>{% endif %}
               <div class="voice-preview-panel" data-voice-preview-panel hidden>
                 <span class="voice-preview-label" data-voice-preview-label>Stimmenprobe</span>
                 <audio class="voice-preview" controls preload="none" data-voice-preview></audio>
@@ -79,6 +80,7 @@
             <div class="field"><label for="{{ speaker_form.name.id_for_label }}">Name</label>{{ speaker_form.name }}</div>
             <div class="field"><label for="{{ speaker_form.color.id_for_label }}">Farbe</label>{{ speaker_form.color }}</div>
             <div class="field"><label for="{{ speaker_form.voice.id_for_label }}">Stimme (optional)</label>{{ speaker_form.voice }}</div>
+            {% if speaker_form.accent %}<div class="field"><label for="{{ speaker_form.accent.id_for_label }}">Akzent</label>{{ speaker_form.accent }}<small class="field-help">{{ speaker_form.accent.help_text }}</small></div>{% endif %}
             <div class="voice-preview-panel" data-voice-preview-panel hidden>
               <span class="voice-preview-label" data-voice-preview-label>Stimmenprobe</span>
               <audio class="voice-preview" controls preload="none" data-voice-preview></audio>

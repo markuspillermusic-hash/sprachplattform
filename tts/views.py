@@ -39,6 +39,16 @@ AGE_NAMES = {
     "old": "Älter",
 }
 
+ACCENT_NAMES = {
+    "american": "Amerikanisch",
+    "australian": "Australisch",
+    "british": "Britisch",
+    "german": "Deutsch",
+    "irish": "Irisch",
+    "parisian": "Pariser Französisch",
+    "standard": "Standard",
+}
+
 
 def _label(voice, key):
     value = voice.labels.get(key, "")
@@ -61,6 +71,8 @@ def voice_catalog(request):
 
     language = request.GET.get("language", "").strip().lower()
     gender = request.GET.get("gender", "").strip().lower()
+    accent = request.GET.get("accent", "").strip().lower()
+    age = request.GET.get("age", "").strip().lower()
     use_case = request.GET.get("use_case", "").strip().lower()
     provider = request.GET.get("provider", "").strip().lower()
     query = request.GET.get("q", "").strip()[:120]
@@ -71,10 +83,16 @@ def voice_catalog(request):
     for voice in voices:
         voice_languages = [str(code).lower() for code in voice.languages]
         voice_gender = _label(voice, "gender").lower()
+        voice_accent = _label(voice, "accent").lower()
+        voice_age = _label(voice, "age").lower()
         voice_use_case = _label(voice, "use_case").lower()
         if language and language not in voice_languages:
             continue
         if gender and gender != voice_gender:
+            continue
+        if accent and accent != voice_accent:
+            continue
+        if age and age != voice_age:
             continue
         if use_case and use_case != voice_use_case:
             continue
@@ -121,7 +139,15 @@ def voice_catalog(request):
                 _label(voice, "age").lower(),
                 _display_label(_label(voice, "age")),
             ),
-            "accent": _display_label(_label(voice, "accent")),
+            "accent": ACCENT_NAMES.get(
+                _label(voice, "accent").lower(),
+                _display_label(_label(voice, "accent")),
+            ),
+            "source": (
+                "ElevenLabs Voice Library"
+                if _label(voice, "catalog_source") == "voice_library"
+                else "ElevenLabs-Konto"
+            ),
         }
         for voice in filtered
     ]
@@ -141,6 +167,12 @@ def voice_catalog(request):
     use_case_values = sorted(
         {_label(voice, "use_case").lower() for voice in voices if _label(voice, "use_case")}
     )
+    accent_values = sorted(
+        {_label(voice, "accent").lower() for voice in voices if _label(voice, "accent")}
+    )
+    age_values = sorted(
+        {_label(voice, "age").lower() for voice in voices if _label(voice, "age")}
+    )
     provider_values = sorted({voice.provider for voice in voices}, key=str.casefold)
 
     return render(
@@ -159,6 +191,13 @@ def voice_catalog(request):
                 (value, GENDER_NAMES.get(value, _display_label(value)))
                 for value in gender_values
             ],
+            "accent_options": [
+                (value, ACCENT_NAMES.get(value, _display_label(value)))
+                for value in accent_values
+            ],
+            "age_options": [
+                (value, AGE_NAMES.get(value, _display_label(value))) for value in age_values
+            ],
             "use_case_options": [
                 (value, USE_CASE_NAMES.get(value, _display_label(value)))
                 for value in use_case_values
@@ -168,6 +207,8 @@ def voice_catalog(request):
                 "q": query,
                 "language": language,
                 "gender": gender,
+                "accent": accent,
+                "age": age,
                 "use_case": use_case,
                 "provider": provider,
                 "favorites": favorites_only,

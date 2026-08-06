@@ -8,7 +8,11 @@ from tts.models import ProviderVoice, VoiceFavorite
 
 from .models import AssistantProposal
 from .schema import validate_script_proposal
-from .voice_casting import default_speaker_profile, match_voices_to_profiles
+from .voice_casting import (
+    default_speaker_profile,
+    match_voices_to_profiles,
+    persistent_speaker_accent,
+)
 
 
 def editable_project_snapshot(project):
@@ -23,6 +27,7 @@ def editable_project_snapshot(project):
                 "provider": speaker.provider,
                 "model": speaker.model,
                 "voice_id": speaker.voice_id,
+                "accent": speaker.accent,
                 "position": speaker.position,
             }
             for speaker in project.speakers.all()
@@ -120,6 +125,7 @@ def _replace_with_snapshot(project, snapshot):
             provider=item.get("provider", ""),
             model=item.get("model", ""),
             voice_id=item.get("voice_id", ""),
+            accent=persistent_speaker_accent(item.get("accent", "")),
             position=item.get("position", index),
         )
         speakers[speaker.name] = speaker
@@ -157,6 +163,7 @@ def apply_proposal(proposal, mode):
                 speakers[item["name"]] = Speaker.objects.create(
                     project=project,
                     name=item["name"],
+                    accent=persistent_speaker_accent(item.get("accent", "")),
                     position=next_position(project.speakers),
                 )
         start = next_position(project.segments)

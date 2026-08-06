@@ -40,6 +40,24 @@
       </select>
     </div>
     <div class="field">
+      <label for="voice-accent">Akzent</label>
+      <select id="voice-accent" name="accent">
+        <option value="">Alle Akzente</option>
+        {% for value, label in accent_options %}
+          <option value="{{ value }}" {% if filters.accent == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="voice-age">Alter</label>
+      <select id="voice-age" name="age">
+        <option value="">Alle Altersgruppen</option>
+        {% for value, label in age_options %}
+          <option value="{{ value }}" {% if filters.age == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
       <label for="voice-use-case">Einsatz</label>
       <select id="voice-use-case" name="use_case">
         <option value="">Alle Einsätze</option>
@@ -82,7 +100,7 @@
             <div>
               {% if card.is_favorite %}<span class="favorite-kicker">Persönlicher Favorit</span>{% endif %}
               <h2>{{ card.voice.display_name }}</h2>
-              <p>{{ card.voice.provider|title }} · {{ card.voice.model }}</p>
+              <p>{{ card.source }} · {{ card.voice.model }}</p>
             </div>
             <form method="post" action="{% url 'tts:favorite_toggle' card.voice.pk %}">
               {% csrf_token %}

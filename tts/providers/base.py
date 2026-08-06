@@ -20,6 +20,7 @@ class DialogueInput:
     text: str
     voice_id: str
     direction: str = ""
+    accent: str = ""
     pause_after_ms: int = 0
 
 

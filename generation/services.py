@@ -62,6 +62,8 @@ def build_project_snapshot(project):
             "provider": speaker.provider,
             "model": speaker.model,
             "voice_id": speaker.voice_id,
+            "accent": speaker.accent,
+            "accent_tag": speaker.accent_tag if project.language == Project.Language.EN else "",
         }
         for speaker in project.speakers.all()
     }
@@ -97,7 +99,9 @@ def build_generation_parts(snapshot, max_characters=2_000):
     parts = []
     for segment in snapshot["segments"]:
         speaker = speakers[segment["speaker_id"]]
-        tag_length = len(segment["direction"]) + 3 if segment["direction"] else 0
+        direction_length = len(segment["direction"]) + 3 if segment["direction"] else 0
+        accent_length = len(speaker["accent_tag"]) + 3 if speaker["accent_tag"] else 0
+        tag_length = direction_length + accent_length
         safe_text_limit = max_characters - tag_length
         pieces = list(split_text(segment["text"], safe_text_limit))
         for index, piece in enumerate(pieces):
@@ -109,6 +113,7 @@ def build_generation_parts(snapshot, max_characters=2_000):
                             "text": piece,
                             "voice_id": speaker["voice_id"],
                             "direction": segment["direction"],
+                            "accent": speaker["accent_tag"],
                         }
                     ],
                     "character_count": rendered_length,

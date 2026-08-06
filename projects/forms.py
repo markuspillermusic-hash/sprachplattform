@@ -75,8 +75,15 @@ class SpeakerForm(forms.ModelForm):
 
     class Meta:
         model = Speaker
-        fields = ("name", "color")
-        labels = {"name": "Sprechername", "color": "Farbe"}
+        fields = ("name", "color", "accent")
+        labels = {
+            "name": "Sprechername",
+            "color": "Farbe",
+            "accent": "Akzentsteuerung",
+        }
+        help_texts = {
+            "accent": "Optional: Eleven v3 verstärkt diesen Akzent zusätzlich zur gewählten Grundstimme.",
+        }
 
     def __init__(
         self,
@@ -89,6 +96,8 @@ class SpeakerForm(forms.ModelForm):
     ):
         super().__init__(*args, **kwargs)
         self.project = project or (self.instance.project if self.instance and self.instance.project_id else None)
+        if self.project and self.project.language != Project.Language.EN:
+            self.fields.pop("accent", None)
         favorite_ids = set(
             user_favorite_voice_ids(user)
             if favorite_ids is None

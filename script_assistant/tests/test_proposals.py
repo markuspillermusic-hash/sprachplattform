@@ -219,3 +219,5 @@ class ProposalApplicationTests(TestCase):
         speakers = {speaker.name: speaker for speaker in self.project.speakers.all()}
         self.assertEqual(speakers["Ms Taylor"].voice_id, teacher_voice.voice_id)
         self.assertEqual(speakers["Ben"].voice_id, student_voice.voice_id)
+        self.assertEqual(speakers["Ms Taylor"].accent, "british")
+        self.assertEqual(speakers["Ben"].accent, "british")

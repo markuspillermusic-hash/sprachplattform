@@ -54,6 +54,25 @@ class Project(models.Model):
 
 
 class Speaker(models.Model):
+    class Accent(models.TextChoices):
+        AUTO = "", "Aus Grundstimme übernehmen"
+        BRITISH = "british", "Britisches Englisch"
+        AMERICAN = "american", "Amerikanisches Englisch"
+        AUSTRALIAN = "australian", "Australisches Englisch"
+        IRISH = "irish", "Irisches Englisch"
+        SCOTTISH = "scottish", "Schottisches Englisch"
+        INDIAN_ENGLISH = "indian_english", "Indisches Englisch"
+        SOUTHERN_US = "southern_us", "Süd-USA"
+
+    ACCENT_TAGS = {
+        Accent.BRITISH: "British accent",
+        Accent.AMERICAN: "American accent",
+        Accent.AUSTRALIAN: "Australian accent",
+        Accent.IRISH: "Irish accent",
+        Accent.SCOTTISH: "Scottish accent",
+        Accent.INDIAN_ENGLISH: "Indian English",
+        Accent.SOUTHERN_US: "Southern US accent",
+    }
     COLORS = (
         ("forest", "Waldgrün"),
         ("gold", "Gold"),
@@ -69,6 +88,7 @@ class Speaker(models.Model):
     provider = models.CharField(max_length=40, blank=True)
     model = models.CharField(max_length=80, blank=True)
     voice_id = models.CharField(max_length=160, blank=True)
+    accent = models.CharField(max_length=24, choices=Accent.choices, blank=True)
     position = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
@@ -76,6 +96,10 @@ class Speaker(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def accent_tag(self):
+        return self.ACCENT_TAGS.get(self.accent, "")
 
 
 class ScriptSegment(models.Model):

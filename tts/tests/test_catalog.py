@@ -74,6 +74,8 @@ class VoiceCatalogTests(TestCase):
             {
                 "language": "fr",
                 "gender": "female",
+                "accent": "parisian",
+                "age": "young",
                 "use_case": "conversational",
                 "q": "parisian",
             },
@@ -81,7 +83,7 @@ class VoiceCatalogTests(TestCase):
 
         self.assertEqual([card["voice"] for card in response.context["cards"]], [self.french_voice])
         self.assertContains(response, "Französisch")
-        self.assertContains(response, "Parisian")
+        self.assertContains(response, "Pariser Französisch")
         self.assertNotContains(response, "Anton")
 
     def test_favorites_are_personal_and_sorted_first(self):

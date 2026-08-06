@@ -44,13 +44,14 @@ class GenerationPipelineTests(TestCase):
             password="Test-Passphrase-123!",
             must_change_password=False,
         )
-        self.project = Project.objects.create(owner=self.user, title="Dialog", language="fr")
+        self.project = Project.objects.create(owner=self.user, title="Dialog", language="en")
         self.speaker = Speaker.objects.create(
             project=self.project,
             name="Camille",
             provider="elevenlabs",
             model="eleven_v3",
             voice_id="voice-camille",
+            accent=Speaker.Accent.BRITISH,
         )
         self.segment = ScriptSegment.objects.create(
             project=self.project,
@@ -83,6 +84,8 @@ class GenerationPipelineTests(TestCase):
         self.assertEqual(job.parts.count(), 1)
         self.assertEqual(UsageLedger.objects.get(job=job).character_count, len(original_text))
         self.assertEqual(job.usage_event.status, "reserved")
+        self.assertEqual(job.version.snapshot["speakers"][0]["accent"], "british")
+        self.assertEqual(job.parts.get().input_data[0]["accent"], "British accent")
 
     def test_user_limit_is_enforced_before_job_creation(self):
         self.user.character_limit = 5
@@ -126,6 +129,7 @@ class GenerationPipelineTests(TestCase):
         self.assertIsNone(job.usage_entry.actual_cost_eur)
         job.usage_event.refresh_from_db()
         self.assertEqual(job.usage_event.status, "committed")
+        self.assertEqual(provider.calls[0][0][0].accent, "British accent")
 
     @mock.patch("generation.services.subprocess.run")
     def test_assembler_fades_and_pads_every_phrase_before_the_configured_pause(self, run):

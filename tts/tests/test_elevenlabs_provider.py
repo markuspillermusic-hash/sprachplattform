@@ -40,14 +40,24 @@ class ElevenLabsProviderTests(SimpleTestCase):
 
         provider = self.provider_with_handler(handler)
         result = provider.synthesize_dialogue(
-            [DialogueInput(text="Bonjour !", voice_id="voice-a", direction="friendly")],
+            [
+                DialogueInput(
+                    text="Bonjour !",
+                    voice_id="voice-a",
+                    direction="friendly",
+                    accent="British accent",
+                )
+            ],
             {"language_code": "fr", "seed": 42},
         )
 
         self.assertEqual(captured["path"], "/v1/text-to-dialogue")
         self.assertEqual(captured["query"]["output_format"], "mp3_44100_128")
         self.assertEqual(captured["json"]["model_id"], "eleven_v3")
-        self.assertEqual(captured["json"]["inputs"][0], {"text": "[friendly] Bonjour !", "voice_id": "voice-a"})
+        self.assertEqual(
+            captured["json"]["inputs"][0],
+            {"text": "[British accent] [friendly] Bonjour !", "voice_id": "voice-a"},
+        )
         self.assertEqual(captured["json"]["language_code"], "fr")
         self.assertEqual(captured["headers"]["xi-api-key"], "test-key-never-log")
         self.assertEqual(result.audio, b"fake-mp3")
@@ -95,6 +105,49 @@ class ElevenLabsProviderTests(SimpleTestCase):
                 [DialogueInput(text="x", voice_id=f"voice-{index}") for index in range(11)]
             )
 
+    def test_shared_voice_library_search_uses_safe_filters_and_normalizes_metadata(self):
+        captured = {}
+
+        def handler(request):
+            captured["path"] = request.url.path
+            captured["query"] = dict(request.url.params)
+            return httpx.Response(
+                200,
+                json={
+                    "voices": [
+                        {
+                            "voice_id": "shared-british",
+                            "name": "Oliver",
+                            "language": "en",
+                            "accent": "British",
+                            "gender": "Male",
+                            "age": "Young",
+                            "use_case": "conversational",
+                            "descriptive": "calm",
+                            "description": "A clear young British voice.",
+                            "preview_url": "https://example.test/oliver.mp3",
+                            "verified_languages": [
+                                {"language": "en", "accent": "british", "locale": "en-GB"}
+                            ],
+                        }
+                    ]
+                },
+            )
+
+        voices = self.provider_with_handler(handler).search_voice_library(
+            language="en",
+            accent="british",
+            page_size=20,
+        )
+
+        self.assertEqual(captured["path"], "/v1/shared-voices")
+        self.assertEqual(captured["query"]["language"], "en")
+        self.assertEqual(captured["query"]["accent"], "british")
+        self.assertEqual(captured["query"]["include_custom_rates"], "false")
+        self.assertEqual(voices[0].labels["gender"], "male")
+        self.assertEqual(voices[0].labels["catalog_source"], "voice_library")
+        self.assertEqual(voices[0].languages, ("en",))
+
     def test_rendered_direction_tags_count_toward_provider_limit(self):
         provider = self.provider_with_handler(
             lambda request: self.fail("Network request must not be sent for invalid input")
@@ -103,6 +156,16 @@ class ElevenLabsProviderTests(SimpleTestCase):
         with self.assertRaisesMessage(ProviderError, "2.000 Zeichen"):
             provider.synthesize_dialogue(
                 [DialogueInput(text="x" * 1995, voice_id="voice-a", direction="friendly")]
+            )
+
+    def test_rendered_accent_tags_count_toward_provider_limit(self):
+        provider = self.provider_with_handler(
+            lambda request: self.fail("Network request must not be sent for invalid input")
+        )
+
+        with self.assertRaisesMessage(ProviderError, "2.000 Zeichen"):
+            provider.synthesize_dialogue(
+                [DialogueInput(text="x" * 1985, voice_id="voice-a", accent="British accent")]
             )
 
     def test_usage_estimate_is_provider_neutral(self):

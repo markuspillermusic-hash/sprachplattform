@@ -292,6 +292,7 @@ def duplicate_project(project, owner=None):
             provider=speaker.provider,
             model=speaker.model,
             voice_id=speaker.voice_id,
+            accent=speaker.accent,
             position=speaker.position,
         )
         speaker_map[speaker.pk] = copied

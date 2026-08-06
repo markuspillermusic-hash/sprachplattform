@@ -89,6 +89,63 @@ class ElevenLabsProvider(TTSProvider):
                 break
         return voices
 
+    def search_voice_library(
+        self,
+        *,
+        language=None,
+        accent=None,
+        page_size=20,
+        sort="trending",
+    ):
+        params = {
+            "page_size": max(1, min(int(page_size), 100)),
+            "sort": sort,
+            "include_custom_rates": "false",
+            "include_live_moderated": "false",
+            "min_notice_period_days": 30,
+        }
+        if language:
+            params["language"] = language
+        if accent:
+            params["accent"] = accent
+        try:
+            response = self.client.get("/v1/shared-voices", params=params, headers=self._headers())
+        except httpx.TimeoutException:
+            raise ProviderTemporaryError("Die ElevenLabs-Stimmenbibliothek hat zu lange gebraucht.") from None
+        except httpx.RequestError:
+            raise ProviderTemporaryError("Die ElevenLabs-Stimmenbibliothek ist derzeit nicht erreichbar.") from None
+        self._raise_safe(response)
+        voices = []
+        for item in response.json().get("voices", []):
+            verified = item.get("verified_languages") or []
+            languages = {
+                entry.get("language", "")
+                for entry in verified
+                if entry.get("language")
+            }
+            if item.get("language"):
+                languages.add(item["language"])
+            labels = {
+                key: str(item.get(key) or "").strip().lower()
+                for key in ("age", "accent", "gender", "use_case", "descriptive")
+                if item.get(key)
+            }
+            labels.update(
+                catalog_source="voice_library",
+                description=str(item.get("description") or "").strip(),
+                notice_period_days=str(item.get("notice_period") or ""),
+            )
+            voices.append(
+                VoiceInfo(
+                    voice_id=item["voice_id"],
+                    name=item.get("name") or item["voice_id"],
+                    languages=tuple(sorted(languages)),
+                    labels=labels,
+                    preview_url=item.get("preview_url") or "",
+                )
+            )
+        return voices
+
     def test_connection(self):
         try:
             response = self.client.get(
@@ -116,7 +173,9 @@ class ElevenLabsProvider(TTSProvider):
         options = options or {}
         estimate = self.estimate_usage(script)
         rendered_characters = sum(
-            len(item.text) + (len(item.direction) + 3 if item.direction else 0)
+            len(item.text)
+            + (len(item.direction) + 3 if item.direction else 0)
+            + (len(item.accent) + 3 if item.accent else 0)
             for item in script
         )
         if estimate.characters == 0:
@@ -128,8 +187,9 @@ class ElevenLabsProvider(TTSProvider):
 
         inputs = []
         for item in script:
+            accent = f"[{item.accent}] " if item.accent else ""
             direction = f"[{item.direction}] " if item.direction else ""
-            inputs.append({"text": f"{direction}{item.text}", "voice_id": item.voice_id})
+            inputs.append({"text": f"{accent}{direction}{item.text}", "voice_id": item.voice_id})
         body = {
             "inputs": inputs,
             "model_id": self.model_id,

@@ -133,6 +133,8 @@ def project_payload(project):
             if voice
             else default_speaker_profile(item["name"])
         )
+        if item.get("accent"):
+            speaker_profiles[-1]["accent"] = item["accent"]
     return {
         "title": snapshot["title"],
         "language": snapshot["language"],

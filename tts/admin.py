@@ -5,6 +5,7 @@ from django.utils.html import format_html
 from .models import ProviderVoice, TTSConfiguration, VoiceFavorite
 from .providers.base import ProviderError
 from .providers.elevenlabs import ElevenLabsProvider
+from .services import sync_curated_voice_library
 
 
 class TTSConfigurationForm(forms.ModelForm):
@@ -49,7 +50,7 @@ class TTSConfigurationAdmin(admin.ModelAdmin):
     form = TTSConfigurationForm
     list_display = ("name", "active", "model", "configured", "updated_at")
     readonly_fields = ("base_url", "api_key_hint", "updated_at")
-    actions = ("test_elevenlabs_connection",)
+    actions = ("test_elevenlabs_connection", "import_curated_voice_library")
     fieldsets = (
         (
             "ElevenLabs",
@@ -107,6 +108,79 @@ class TTSConfigurationAdmin(admin.ModelAdmin):
                     level=messages.SUCCESS,
                 )
 
+    @admin.action(description="Kuratierte ElevenLabs-Stimmenbibliothek importieren")
+    def import_curated_voice_library(self, request, queryset):
+        configuration = queryset.first()
+        if not configuration or not configuration.is_configured:
+            self.message_user(
+                request,
+                "Die ElevenLabs-Anbindung ist noch nicht vollständig eingerichtet.",
+                level=messages.ERROR,
+            )
+            return
+        provider = ElevenLabsProvider(
+            api_key=configuration.get_api_key(),
+            base_url=configuration.base_url,
+            model_id=configuration.model,
+            estimated_eur_per_1000_characters=configuration.estimated_eur_per_1000_characters,
+        )
+        try:
+            voices, created = sync_curated_voice_library(provider=provider)
+        except (ProviderError, ValueError) as exc:
+            self.message_user(request, str(exc), level=messages.ERROR)
+            return
+        self.message_user(
+            request,
+            f"{len(voices)} Bibliotheksstimmen wurden abgeglichen, davon {created} neu. "
+            "Neue Stimmen bleiben zunächst deaktiviert und können unter „Anbieter-Stimmen“ geprüft werden.",
+            level=messages.SUCCESS,
+        )
+
+
+class VoiceAccentFilter(admin.SimpleListFilter):
+    title = "Akzent"
+    parameter_name = "accent"
+
+    def lookups(self, request, model_admin):
+        values = sorted(
+            {
+                str(voice.labels.get("accent", "")).strip().lower()
+                for voice in model_admin.get_queryset(request).only("labels")
+                if voice.labels.get("accent")
+            }
+        )
+        return tuple((value, value.replace("_", " ").title()) for value in values)
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+        ids = [
+            voice.pk
+            for voice in queryset.only("pk", "labels")
+            if str(voice.labels.get("accent", "")).strip().lower() == value
+        ]
+        return queryset.filter(pk__in=ids)
+
+
+class VoiceAgeFilter(admin.SimpleListFilter):
+    title = "Alter"
+    parameter_name = "age"
+
+    def lookups(self, request, model_admin):
+        return (("young", "Jung"), ("middle_aged", "Mittleres Alter"), ("old", "Älter"))
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+        ids = [
+            voice.pk
+            for voice in queryset.only("pk", "labels")
+            if str(voice.labels.get("age", "")).strip().lower() == value
+        ]
+        return queryset.filter(pk__in=ids)
+
 
 class VoiceLanguageFilter(admin.SimpleListFilter):
     title = "Sprache"
@@ -139,6 +213,8 @@ class ProviderVoiceAdmin(admin.ModelAdmin):
         "display_name",
         "language_codes",
         "gender",
+        "accent",
+        "age",
         "use_case",
         "preview_player",
         "active",
@@ -146,7 +222,7 @@ class ProviderVoiceAdmin(admin.ModelAdmin):
     )
     list_display_links = ("display_name",)
     list_editable = ("active",)
-    list_filter = (VoiceLanguageFilter, "provider", "model", "active")
+    list_filter = (VoiceLanguageFilter, VoiceAccentFilter, VoiceAgeFilter, "provider", "model", "active")
     search_fields = ("display_name", "voice_id")
     readonly_fields = ("updated_at", "preview_player")
     actions = ("activate_selected", "deactivate_selected")
@@ -159,6 +235,14 @@ class ProviderVoiceAdmin(admin.ModelAdmin):
     @admin.display(description="Stimme")
     def gender(self, voice):
         return voice.labels.get("gender", "–")
+
+    @admin.display(description="Akzent")
+    def accent(self, voice):
+        return voice.labels.get("accent", "–").replace("_", " ")
+
+    @admin.display(description="Alter")
+    def age(self, voice):
+        return voice.labels.get("age", "–").replace("_", " ")
 
     @admin.display(description="Einsatz")
     def use_case(self, voice):

@@ -65,6 +65,8 @@ class ProjectWorkflowTests(TestCase):
         self.assertRedirects(response, reverse("projects:editor", args=[created.pk]), fetch_redirect_response=False)
 
     def test_duplicate_copies_speakers_and_segments(self):
+        self.speaker.accent = Speaker.Accent.AMERICAN
+        self.speaker.save(update_fields=["accent"])
         response = self.client.post(reverse("projects:duplicate", args=[self.project.pk]))
         copied = Project.objects.exclude(pk=self.project.pk).exclude(pk=self.other_project.pk).get()
 
@@ -73,6 +75,7 @@ class ProjectWorkflowTests(TestCase):
         self.assertEqual(copied.speakers.count(), 1)
         self.assertEqual(copied.segments.get().text, self.segment.text)
         self.assertNotEqual(copied.segments.get().speaker_id, self.speaker.pk)
+        self.assertEqual(copied.speakers.get().accent, Speaker.Accent.AMERICAN)
 
     def test_segment_form_rejects_speaker_from_another_project(self):
         foreign_speaker = Speaker.objects.create(project=self.other_project, name="Fremd")
@@ -120,20 +123,28 @@ class ProjectWorkflowTests(TestCase):
 
         self.assertEqual(list(form.fields["voice"].queryset), [french_voice])
         self.assertEqual(form.fields["voice"].widget.attrs["data-voice-select"], "true")
+        self.assertNotIn("accent", form.fields)
 
     def test_speaker_can_be_added_with_compatible_voice(self):
+        self.project.language = Project.Language.EN
+        self.project.save(update_fields=["language"])
         voice = ProviderVoice.objects.create(
             provider="elevenlabs",
             model="eleven_v3",
             voice_id="voice-fr",
             display_name="Camille",
-            languages=["fr"],
+            languages=["en"],
             active=True,
         )
 
         response = self.client.post(
             reverse("projects:speaker_add", args=[self.project.pk]),
-            {"name": "Camille", "color": "berry", "voice": voice.pk},
+            {
+                "name": "Camille",
+                "color": "berry",
+                "voice": voice.pk,
+                "accent": Speaker.Accent.BRITISH,
+            },
         )
 
         self.assertRedirects(
@@ -144,6 +155,7 @@ class ProjectWorkflowTests(TestCase):
         speaker = self.project.speakers.get(name="Camille")
         self.assertEqual(speaker.voice_id, "voice-fr")
         self.assertEqual(speaker.provider, "elevenlabs")
+        self.assertEqual(speaker.accent, Speaker.Accent.BRITISH)
 
     def test_speaker_error_message_includes_validation_detail(self):
         german_voice = ProviderVoice.objects.create(

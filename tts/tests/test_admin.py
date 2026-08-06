@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -59,6 +61,15 @@ class ProviderVoiceAdminTests(TestCase):
         self.assertContains(response, "<audio", html=False)
         self.assertContains(response, "https://example.com/camille.mp3")
 
+    def test_accent_filter_is_available(self):
+        self.french_voice.labels["accent"] = "parisian"
+        self.french_voice.save(update_fields=["labels"])
+
+        response = self.client.get(self.url, {"accent": "parisian"})
+
+        self.assertContains(response, "Camille")
+        self.assertNotContains(response, "Hanna")
+
 
 class TTSConfigurationAdminTests(TestCase):
     def setUp(self):
@@ -94,3 +105,23 @@ class TTSConfigurationAdminTests(TestCase):
         )
         self.assertContains(change, "…9876")
         self.assertNotContains(change, "sk_elevenlabs-test-9876")
+
+    @patch("tts.admin.sync_curated_voice_library", return_value=([object(), object()], 2))
+    def test_admin_action_imports_library_voices_as_review_queue(self, sync):
+        configuration = TTSConfiguration.objects.create(active=True)
+        configuration.set_api_key("sk-library-test")
+        configuration.save()
+
+        response = self.client.post(
+            reverse("admin:tts_ttsconfiguration_changelist"),
+            {
+                "action": "import_curated_voice_library",
+                "_selected_action": [str(configuration.pk)],
+                "index": "0",
+            },
+            follow=True,
+        )
+
+        self.assertContains(response, "2 Bibliotheksstimmen wurden abgeglichen")
+        self.assertContains(response, "zunächst deaktiviert")
+        sync.assert_called_once()
