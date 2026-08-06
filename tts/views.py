@@ -14,6 +14,9 @@ LANGUAGE_NAMES = {
     "fr": "Französisch",
     "es": "Spanisch",
     "it": "Italienisch",
+    "tr": "Türkisch",
+    "ru": "Russisch",
+    "ar": "Arabisch",
 }
 
 GENDER_NAMES = {

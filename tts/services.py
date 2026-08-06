@@ -19,7 +19,32 @@ CURATED_LIBRARY_SEARCHES = (
 )
 
 
-def _store_voice(provider, voice, *, activate=False):
+def _store_voice(
+    provider,
+    voice,
+    *,
+    activate=False,
+    curated_match=None,
+    curated_rank=None,
+):
+    labels = dict(voice.labels)
+    if curated_match:
+        existing_labels = (
+            ProviderVoice.objects.filter(
+                provider="elevenlabs",
+                model=provider.model_id,
+                voice_id=voice.voice_id,
+            )
+            .values_list("labels", flat=True)
+            .first()
+            or {}
+        )
+        matches = set(existing_labels.get("curated_matches", []))
+        matches.add(curated_match)
+        labels["curated_matches"] = sorted(matches)
+        ranks = dict(existing_labels.get("curated_ranks", {}))
+        ranks[curated_match] = curated_rank
+        labels["curated_ranks"] = ranks
     catalog_voice, created = ProviderVoice.objects.update_or_create(
         provider="elevenlabs",
         model=provider.model_id,
@@ -27,7 +52,7 @@ def _store_voice(provider, voice, *, activate=False):
         defaults={
             "display_name": voice.name,
             "languages": list(voice.languages),
-            "labels": voice.labels,
+            "labels": labels,
             "preview_url": voice.preview_url,
         },
     )
@@ -59,8 +84,15 @@ def sync_curated_voice_library(*, provider=None, activate=False, page_size=20):
             page_size=page_size,
             sort="trending",
         )
-        for voice in voices:
-            catalog_voice, created = _store_voice(provider, voice, activate=activate)
+        curated_match = f"{language}:{accent or 'all'}"
+        for rank, voice in enumerate(voices, start=1):
+            catalog_voice, created = _store_voice(
+                provider,
+                voice,
+                activate=activate,
+                curated_match=curated_match,
+                curated_rank=rank,
+            )
             synced[catalog_voice.pk] = catalog_voice
             created_count += int(created)
     return list(synced.values()), created_count

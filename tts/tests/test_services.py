@@ -40,3 +40,11 @@ class VoiceLibrarySyncTests(TestCase):
         stored = ProviderVoice.objects.get(voice_id="shared-voice")
         self.assertFalse(stored.active)
         self.assertEqual(stored.labels["catalog_source"], "voice_library")
+        self.assertEqual(
+            stored.labels["curated_matches"],
+            sorted(
+                f"{language}:{accent or 'all'}"
+                for language, accent in CURATED_LIBRARY_SEARCHES
+            ),
+        )
+        self.assertEqual(stored.labels["curated_ranks"]["en:british"], 1)
