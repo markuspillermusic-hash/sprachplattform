@@ -14,6 +14,103 @@
     </form>
   </header>
 
+  <section id="audio-output" class="audio-output" aria-labelledby="audio-output-title">
+    <header class="audio-output-heading">
+      <div>
+        <p class="eyebrow">Audioausgabe</p>
+        <h2 id="audio-output-title">Erzeugen, anhören und herunterladen</h2>
+      </div>
+      {% if latest_job %}<span class="status-badge status-{{ latest_job.status }}" data-job-status>{{ latest_job.get_status_display }}</span>{% endif %}
+    </header>
+
+    {% if latest_job %}
+      <article
+        class="featured-job featured-job-{{ latest_job.status }}"
+        data-job-url="{% url 'generation:status' latest_job.id %}"
+        data-job-active="{% if latest_job.status == 'queued' or latest_job.status == 'running' %}true{% else %}false{% endif %}"
+      >
+        <div class="audio-state-icon status-{{ latest_job.status }}" data-job-icon aria-hidden="true">
+          {% if latest_job.status == 'queued' or latest_job.status == 'running' %}<span class="activity-spinner"></span>{% elif latest_job.status == 'succeeded' %}✓{% else %}!{% endif %}
+        </div>
+        <div class="featured-job-main">
+          <span class="version-label">Version {{ latest_job.version.number }}</span>
+          <h3 data-job-title>
+            {% if latest_job.status == 'queued' %}Die Audioerzeugung startet gleich
+            {% elif latest_job.status == 'running' %}Ihre Audiodatei wird erstellt
+            {% elif latest_job.status == 'succeeded' %}Ihre Audiodatei ist fertig
+            {% else %}Die Audioerzeugung ist fehlgeschlagen{% endif %}
+          </h3>
+          <p data-job-message role="status" aria-live="polite">
+            {% if latest_job.status == 'queued' %}Der Auftrag wartet auf die Verarbeitung.
+            {% elif latest_job.status == 'running' %}Sie können auf dieser Seite bleiben; der Status wird automatisch aktualisiert.
+            {% elif latest_job.status == 'succeeded' %}Hören Sie das Ergebnis direkt an oder laden Sie die MP3 herunter.
+            {% else %}{{ latest_job.error_message }}{% endif %}
+          </p>
+
+          <div class="generation-progress" data-job-progress-wrap {% if latest_job.status != 'queued' and latest_job.status != 'running' %}hidden{% endif %}>
+            <progress
+              data-job-progress
+              value="{{ latest_job.completed_parts }}"
+              max="{{ latest_job.total_parts|default:1 }}"
+              aria-label="Fortschritt der Audioerzeugung"
+            >{{ latest_job.completed_parts }} von {{ latest_job.total_parts }}</progress>
+            <span><strong data-job-completed>{{ latest_job.completed_parts }}</strong> von <span data-job-total>{{ latest_job.total_parts }}</span> Abschnitten fertig</span>
+          </div>
+
+          <div class="audio-result" data-job-result {% if latest_job.status != 'succeeded' %}hidden{% endif %}>
+            {% if latest_job.status == 'succeeded' %}
+              <audio controls preload="metadata" data-output-audio aria-label="Audioversion {{ latest_job.version.number }}" src="{% url 'generation:play' latest_job.audio_asset.id %}"></audio>
+              <a class="button button-primary" href="{% url 'generation:download' latest_job.audio_asset.id %}">MP3 herunterladen</a>
+            {% endif %}
+          </div>
+
+          <div class="job-recovery" data-job-error {% if latest_job.status != 'failed' %}hidden{% endif %}>
+            <p class="job-error" data-job-error-message>{{ latest_job.error_message }}</p>
+            <form method="post" action="{% url 'generation:retry' latest_job.id %}">{% csrf_token %}<button class="button button-secondary" type="submit">Erneut versuchen</button></form>
+          </div>
+        </div>
+      </article>
+    {% else %}
+      <div class="audio-output-empty"><span aria-hidden="true">♪</span><p>Noch keine Audioversion vorhanden. Prüfen Sie Ihren Hörtext und starten Sie anschließend die erste Erzeugung.</p></div>
+    {% endif %}
+
+    <div class="audio-generate-action">
+      <div>
+        <strong>Neue Audioversion erzeugen</strong>
+        <span>{{ project.character_count }} Zeichen werden als neue Version verarbeitet.</span>
+        <small>Der angezeigte Eurobetrag ist ein Tarifwert – keine zusätzliche Einzelabbuchung.</small>
+      </div>
+      <form method="post" action="{% url 'generation:start' project.id %}">
+        {% csrf_token %}
+        <button class="button button-primary" type="submit" data-generate-button {% if not provider_configured or latest_job.status == 'queued' or latest_job.status == 'running' %}disabled{% endif %}>
+          {% if latest_job.status == 'queued' or latest_job.status == 'running' %}Audio wird erzeugt{% else %}Audio erzeugen{% endif %}
+        </button>
+      </form>
+      {% if not provider_configured %}<small class="generation-unavailable">Noch nicht verfügbar: Serverzugang zu ElevenLabs fehlt.</small>{% endif %}
+    </div>
+
+    {% if latest_jobs|length > 1 %}
+      <details class="audio-history">
+        <summary>Weitere Audioversionen anzeigen</summary>
+        <ul>
+          {% for job in latest_jobs|slice:"1:" %}
+            <li>
+              <div><strong>Version {{ job.version.number }}</strong><span class="status-badge status-{{ job.status }}">{{ job.get_status_display }}</span></div>
+              <small>{{ job.character_count }} Zeichen · ca. {{ job.estimated_cost_eur }} € Tarifwert</small>
+              {% if job.status == 'succeeded' %}
+                <audio controls preload="metadata" aria-label="Audioversion {{ job.version.number }}" src="{% url 'generation:play' job.audio_asset.id %}"></audio>
+                <a class="button button-secondary" href="{% url 'generation:download' job.audio_asset.id %}">MP3 herunterladen</a>
+              {% elif job.status == 'failed' %}
+                <p class="job-error">{{ job.error_message }}</p>
+                <form method="post" action="{% url 'generation:retry' job.id %}">{% csrf_token %}<button class="button button-secondary" type="submit">Erneut versuchen</button></form>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </details>
+    {% endif %}
+  </section>
+
   <div class="editor-grid">
     <section class="script-column" aria-labelledby="script-title">
       <div class="column-heading"><div><p class="eyebrow">Skript</p><h1 id="script-title">Sprechbeiträge</h1></div><span class="character-count">{{ project.character_count }} Zeichen</span></div>
@@ -110,33 +207,6 @@
         {% if usage_percent >= 100 %}<p class="limit-warning">Ihr Limit ist erreicht.</p>{% elif usage_percent >= 80 %}<p class="limit-warning">Ihr Limit ist fast erreicht.</p>{% endif %}
       </div>
 
-      {% if latest_jobs %}
-        <div class="sidebar-card job-list"><p class="eyebrow">Audioversionen</p><h2>Letzte Aufträge</h2>
-          <ul>
-            {% for job in latest_jobs %}
-              <li data-job-url="{% url 'generation:status' job.id %}">
-                <div><strong>Version {{ job.version.number }}</strong><span class="status-badge status-{{ job.status }}">{{ job.get_status_display }}</span></div>
-                <small>{{ job.character_count }} Zeichen · geschätzter Tarifwert ca. {{ job.estimated_cost_eur }} €</small>
-                {% if job.status == 'succeeded' %}
-                  <audio controls preload="none" aria-label="Audioversion {{ job.version.number }}"><source src="{% url 'generation:play' job.audio_asset.id %}" type="audio/mpeg"></audio>
-                  <a class="button button-secondary button-wide" href="{% url 'generation:download' job.audio_asset.id %}">MP3 herunterladen</a>
-                {% elif job.status == 'failed' %}
-                  <p class="job-error">{{ job.error_message }}</p>
-                  <form method="post" action="{% url 'generation:retry' job.id %}">{% csrf_token %}<button class="button button-secondary button-wide" type="submit">Fehlgeschlagene Teile erneut versuchen</button></form>
-                {% endif %}
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
-      {% endif %}
-
-      <div class="generation-card">
-        <strong>Audio erzeugen</strong>
-        <span>Vor dem Start: {{ project.character_count }} Zeichen werden als Version reserviert.</span>
-        <small>Der Eurobetrag ist ein anteiliger Tarifwert auf Basis der Servereinstellung – keine zusätzliche Einzelabbuchung.</small>
-        <form method="post" action="{% url 'generation:start' project.id %}">{% csrf_token %}<button class="button button-primary button-wide" type="submit" {% if not provider_configured %}disabled aria-describedby="provider-note"{% endif %}>Audio erzeugen</button></form>
-        {% if not provider_configured %}<small id="provider-note">Noch nicht verfügbar: Serverzugang zu ElevenLabs fehlt.</small>{% endif %}
-      </div>
     </aside>
   </div>
 </section>

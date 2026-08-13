@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models.deletion import RestrictedError
-from django.db.models import Sum
+from django.db.models import Count, Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -116,6 +116,18 @@ def project_editor(request, project_id):
         status=AssistantProposal.Status.APPLIED,
     ).first()
     assistant_configuration = AssistantConfiguration.objects.order_by("pk").first()
+    latest_jobs = list(
+        GenerationJob.objects.filter(version__project=project)
+        .select_related("version")
+        .prefetch_related("parts")
+        .annotate(
+            completed_parts=Count(
+                "parts",
+                filter=Q(parts__status="succeeded"),
+            ),
+            total_parts=Count("parts"),
+        )[:5]
+    )
     return render(
         request,
         "projects/editor.html",
@@ -162,7 +174,8 @@ def project_editor(request, project_id):
                 (segment, SegmentForm(instance=segment, project=project, prefix=str(segment.pk)))
                 for segment in segments
             ],
-            "latest_jobs": GenerationJob.objects.filter(version__project=project).prefetch_related("parts")[:5],
+            "latest_job": latest_jobs[0] if latest_jobs else None,
+            "latest_jobs": latest_jobs,
             "usage_used": usage_used,
             "usage_limit": request.user.character_limit,
             "usage_percent": min(100, round(usage_used / request.user.character_limit * 100)) if request.user.character_limit else 100,

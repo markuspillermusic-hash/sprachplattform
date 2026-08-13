@@ -196,3 +196,61 @@ class AudioAccessAndCleanupTests(TestCase):
             asset.refresh_from_db()
             self.assertFalse(path.exists())
             self.assertIsNotNone(asset.deleted_at)
+
+    @mock.patch("generation.views.generate_audio.delay")
+    @mock.patch("generation.views.tts_provider_is_configured", return_value=True)
+    def test_start_generation_redirects_to_prominent_audio_output(self, configured, delay):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(reverse("generation:start", args=[self.project.pk]))
+        job = GenerationJob.objects.get()
+
+        self.assertEqual(
+            response.url,
+            f"{reverse('projects:editor', args=[self.project.pk])}#audio-output",
+        )
+        delay.assert_called_once_with(str(job.pk))
+
+    def test_status_returns_audio_links_after_completion(self):
+        job = create_generation_job(self.project, self.owner)
+        job.status = GenerationJob.Status.SUCCEEDED
+        job.save(update_fields=["status"])
+        asset = AudioAsset.objects.create(
+            version=job.version,
+            job=job,
+            file_path="audio.mp3",
+            size_bytes=5,
+            expires_at=timezone.now() + timezone.timedelta(days=1),
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse("generation:status", args=[job.pk]))
+
+        self.assertEqual(
+            response.json()["audio"],
+            {
+                "play_url": reverse("generation:play", args=[asset.pk]),
+                "download_url": reverse("generation:download", args=[asset.pk]),
+            },
+        )
+
+    def test_editor_prominently_renders_finished_audio_with_metadata_preload(self):
+        job = create_generation_job(self.project, self.owner)
+        job.status = GenerationJob.Status.SUCCEEDED
+        job.save(update_fields=["status"])
+        asset = AudioAsset.objects.create(
+            version=job.version,
+            job=job,
+            file_path="audio.mp3",
+            size_bytes=5,
+            expires_at=timezone.now() + timezone.timedelta(days=1),
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse("projects:editor", args=[self.project.pk]))
+
+        self.assertContains(response, 'id="audio-output"')
+        self.assertContains(response, "Ihre Audiodatei ist fertig")
+        self.assertContains(response, 'preload="metadata"')
+        self.assertContains(response, reverse("generation:play", args=[asset.pk]))
+        self.assertContains(response, reverse("generation:download", args=[asset.pk]))

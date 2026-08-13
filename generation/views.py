@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 from usage_control.services import release_usage
@@ -46,7 +47,8 @@ def start_generation(request, project_id):
         messages.error(request, job.error_message)
     else:
         messages.success(request, "Die Audioerzeugung wurde gestartet.")
-    return redirect("projects:editor", project_id=project.pk)
+    editor_url = reverse("projects:editor", args=[project.pk])
+    return redirect(f"{editor_url}#audio-output")
 
 
 @require_POST
@@ -71,7 +73,8 @@ def retry_generation(request, job_id):
         job.save(update_fields=["status", "error_message", "finished_at"])
         generate_audio.delay(str(job.pk))
         messages.success(request, "Fehlgeschlagene Teile werden erneut versucht.")
-    return redirect("projects:editor", project_id=job.version.project_id)
+    editor_url = reverse("projects:editor", args=[job.version.project_id])
+    return redirect(f"{editor_url}#audio-output")
 
 
 @require_GET
@@ -83,16 +86,26 @@ def job_status(request, job_id):
         version__project__in=visible_projects(request.user),
     )
     completed = job.parts.filter(status="succeeded").count()
-    return JsonResponse(
-        {
-            "id": str(job.pk),
-            "status": job.status,
-            "status_label": job.get_status_display(),
-            "completed_parts": completed,
-            "total_parts": job.parts.count(),
-            "error": job.error_message,
-        }
-    )
+    payload = {
+        "id": str(job.pk),
+        "status": job.status,
+        "status_label": job.get_status_display(),
+        "completed_parts": completed,
+        "total_parts": job.parts.count(),
+        "error": job.error_message,
+        "version_number": job.version.number,
+    }
+    if job.status == GenerationJob.Status.SUCCEEDED:
+        try:
+            asset = job.audio_asset
+        except AudioAsset.DoesNotExist:
+            asset = None
+        if asset and asset.deleted_at is None and asset.expires_at > timezone.now():
+            payload["audio"] = {
+                "play_url": reverse("generation:play", args=[asset.pk]),
+                "download_url": reverse("generation:download", args=[asset.pk]),
+            }
+    return JsonResponse(payload)
 
 
 def _get_audio_asset(request, asset_id):

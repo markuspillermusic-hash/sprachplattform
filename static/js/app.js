@@ -105,22 +105,114 @@
     });
   });
 
-  const activeJobs = document.querySelectorAll('[data-job-url] .status-queued, [data-job-url] .status-running');
+  const activeJobs = document.querySelectorAll('[data-job-url][data-job-active="true"]');
   if (activeJobs.length) {
-    window.setInterval(async () => {
-      for (const badge of activeJobs) {
-        const item = badge.closest('[data-job-url]');
-        try {
-          const response = await fetch(item.dataset.jobUrl, {headers: {'Accept': 'application/json'}});
-          if (!response.ok) continue;
-          const job = await response.json();
-          if (job.status === 'succeeded' || job.status === 'failed') window.location.reload();
-          badge.textContent = `${job.status_label} (${job.completed_parts}/${job.total_parts})`;
-        } catch (_) {
-          badge.textContent = 'Status derzeit nicht erreichbar';
-        }
+    const pollJobs = async () => {
+      for (const item of activeJobs) {
+        if (item.dataset.jobActive !== 'true') continue;
+        await updateJobStatus(item);
       }
-    }, 5000);
+    };
+    window.setInterval(pollJobs, 2500);
+  }
+
+  async function updateJobStatus(item) {
+    const badge = document.querySelector('[data-job-status]');
+    const message = item.querySelector('[data-job-message]');
+    try {
+      const response = await fetch(item.dataset.jobUrl, {headers: {'Accept': 'application/json'}});
+      if (!response.ok) throw new Error('status request failed');
+      const job = await response.json();
+      const progress = item.querySelector('[data-job-progress]');
+      const completed = item.querySelector('[data-job-completed]');
+      const total = item.querySelector('[data-job-total]');
+      if (progress) {
+        progress.max = Math.max(1, job.total_parts);
+        progress.value = job.completed_parts;
+      }
+      if (completed) completed.textContent = String(job.completed_parts);
+      if (total) total.textContent = String(job.total_parts);
+      if (badge) {
+        badge.textContent = job.status_label;
+        badge.className = `status-badge status-${job.status}`;
+      }
+      if (job.status === 'running' && message) {
+        message.textContent = 'Sie können auf dieser Seite bleiben; der Status wird automatisch aktualisiert.';
+      }
+      if (job.status === 'succeeded') showCompletedJob(item, job);
+      if (job.status === 'failed') showFailedJob(item, job);
+    } catch (_) {
+      if (message) message.textContent = 'Der Status ist gerade nicht erreichbar. Die Verarbeitung läuft möglicherweise weiter.';
+    }
+  }
+
+  function showCompletedJob(item, job) {
+    item.dataset.jobActive = 'false';
+    item.className = 'featured-job featured-job-succeeded';
+    const icon = item.querySelector('[data-job-icon]');
+    if (icon) {
+      icon.className = 'audio-state-icon status-succeeded';
+      icon.textContent = '✓';
+    }
+    const title = item.querySelector('[data-job-title]');
+    const message = item.querySelector('[data-job-message]');
+    if (title) title.textContent = 'Ihre Audiodatei ist fertig';
+    if (message) message.textContent = 'Hören Sie das Ergebnis direkt an oder laden Sie die MP3 herunter.';
+    const progressWrap = item.querySelector('[data-job-progress-wrap]');
+    if (progressWrap) progressWrap.hidden = true;
+    const result = item.querySelector('[data-job-result]');
+    if (result && job.audio) {
+      const audio = document.createElement('audio');
+      audio.controls = true;
+      audio.preload = 'metadata';
+      audio.src = job.audio.play_url;
+      audio.setAttribute('aria-label', `Audioversion ${job.version_number}`);
+      const download = document.createElement('a');
+      download.className = 'button button-primary';
+      download.href = job.audio.download_url;
+      download.textContent = 'MP3 herunterladen';
+      result.replaceChildren(audio, download);
+      result.hidden = false;
+      audio.load();
+    }
+    resetGenerateButton('Weitere Version erzeugen');
+    revealJob(item);
+  }
+
+  function showFailedJob(item, job) {
+    item.dataset.jobActive = 'false';
+    item.className = 'featured-job featured-job-failed';
+    const icon = item.querySelector('[data-job-icon]');
+    if (icon) {
+      icon.className = 'audio-state-icon status-failed';
+      icon.textContent = '!';
+    }
+    const title = item.querySelector('[data-job-title]');
+    const message = item.querySelector('[data-job-message]');
+    if (title) title.textContent = 'Die Audioerzeugung ist fehlgeschlagen';
+    if (message) message.textContent = job.error || 'Die Audiodatei konnte nicht erstellt werden.';
+    const progressWrap = item.querySelector('[data-job-progress-wrap]');
+    if (progressWrap) progressWrap.hidden = true;
+    const recovery = item.querySelector('[data-job-error]');
+    const errorMessage = item.querySelector('[data-job-error-message]');
+    if (errorMessage) errorMessage.textContent = job.error || 'Die Audiodatei konnte nicht erstellt werden.';
+    if (recovery) recovery.hidden = false;
+    resetGenerateButton('Audio erneut erzeugen');
+    revealJob(item);
+  }
+
+  function resetGenerateButton(label) {
+    const button = document.querySelector('[data-generate-button]');
+    if (!button) return;
+    button.disabled = false;
+    button.textContent = label;
+  }
+
+  function revealJob(item) {
+    const rect = item.getBoundingClientRect();
+    if (rect.top >= 0 && rect.bottom <= window.innerHeight) return;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    item.scrollIntoView({behavior: reducedMotion ? 'auto' : 'smooth', block: 'center'});
   }
 
   document.querySelectorAll('[data-assistant-prompt]').forEach((button) => {
