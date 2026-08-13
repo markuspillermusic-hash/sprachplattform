@@ -140,6 +140,13 @@ class VoiceCatalogTests(TestCase):
             ).exists()
         )
 
+    def test_catalog_marks_favorite_forms_for_in_place_updates(self):
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "data-favorite-form")
+        self.assertContains(response, "data-favorite-count")
+        self.assertContains(response, "Favoriten erscheinen nach dem nächsten Laden zuerst")
+
     def test_inactive_voice_cannot_be_favorited(self):
         response = self.client.post(
             reverse("tts:favorite_toggle", args=[self.inactive_voice.pk])

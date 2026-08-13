@@ -240,6 +240,39 @@ class ProjectWorkflowTests(TestCase):
         self.assertEqual(self.segment.text, "Bonsoir !")
         self.assertEqual(self.segment.direction, "friendly")
 
+    def test_segment_add_redirects_to_new_segment_anchor(self):
+        response = self.client.post(reverse("projects:segment_add", args=[self.project.pk]))
+        added = self.project.segments.order_by("-position").first()
+
+        self.assertEqual(
+            response.url,
+            f"{reverse('projects:editor', args=[self.project.pk])}#segment-{added.pk}",
+        )
+
+    def test_segment_autosave_returns_selected_speaker_appearance(self):
+        second_speaker = Speaker.objects.create(
+            project=self.project,
+            name="Marc",
+            color="blue",
+            position=2,
+        )
+        prefix = str(self.segment.pk)
+
+        response = self.client.post(
+            reverse("projects:segment_autosave", args=[self.project.pk, self.segment.pk]),
+            {
+                f"{prefix}-speaker": second_speaker.pk,
+                f"{prefix}-text": self.segment.text,
+                f"{prefix}-direction": "",
+                f"{prefix}-pause_after_ms": 500,
+                f"{prefix}-speed": 1,
+            },
+        )
+
+        self.assertEqual(response.json()["speaker"], {"name": "Marc", "color": "blue"})
+        self.segment.refresh_from_db()
+        self.assertEqual(self.segment.speaker, second_speaker)
+
     def test_destructive_routes_reject_get(self):
         self.assertEqual(self.client.get(reverse("projects:delete", args=[self.project.pk])).status_code, 405)
         self.assertEqual(

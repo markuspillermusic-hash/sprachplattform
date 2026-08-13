@@ -11,7 +11,7 @@
     <div class="catalog-summary" aria-label="Übersicht">
       <strong>{{ total_count }}</strong>
       <span>verfügbare Stimmen</span>
-      <strong>{{ favorite_count }}</strong>
+      <strong data-favorite-count>{{ favorite_count }}</strong>
       <span>persönliche Favoriten</span>
     </div>
   </header>
@@ -89,7 +89,7 @@
 
   <div class="catalog-result-heading">
     <p><strong>{{ result_count }}</strong> {% if result_count == 1 %}Stimme{% else %}Stimmen{% endif %} gefunden</p>
-    <p class="muted">Favoriten erscheinen zuerst – auch später in der Stimmenauswahl.</p>
+    <p class="muted" data-favorite-status role="status">Favoriten erscheinen nach dem nächsten Laden zuerst – auch in der Stimmenauswahl.</p>
   </div>
 
   {% if cards %}
@@ -102,7 +102,7 @@
               <h2>{{ card.voice.display_name }}</h2>
               <p>{{ card.source }} · {{ card.voice.model }}</p>
             </div>
-            <form method="post" action="{% url 'tts:favorite_toggle' card.voice.pk %}">
+            <form method="post" action="{% url 'tts:favorite_toggle' card.voice.pk %}" data-favorite-form data-voice-name="{{ card.voice.display_name }}">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ request.get_full_path }}">
               <button

@@ -5,6 +5,7 @@ from django.db.models.deletion import RestrictedError
 from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from generation.models import GenerationJob, UsageLedger
@@ -263,14 +264,16 @@ def segment_add(request, project_id):
     speaker = project.speakers.first()
     if speaker is None:
         messages.error(request, "Legen Sie zuerst mindestens einen Sprecher an.")
+        return redirect("projects:editor", project_id=project.pk)
     else:
-        ScriptSegment.objects.create(
+        segment = ScriptSegment.objects.create(
             project=project,
             speaker=speaker,
             position=next_position(project.segments),
             text="",
         )
-    return redirect("projects:editor", project_id=project.pk)
+    editor_url = reverse("projects:editor", args=[project.pk])
+    return redirect(f"{editor_url}#segment-{segment.pk}")
 
 
 @require_POST
@@ -282,7 +285,16 @@ def segment_autosave(request, project_id, segment_id):
     if form.is_valid():
         form.save()
         project.save(update_fields=["updated_at"])
-        return JsonResponse({"status": "saved", "characters": len(segment.text)})
+        return JsonResponse(
+            {
+                "status": "saved",
+                "characters": len(segment.text),
+                "speaker": {
+                    "name": segment.speaker.name,
+                    "color": segment.speaker.color,
+                },
+            }
+        )
     return JsonResponse({"status": "invalid", "errors": form.errors.get_json_data()}, status=422)
 
 

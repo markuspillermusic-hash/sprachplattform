@@ -22,9 +22,9 @@
         <ol class="segment-list">
           {% for segment, form in segments_with_forms %}
             <li>
-              <article class="segment-card segment-{{ segment.speaker.color }}">
+              <article id="segment-{{ segment.pk }}" class="segment-card segment-{{ segment.speaker.color }}" data-segment-card>
                 <header class="segment-heading"><span>Beitrag {{ forloop.counter }}</span><strong>{{ segment.speaker.name }}</strong></header>
-                <form method="post" action="{% url 'projects:segment_autosave' project.id segment.id %}" data-autosave>
+                <form method="post" action="{% url 'projects:segment_autosave' project.id segment.id %}" data-autosave data-segment-autosave>
                   {% csrf_token %}
                   <div class="field"><label for="{{ form.speaker.id_for_label }}">Sprecher</label>{{ form.speaker }}</div>
                   <div class="field"><label for="{{ form.text.id_for_label }}">Sprechtext</label>{{ form.text }}</div>

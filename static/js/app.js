@@ -20,12 +20,35 @@
         body: new FormData(form),
         headers: {'X-Requested-With': 'XMLHttpRequest'},
       });
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (_) {
+        payload = {};
+      }
       status.textContent = response.ok ? 'Gespeichert' : 'Nicht gespeichert – Eingaben prüfen';
       status.classList.toggle('save-error', !response.ok);
+      if (response.ok && form.matches('[data-segment-autosave]')) {
+        updateSegmentAppearance(form, payload.speaker);
+      }
     } catch (_) {
       status.textContent = 'Speichern fehlgeschlagen – Verbindung prüfen';
       status.classList.add('save-error');
     }
+  }
+
+  function updateSegmentAppearance(form, speaker) {
+    if (!speaker?.name || !speaker?.color) return;
+    const card = form.closest('[data-segment-card]');
+    if (!card) return;
+    Array.from(card.classList).forEach((className) => {
+      if (className.startsWith('segment-') && className !== 'segment-card') {
+        card.classList.remove(className);
+      }
+    });
+    card.classList.add(`segment-${speaker.color}`);
+    const heading = card.querySelector('.segment-heading strong');
+    if (heading) heading.textContent = speaker.name;
   }
 
   document.querySelectorAll('[data-confirm]').forEach((form) => {
@@ -108,6 +131,66 @@
       if (!input) return;
       input.value = button.dataset.assistantPrompt;
       input.focus();
+    });
+  });
+
+  const favoriteCount = document.querySelector('[data-favorite-count]');
+  const favoriteStatus = document.querySelector('[data-favorite-status]');
+  document.querySelectorAll('[data-favorite-form]').forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = form.querySelector('.favorite-button');
+      const card = form.closest('[data-voice-card]');
+      if (!button || !card || button.disabled) return;
+
+      button.disabled = true;
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: {'X-Requested-With': 'XMLHttpRequest'},
+        });
+        if (!response.ok) throw new Error('favorite request failed');
+        const payload = await response.json();
+        const isFavorite = Boolean(payload.is_favorite);
+        const voiceName = form.dataset.voiceName || 'Stimme';
+        const wasFavorite = button.getAttribute('aria-pressed') === 'true';
+
+        card.classList.toggle('is-favorite', isFavorite);
+        button.setAttribute('aria-pressed', String(isFavorite));
+        button.setAttribute(
+          'aria-label',
+          isFavorite ? `${voiceName} aus Favoriten entfernen` : `${voiceName} als Favorit merken`,
+        );
+        button.title = isFavorite ? 'Aus Favoriten entfernen' : 'Als Favorit merken';
+        const star = button.querySelector('[aria-hidden="true"]');
+        if (star) star.textContent = isFavorite ? '★' : '☆';
+
+        const heading = card.querySelector('.voice-card-heading > div');
+        let kicker = heading?.querySelector('.favorite-kicker');
+        if (isFavorite && heading && !kicker) {
+          kicker = document.createElement('span');
+          kicker.className = 'favorite-kicker';
+          kicker.textContent = 'Persönlicher Favorit';
+          heading.prepend(kicker);
+        } else if (!isFavorite && kicker) {
+          kicker.remove();
+        }
+
+        if (favoriteCount && wasFavorite !== isFavorite) {
+          const currentCount = Number.parseInt(favoriteCount.textContent, 10) || 0;
+          favoriteCount.textContent = String(Math.max(0, currentCount + (isFavorite ? 1 : -1)));
+        }
+        if (favoriteStatus) {
+          favoriteStatus.textContent = isFavorite
+            ? 'Als Favorit gespeichert. Die Reihenfolge ändert sich beim nächsten Laden.'
+            : 'Aus den Favoriten entfernt. Die Reihenfolge ändert sich beim nächsten Laden.';
+        }
+      } catch (_) {
+        if (favoriteStatus) favoriteStatus.textContent = 'Favorit konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.';
+      } finally {
+        button.disabled = false;
+      }
     });
   });
 

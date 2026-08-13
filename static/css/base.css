@@ -130,7 +130,7 @@ dd { margin: 0; font-weight: 700; text-align: right; }
 .character-count, .muted { color: var(--muted); }
 .segment-list { display: grid; gap: 1rem; }
 .segment-card, .sidebar-card, .generation-card { overflow: hidden; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
-.segment-card { border-left: 0.35rem solid var(--brand); }
+.segment-card { scroll-margin-top: 1rem; border-left: 0.35rem solid var(--brand); }
 .segment-gold { border-left-color: #c6851c; }
 .segment-blue { border-left-color: #3d73a4; }
 .segment-berry { border-left-color: #994c70; }
