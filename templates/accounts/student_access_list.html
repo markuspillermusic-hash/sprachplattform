@@ -11,6 +11,19 @@
     <a class="button button-primary" href="{% url 'accounts:student_access_create' %}">Zugänge erstellen</a>
   </header>
 
+  <section class="student-access-guide" aria-labelledby="student-access-guide-title">
+    <div class="student-access-guide-heading">
+      <p class="eyebrow">Kurzanleitung</p>
+      <h2 id="student-access-guide-title">Schülerzugänge in vier Schritten</h2>
+    </div>
+    <ol>
+      <li><strong>Rahmen festlegen</strong><span>„Zugänge erstellen“ wählen und Anzahl, Gültigkeit sowie Audio-Kontingent bestimmen. KI nur bei Bedarf freigeben.</span></li>
+      <li><strong>Zugangsdaten sichern</strong><span>Die erzeugte Liste sofort kopieren oder drucken. Die Kennwörter werden später nicht erneut angezeigt.</span></li>
+      <li><strong>Einzeln ausgeben</strong><span>Jeder Schülerin und jedem Schüler genau einen Benutzernamen mit Kennwort und Anmeldeadresse geben.</span></li>
+      <li><strong>Nutzung abschließen</strong><span>Projekte hier öffnen und Zugänge nach der Stunde sperren. Andernfalls enden sie automatisch.</span></li>
+    </ol>
+  </section>
+
   <div class="student-access-summary" aria-label="Zusammenfassung">
     <div><strong>{{ active_count }}</strong><span>derzeit aktiv</span></div>
     <div><strong>{{ accesses|length }}</strong><span>insgesamt erstellt</span></div>

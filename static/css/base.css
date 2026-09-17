@@ -266,6 +266,14 @@ dd { margin: 0; font-weight: 700; text-align: right; }
 .status-running { color: #70520e; background: #fff4d8; }
 
 .student-access-page .page-heading { align-items: end; }
+.student-access-guide { margin-top: 2rem; padding: clamp(1.1rem, 3vw, 1.5rem); border: 1px solid var(--line); border-radius: 1rem; background: var(--paper); }
+.student-access-guide-heading { display: grid; gap: 0.25rem; }
+.student-access-guide-heading h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.35rem, 3vw, 1.75rem); font-weight: 500; }
+.student-access-guide ol { margin: 1rem 0 0; padding: 0; display: grid; gap: 0.75rem; list-style: none; counter-reset: guide-step; }
+.student-access-guide li { min-width: 0; padding: 0.85rem; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.2rem 0.75rem; align-content: start; border-radius: 0.75rem; background: var(--surface); counter-increment: guide-step; }
+.student-access-guide li::before { width: 1.8rem; height: 1.8rem; grid-row: 1 / span 2; display: grid; place-items: center; border-radius: 50%; color: #fff; background: var(--brand); content: counter(guide-step); font-size: 0.82rem; font-weight: 800; }
+.student-access-guide strong { line-height: 1.35; }
+.student-access-guide span { color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
 .student-access-summary { margin-top: 2rem; display: flex; flex-wrap: wrap; gap: 0.8rem; }
 .student-access-summary div { min-width: 10rem; padding: 1rem 1.2rem; display: grid; gap: 0.15rem; border: 1px solid var(--line); border-radius: 0.9rem; background: var(--surface); }
 .student-access-summary strong { color: var(--brand); font-family: Georgia, "Times New Roman", serif; font-size: 1.9rem; font-weight: 500; }
@@ -403,6 +411,7 @@ dd { margin: 0; font-weight: 700; text-align: right; }
 footer { min-height: 5rem; padding-block: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
 
 @media (min-width: 48rem) {
+  .student-access-guide ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero { grid-template-columns: minmax(0, 1.65fr) minmax(18rem, 0.75fr); }
   .principle-grid { grid-template-columns: repeat(3, 1fr); }
   .auth-layout { grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.72fr); }

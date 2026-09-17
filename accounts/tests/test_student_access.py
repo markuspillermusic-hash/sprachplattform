@@ -131,6 +131,13 @@ class TemporaryStudentAccessTests(TestCase):
 
         self.assertEqual(self.client.get(reverse("accounts:student_access_list")).status_code, 403)
 
+    def test_teacher_sees_short_access_guide(self):
+        response = self.client.get(reverse("accounts:student_access_list"))
+
+        self.assertContains(response, "Schülerzugänge in vier Schritten")
+        self.assertContains(response, "Zugangsdaten sichern")
+        self.assertContains(response, "Nutzung abschließen")
+
     def test_teacher_can_retrieve_own_students_projects_but_other_teacher_cannot(self):
         credential = self.create_access()
         project = Project.objects.create(
