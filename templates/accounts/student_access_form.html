@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Schülerzugänge erstellen · Sprachplattform{% endblock %}
+{% block content %}
+<section class="page-shell student-access-create" aria-labelledby="student-access-create-title">
+  <header class="create-heading">
+    <a class="back-link" href="{% url 'accounts:student_access_list' %}">← Alle Schülerzugänge</a>
+    <p class="eyebrow">Neue Unterrichtssitzung</p>
+    <h1 id="student-access-create-title">Zugänge sicher begrenzen</h1>
+    <p class="lead">Jeder Zugang erhält ein eigenes Kennwort und ein festes Gesamtbudget. Nach Ablauf ist keine Anmeldung mehr möglich.</p>
+  </header>
+
+  <div class="student-access-create-grid">
+    <form class="form-card" method="post" novalidate data-student-access-form data-estimated-rate="{{ estimated_rate }}">
+      {% csrf_token %}
+      {% for field in form %}
+        <div class="field{% if field.field.widget.input_type == 'checkbox' %} field-checkbox{% endif %}">
+          {% if field.field.widget.input_type == 'checkbox' %}{{ field }}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% endif %}
+          {% if field.help_text %}<small class="form-help">{{ field.help_text }}</small>{% endif %}
+          {% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}
+        </div>
+      {% endfor %}
+      <button class="button button-primary button-wide" type="submit">Zugangsdaten erzeugen</button>
+    </form>
+
+    <aside class="student-cost-preview" aria-labelledby="cost-preview-title">
+      <p class="eyebrow">Kostenrahmen</p>
+      <h2 id="cost-preview-title">Maximaler ElevenLabs-Tarifwert</h2>
+      <strong data-student-cost>–</strong>
+      <p><span data-student-characters>–</span> Zeichen für alle neu erstellten Zugänge zusammen.</p>
+      <small>Berechnet mit dem in der Verwaltung hinterlegten ElevenLabs-Tarifwert. Tatsächlich entstehen nur Kosten für erzeugte Audios.</small>
+      <ul>
+        <li>Keine E-Mail-Adresse erforderlich</li>
+        <li>Automatischer Ablauf</li>
+        <li>Sofort manuell sperrbar</li>
+        <li>KI-Assistent standardmäßig deaktiviert</li>
+      </ul>
+    </aside>
+  </div>
+</section>
+{% endblock %}

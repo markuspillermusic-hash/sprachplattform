@@ -3,6 +3,7 @@ import math
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
@@ -49,9 +50,18 @@ def _check_user_quota(user, provider, character_count, input_tokens, output_toke
     usage = UsageEvent.objects.filter(
         user=user,
         provider=provider,
-        billing_period=month_start,
         status__in=ACTIVE_STATUSES,
     )
+    is_temporary_student = user.role == user.Role.STUDENT
+    if is_temporary_student:
+        try:
+            access = user.temporary_student_access
+        except ObjectDoesNotExist:
+            access = None
+        if access is None or not access.is_usable:
+            raise QuotaExceeded("Dieser Schülerzugang ist nicht mehr gültig.")
+    else:
+        usage = usage.filter(billing_period=month_start)
     totals = usage.aggregate(
         characters=Coalesce(Sum("character_count"), 0),
         input_tokens=Coalesce(Sum("input_tokens"), 0),
@@ -59,15 +69,23 @@ def _check_user_quota(user, provider, character_count, input_tokens, output_toke
     )
     if provider == UsageEvent.Provider.ELEVENLABS:
         if totals["characters"] + character_count > user.character_limit:
+            if is_temporary_student:
+                raise QuotaExceeded("Das Audio-Kontingent dieses Schülerzugangs ist erreicht.")
             raise QuotaExceeded("Ihr monatliches ElevenLabs-Kontingent ist erreicht.")
         return
 
-    daily_requests = usage.filter(created_at__date=today).count()
-    if daily_requests >= user.openai_daily_request_limit:
+    request_count = usage.count() if is_temporary_student else usage.filter(created_at__date=today).count()
+    if request_count >= user.openai_daily_request_limit:
+        if is_temporary_student:
+            raise QuotaExceeded("Das KI-Kontingent dieses Schülerzugangs ist erreicht.")
         raise QuotaExceeded("Ihr tägliches Kontingent für den KI-Assistenten ist erreicht.")
     if totals["input_tokens"] + input_tokens > user.openai_monthly_input_token_limit:
+        if is_temporary_student:
+            raise QuotaExceeded("Das KI-Kontingent dieses Schülerzugangs ist erreicht.")
         raise QuotaExceeded("Ihr monatliches OpenAI-Eingabekontingent ist erreicht.")
     if totals["output_tokens"] + output_tokens > user.openai_monthly_output_token_limit:
+        if is_temporary_student:
+            raise QuotaExceeded("Das KI-Kontingent dieses Schülerzugangs ist erreicht.")
         raise QuotaExceeded("Ihr monatliches OpenAI-Ausgabekontingent ist erreicht.")
 
 

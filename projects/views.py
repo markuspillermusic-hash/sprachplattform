@@ -32,6 +32,10 @@ def visible_projects(user):
     queryset = Project.objects.all()
     if user.is_staff or user.role == user.Role.ADMIN:
         return queryset
+    if user.role == user.Role.TEACHER:
+        return queryset.filter(
+            Q(owner=user) | Q(owner__temporary_student_access__teacher=user)
+        ).distinct()
     return queryset.filter(owner=user)
 
 
@@ -50,14 +54,22 @@ def form_error_summary(form):
 @login_required
 def project_list(request):
     ensure_demo_projects(request.user)
-    projects = visible_projects(request.user).prefetch_related("segments", "speakers")
+    projects = visible_projects(request.user)
+    if not (request.user.is_staff or request.user.role == request.user.Role.ADMIN):
+        projects = projects.filter(owner=request.user)
+    projects = projects.prefetch_related("segments", "speakers")
     return render(request, "projects/project_list.html", {"projects": projects})
 
 
 @login_required
 def project_create(request):
     assistant_configuration = AssistantConfiguration.objects.order_by("pk").first()
+    assistant_allowed = request.user.openai_daily_request_limit > 0
     selected_mode = request.POST.get("mode") or request.GET.get("mode", "")
+    if selected_mode == "assistant" and not assistant_allowed:
+        if request.method == "POST":
+            raise PermissionDenied
+        selected_mode = "manual"
     if request.method == "POST" and not selected_mode and "title" in request.POST:
         selected_mode = "manual"
     form = ProjectCreateForm(request.POST or None) if selected_mode == "manual" else ProjectCreateForm()
@@ -92,6 +104,7 @@ def project_create(request):
             "assistant_configured": bool(
                 assistant_configuration and assistant_configuration.is_configured
             ),
+            "assistant_allowed": assistant_allowed,
         },
     )
 
@@ -108,10 +121,10 @@ def project_editor(request, project_id):
     )
     speaker_form_voices = list(speaker_form_voice_queryset)
     month_start = timezone.localdate().replace(day=1)
-    usage_used = UsageLedger.objects.filter(
-        user=request.user,
-        billing_period=month_start,
-    ).aggregate(total=Sum("character_count"))["total"] or 0
+    usage_queryset = UsageLedger.objects.filter(user=request.user)
+    if request.user.role != request.user.Role.STUDENT:
+        usage_queryset = usage_queryset.filter(billing_period=month_start)
+    usage_used = usage_queryset.aggregate(total=Sum("character_count"))["total"] or 0
     last_applied_proposal = project.assistant_proposals.filter(
         status=AssistantProposal.Status.APPLIED,
     ).first()
@@ -184,6 +197,7 @@ def project_editor(request, project_id):
             "assistant_configured": bool(
                 assistant_configuration and assistant_configuration.is_configured
             ),
+            "assistant_allowed": request.user.openai_daily_request_limit > 0,
             "last_applied_proposal": last_applied_proposal,
         },
     )

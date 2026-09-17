@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Zugangsdaten erstellt · Sprachplattform{% endblock %}
+{% block content %}
+<section class="page-shell credentials-page" aria-labelledby="credentials-title">
+  <header class="credentials-heading">
+    <div>
+      <p class="eyebrow">Nur jetzt sichtbar</p>
+      <h1 id="credentials-title">{% if password_reset %}Neues Passwort erstellt{% else %}Zugangsdaten sind bereit{% endif %}</h1>
+      <p class="lead">Drucken oder kopieren Sie diese Seite jetzt. Die Kennwörter werden nicht im Klartext gespeichert und können später nicht erneut angezeigt werden.</p>
+    </div>
+    <div class="credentials-toolbar no-print">
+      <button class="button button-secondary" type="button" data-copy-credentials>Alle kopieren</button>
+      <button class="button button-primary" type="button" onclick="window.print()">Drucken</button>
+    </div>
+  </header>
+
+  <div class="credential-meta">
+    <span>Anmeldung: <strong>{{ login_url }}</strong></span>
+    <span>Maximal {{ character_total }} Audio-Zeichen · ca. {{ estimated_cost|floatformat:2 }} € Tarifwert</span>
+    {% if allow_ai %}<span>KI-Assistent: freigegeben</span>{% else %}<span>KI-Assistent: nicht freigegeben</span>{% endif %}
+  </div>
+
+  <p class="copy-status" data-copy-status role="status" aria-live="polite"></p>
+  <ol class="credential-list" data-credential-list data-login-url="{{ login_url }}">
+    {% for credential in credentials %}
+      <li>
+        <div><span>Zugang</span><strong>{{ credential.access.label }}</strong></div>
+        <div><span>Benutzername</span><code data-credential-username>{{ credential.username }}</code></div>
+        <div><span>Passwort</span><code data-credential-password>{{ credential.password }}</code></div>
+        <div><span>Gültig bis</span><strong>{{ credential.access.expires_at|date:"d.m.Y, H:i" }} Uhr</strong></div>
+      </li>
+    {% endfor %}
+  </ol>
+
+  <div class="credentials-finish no-print">
+    <a class="button button-primary" href="{% url 'accounts:student_access_list' %}">Zur Zugangsverwaltung</a>
+  </div>
+</section>
+{% endblock %}

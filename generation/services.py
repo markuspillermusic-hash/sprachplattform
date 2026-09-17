@@ -11,6 +11,7 @@ from django.db import transaction
 from django.db.models import Max, Sum
 from django.utils import timezone
 
+from accounts.models import TemporaryStudentAccess
 from projects.models import Project
 from tts.providers import get_tts_provider
 from tts.providers.base import DialogueInput, ProviderError, ProviderTemporaryError
@@ -136,8 +137,14 @@ def _period_usage(user, today):
 def create_generation_job(project, requested_by):
     project = Project.objects.select_for_update().get(pk=project.pk)
     get_user_model().objects.select_for_update().get(pk=requested_by.pk)
+    manages_student_project = TemporaryStudentAccess.objects.filter(
+        teacher=requested_by,
+        student_id=project.owner_id,
+    ).exists()
     if project.owner_id != requested_by.pk and not (
-        requested_by.is_staff or requested_by.role == requested_by.Role.ADMIN
+        requested_by.is_staff
+        or requested_by.role == requested_by.Role.ADMIN
+        or manages_student_project
     ):
         raise PermissionDenied
     snapshot = build_project_snapshot(project)

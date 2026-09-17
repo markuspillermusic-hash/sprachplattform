@@ -9,17 +9,19 @@
     <p class="lead">Sie können direkt losschreiben oder sich in wenigen Schritten einen vollständigen Entwurf erstellen lassen.</p>
   </header>
 
-  <div class="creation-choice-grid" aria-label="Erstellungsart wählen">
+  <div class="creation-choice-grid{% if not assistant_allowed %} creation-choice-grid-single{% endif %}" aria-label="Erstellungsart wählen">
     <a class="creation-choice{% if selected_mode == 'manual' %} is-selected{% endif %}" href="?mode=manual">
       <span class="choice-number" aria-hidden="true">1</span>
       <strong>Hörtext selbst erstellen</strong>
       <span>Titel und Sprache festlegen, danach frei im Editor schreiben.</span>
     </a>
-    <a class="creation-choice{% if selected_mode == 'assistant' %} is-selected{% endif %}" href="?mode=assistant">
-      <span class="choice-number" aria-hidden="true">2</span>
-      <strong>Mit KI-Unterstützung erstellen</strong>
-      <span>Ein paar Angaben machen und sofort einen bearbeitbaren Entwurf erhalten.</span>
-    </a>
+    {% if assistant_allowed %}
+      <a class="creation-choice{% if selected_mode == 'assistant' %} is-selected{% endif %}" href="?mode=assistant">
+        <span class="choice-number" aria-hidden="true">2</span>
+        <strong>Mit KI-Unterstützung erstellen</strong>
+        <span>Ein paar Angaben machen und sofort einen bearbeitbaren Entwurf erhalten.</span>
+      </a>
+    {% endif %}
   </div>
 
   {% if selected_mode == 'manual' %}
@@ -29,7 +31,7 @@
       {% for field in form %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}</div>{% endfor %}
       <button class="button button-primary button-wide" type="submit">Projekt anlegen</button>
     </form>
-  {% elif selected_mode == 'assistant' %}
+  {% elif selected_mode == 'assistant' and assistant_allowed %}
     <form class="assistant-brief-card" method="post" novalidate>
       {% csrf_token %}<input type="hidden" name="mode" value="assistant">
       <div class="assistant-brief-intro">

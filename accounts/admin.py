@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import User
+from .models import TemporaryStudentAccess, User
 from .services import reset_temporary_password
 
 
@@ -58,3 +58,32 @@ class SprachplattformUserAdmin(UserAdmin):
             request,
             "Nur jetzt sichtbar – sicher übermitteln: " + " · ".join(credentials),
         )
+
+
+@admin.register(TemporaryStudentAccess)
+class TemporaryStudentAccessAdmin(admin.ModelAdmin):
+    list_display = (
+        "label",
+        "student",
+        "teacher",
+        "expires_at",
+        "status_display",
+        "created_at",
+    )
+    list_filter = ("revoked_at", "expires_at", "created_at")
+    search_fields = ("label", "student__username", "teacher__username")
+    readonly_fields = (
+        "teacher",
+        "student",
+        "label",
+        "expires_at",
+        "revoked_at",
+        "created_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.display(description="Status")
+    def status_display(self, access):
+        return access.status_label

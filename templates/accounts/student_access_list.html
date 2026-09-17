@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Schülerzugänge · Sprachplattform{% endblock %}
+{% block content %}
+<section class="page-shell student-access-page" aria-labelledby="student-access-title">
+  <header class="page-heading">
+    <div>
+      <p class="eyebrow">Unterricht</p>
+      <h1 id="student-access-title">Temporäre Schülerzugänge</h1>
+      <p class="lead">Erstellen Sie anonyme Einzelzugänge für eine Unterrichtsstunde. Laufzeit und Audio-Kontingent begrenzen die Nutzung automatisch.</p>
+    </div>
+    <a class="button button-primary" href="{% url 'accounts:student_access_create' %}">Zugänge erstellen</a>
+  </header>
+
+  <div class="student-access-summary" aria-label="Zusammenfassung">
+    <div><strong>{{ active_count }}</strong><span>derzeit aktiv</span></div>
+    <div><strong>{{ accesses|length }}</strong><span>insgesamt erstellt</span></div>
+  </div>
+
+  {% if accesses %}
+    <ul class="student-access-list">
+      {% for access in accesses %}
+        <li class="student-access-card status-{{ access.status }}">
+          <div class="student-access-card-heading">
+            <div>
+              <span class="status-badge status-{{ access.status }}">{{ access.status_label }}</span>
+              <h2>{{ access.label }}</h2>
+              <p>Benutzername: <code>{{ access.student.username }}</code></p>
+            </div>
+            <dl>
+              <div><dt>Gültig bis</dt><dd>{{ access.expires_at|date:"d.m.Y, H:i" }} Uhr</dd></div>
+              <div><dt>Audio</dt><dd>{{ access.characters_used }} / {{ access.student.character_limit }} Zeichen</dd></div>
+              {% if access.student.openai_daily_request_limit %}<div><dt>KI-Anfragen</dt><dd>{{ access.ai_requests_used }} / {{ access.student.openai_daily_request_limit }}</dd></div>{% endif %}
+              <div><dt>Projekte</dt><dd>{{ access.project_count }}</dd></div>
+            </dl>
+          </div>
+          {% if access.project_count %}
+            <details class="student-projects">
+              <summary>{{ access.project_count }} Schülerprojekt{{ access.project_count|pluralize:"e" }} anzeigen</summary>
+              <ul>
+                {% for project in access.student.projects.all %}
+                  <li><a href="{% url 'projects:editor' project.id %}">{{ project.title }}</a><span>{{ project.get_language_display }}{% if project.level %} · {{ project.level }}{% endif %}</span></li>
+                {% endfor %}
+              </ul>
+            </details>
+          {% endif %}
+          {% if access.status == 'active' %}
+            <div class="student-access-actions">
+              <form method="post" action="{% url 'accounts:student_access_reset_password' access.id %}">
+                {% csrf_token %}<button class="button button-secondary" type="submit">Neues Passwort</button>
+              </form>
+              <form method="post" action="{% url 'accounts:student_access_revoke' access.id %}" data-confirm="Diesen Schülerzugang sofort sperren?">
+                {% csrf_token %}<button class="button button-danger" type="submit">Zugang sperren</button>
+              </form>
+            </div>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty-state">
+      <span class="empty-icon" aria-hidden="true">⌛</span>
+      <h2>Noch keine Schülerzugänge</h2>
+      <p>Erzeugen Sie bei Bedarf einzelne oder mehrere Zugänge. Es werden keine Namen oder E-Mail-Adressen benötigt.</p>
+      <a class="button button-primary" href="{% url 'accounts:student_access_create' %}">Erste Zugänge erstellen</a>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

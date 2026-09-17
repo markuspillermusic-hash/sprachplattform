@@ -187,7 +187,7 @@
         </details>
       </div>
 
-      <div class="sidebar-card assistant-card">
+      {% if assistant_allowed %}<div class="sidebar-card assistant-card">
         <p class="eyebrow">KI-Assistent</p><h2>Text gemeinsam weiterentwickeln</h2>
         {% if assistant_configured %}
           <p>Ein neuer Vorschlag bleibt getrennt von diesem Hörtext, bis Sie ihn ausdrücklich übernehmen.</p>
@@ -199,9 +199,9 @@
           <p>Der KI-Assistent muss zuerst von der Administration mit OpenAI verbunden werden.</p>
           {% if request.user.is_staff %}{% if assistant_configuration %}<a class="button button-secondary button-wide" href="{% url 'admin:script_assistant_assistantconfiguration_change' assistant_configuration.id %}">KI-Anbindung einrichten</a>{% else %}<a class="button button-secondary button-wide" href="{% url 'admin:script_assistant_assistantconfiguration_add' %}">KI-Anbindung einrichten</a>{% endif %}{% endif %}
         {% endif %}
-      </div>
+      </div>{% endif %}
       <div class="sidebar-card usage-card">
-        <p class="eyebrow">Nutzung diesen Monat</p>
+        <p class="eyebrow">{% if request.user.role == 'student' %}Kontingent dieses Zugangs{% else %}Nutzung diesen Monat{% endif %}</p>
         <strong>{{ usage_used }} von {{ usage_limit }} Zeichen</strong>
         <progress value="{{ usage_used }}" max="{{ usage_limit }}">{{ usage_percent }} %</progress>
         {% if usage_percent >= 100 %}<p class="limit-warning">Ihr Limit ist erreicht.</p>{% elif usage_percent >= 80 %}<p class="limit-warning">Ihr Limit ist fast erreicht.</p>{% endif %}

@@ -45,7 +45,7 @@ a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; border-
 .brand { display: inline-flex; align-items: center; gap: 0.75rem; color: var(--ink); font-weight: 750; text-decoration: none; }
 .brand-mark { width: 2.3rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 0.75rem 0.75rem 0.75rem 0.2rem; color: white; background: var(--brand); }
 .environment { padding: 0.45rem 0.75rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(255, 254, 250, 0.75); font-size: 0.8rem; }
-.account-nav { display: flex; align-items: center; gap: 0.75rem; }
+.account-nav { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.75rem; }
 .account-nav form { margin: 0; }
 .account-name { color: var(--muted); font-size: 0.9rem; }
 main { flex: 1; }
@@ -258,10 +258,64 @@ dd { margin: 0; font-weight: 700; text-align: right; }
 .usage-card progress { width: 100%; height: 0.8rem; accent-color: var(--brand); }
 .limit-warning, .job-error { color: #8b2929; font-size: 0.9rem; }
 .status-badge { padding: 0.25rem 0.5rem; border-radius: 999px; color: var(--muted); background: var(--paper); font-size: 0.72rem; }
+.status-active { color: #145c43; background: #e6f5ee; }
+.status-expired, .status-revoked { color: #6c6258; background: #ece8e1; }
 .status-running, .status-queued { color: #70520e; background: #fff0c9; }
 .status-succeeded { color: #145c43; background: #e6f5ee; }
 .status-failed { color: #8b2929; background: #fbecec; }
 .status-running { color: #70520e; background: #fff4d8; }
+
+.student-access-page .page-heading { align-items: end; }
+.student-access-summary { margin-top: 2rem; display: flex; flex-wrap: wrap; gap: 0.8rem; }
+.student-access-summary div { min-width: 10rem; padding: 1rem 1.2rem; display: grid; gap: 0.15rem; border: 1px solid var(--line); border-radius: 0.9rem; background: var(--surface); }
+.student-access-summary strong { color: var(--brand); font-family: Georgia, "Times New Roman", serif; font-size: 1.9rem; font-weight: 500; }
+.student-access-summary span { color: var(--muted); font-size: 0.82rem; }
+.student-access-list { margin: 1.3rem 0 0; padding: 0; display: grid; gap: 1rem; list-style: none; }
+.student-access-card { padding: clamp(1rem, 3vw, 1.4rem); border: 1px solid var(--line); border-left: 0.35rem solid var(--brand); border-radius: 1rem; background: var(--surface); box-shadow: 0 0.5rem 1.5rem rgba(23, 37, 31, 0.04); }
+.student-access-card.status-expired, .student-access-card.status-revoked { border-left-color: #9a9188; opacity: 0.8; }
+.student-access-card-heading { display: grid; gap: 1rem 2rem; }
+.student-access-card h2 { margin: 0.55rem 0 0.2rem; font-family: Georgia, "Times New Roman", serif; font-size: 1.45rem; font-weight: 500; }
+.student-access-card p { margin: 0; color: var(--muted); }
+.student-access-card code, .credential-list code { padding: 0.18rem 0.38rem; border-radius: 0.3rem; color: var(--ink); background: var(--paper); font-size: 0.9rem; overflow-wrap: anywhere; }
+.student-access-card dl { margin: 0; display: grid; gap: 0.4rem; }
+.student-access-card dl div { display: grid; grid-template-columns: minmax(6rem, auto) minmax(0, 1fr); gap: 0.8rem; }
+.student-access-card dt { color: var(--muted); }
+.student-access-card dd { text-align: left; }
+.student-access-actions { margin-top: 1rem; padding-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.6rem; border-top: 1px solid var(--line); }
+.student-access-actions form { margin: 0; }
+.student-projects { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--line); }
+.student-projects summary { min-height: 2.5rem; display: flex; align-items: center; color: var(--brand-dark); font-weight: 750; cursor: pointer; }
+.student-projects ul { margin: 0.35rem 0 0; padding: 0; display: grid; gap: 0.45rem; list-style: none; }
+.student-projects li { padding: 0.65rem 0.75rem; display: flex; justify-content: space-between; gap: 1rem; border-radius: 0.55rem; background: var(--paper); }
+.student-projects a { font-weight: 750; }
+.student-projects span { color: var(--muted); font-size: 0.82rem; }
+
+.student-access-create { max-width: 70rem; }
+.student-access-create-grid { margin-top: 2rem; display: grid; gap: 1.5rem; align-items: start; }
+.field-checkbox { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 0.65rem; }
+.field-checkbox input { width: 1.2rem; height: 1.2rem; accent-color: var(--brand); }
+.field-checkbox label { margin: 0; }
+.field-checkbox .form-help, .field-checkbox .field-errors { grid-column: 2; }
+.student-cost-preview { padding: clamp(1.2rem, 4vw, 2rem); border: 1px solid #d7bc7b; border-radius: var(--radius-lg); background: #fff8e8; box-shadow: var(--shadow); }
+.student-cost-preview h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 1.7rem; font-weight: 500; }
+.student-cost-preview > strong { display: block; margin: 0.5rem 0; color: #70520e; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.4rem, 6vw, 4rem); font-weight: 500; }
+.student-cost-preview p { line-height: 1.5; }
+.student-cost-preview small { color: var(--muted); line-height: 1.5; }
+.student-cost-preview ul { margin: 1.2rem 0 0; padding-left: 1.2rem; display: grid; gap: 0.5rem; }
+
+.credentials-page { max-width: 72rem; }
+.credentials-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1.5rem; align-items: end; }
+.credentials-heading > div:first-child { max-width: 48rem; }
+.credentials-toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.credential-meta { margin-top: 1.8rem; padding: 1rem 1.2rem; display: grid; gap: 0.4rem; border: 1px solid #d7bc7b; border-radius: 0.8rem; background: #fff8e8; }
+.credential-meta span { line-height: 1.45; overflow-wrap: anywhere; }
+.copy-status { min-height: 1.5rem; color: var(--success); font-weight: 700; }
+.credential-list { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 1rem; list-style: none; counter-reset: credentials; }
+.credential-list li { padding: 1.15rem; display: grid; gap: 0.75rem; border: 1px solid var(--line); border-radius: 0.9rem; background: var(--surface); break-inside: avoid; }
+.credential-list li > div { display: grid; gap: 0.2rem; }
+.credential-list li span { color: var(--muted); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.credential-list code { font-size: 1rem; font-weight: 750; user-select: all; }
+.credentials-finish { margin-top: 1.5rem; }
 
 .catalog-heading { display: grid; gap: 2rem; align-items: end; }
 .catalog-heading h1 { max-width: 12ch; font-size: clamp(2.6rem, 7vw, 5.2rem); }
@@ -358,11 +412,14 @@ footer { min-height: 5rem; padding-block: 1rem; display: flex; align-items: cent
   .catalog-heading { grid-template-columns: minmax(0, 1.5fr) minmax(15rem, 0.5fr); }
   .voice-filter-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .creation-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .creation-choice-grid-single { max-width: 34rem; grid-template-columns: minmax(0, 1fr); }
   .assistant-brief-intro { grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.7fr); align-items: end; }
   .assistant-core-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .assistant-core-fields .field-topic { grid-column: 1 / -1; }
   .filter-actions { grid-column: 1 / -1; }
   .audio-generate-action { grid-template-columns: minmax(0, 1fr) auto; }
+  .student-access-card-heading { grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.7fr); }
+  .student-access-create-grid { grid-template-columns: minmax(0, 1.1fr) minmax(18rem, 0.7fr); }
 }
 
 @media (min-width: 64rem) {
@@ -392,4 +449,13 @@ footer { min-height: 5rem; padding-block: 1rem; display: flex; align-items: cent
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }
   .activity-spinner { animation: none; }
+}
+
+@media print {
+  .site-header, footer, .no-print, .message-stack, .skip-link { display: none !important; }
+  body { color: #000; background: #fff; }
+  main, .page-shell { width: 100%; margin: 0; padding: 0; }
+  .credentials-page h1 { font-size: 2rem; }
+  .credential-meta, .credential-list li { color: #000; background: #fff; box-shadow: none; }
+  .credential-list { grid-template-columns: repeat(2, 1fr); }
 }

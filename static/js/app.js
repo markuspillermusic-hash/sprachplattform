@@ -226,6 +226,52 @@
     });
   });
 
+  const studentAccessForm = document.querySelector('[data-student-access-form]');
+  if (studentAccessForm) {
+    const count = studentAccessForm.querySelector('[name="count"]');
+    const characterLimit = studentAccessForm.querySelector('[name="character_limit"]');
+    const costOutput = document.querySelector('[data-student-cost]');
+    const charactersOutput = document.querySelector('[data-student-characters]');
+    const rate = Number.parseFloat((studentAccessForm.dataset.estimatedRate || '0').replace(',', '.'));
+    const updateStudentCost = () => {
+      const totalCharacters = Math.max(0, Number(count?.value) || 0)
+        * Math.max(0, Number(characterLimit?.value) || 0);
+      const estimatedCost = totalCharacters / 1000 * rate;
+      if (charactersOutput) charactersOutput.textContent = totalCharacters.toLocaleString('de-DE');
+      if (costOutput) {
+        costOutput.textContent = `${estimatedCost.toLocaleString('de-DE', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })} €`;
+      }
+    };
+    count?.addEventListener('input', updateStudentCost);
+    characterLimit?.addEventListener('input', updateStudentCost);
+    updateStudentCost();
+  }
+
+  const copyCredentialsButton = document.querySelector('[data-copy-credentials]');
+  if (copyCredentialsButton) {
+    copyCredentialsButton.addEventListener('click', async () => {
+      const list = document.querySelector('[data-credential-list]');
+      const status = document.querySelector('[data-copy-status]');
+      if (!list) return;
+      const loginUrl = list.dataset.loginUrl || '';
+      const rows = Array.from(list.querySelectorAll('li')).map((item) => {
+        const username = item.querySelector('[data-credential-username]')?.textContent?.trim() || '';
+        const password = item.querySelector('[data-credential-password]')?.textContent?.trim() || '';
+        return `${username} | ${password}`;
+      });
+      const text = [`Anmeldung: ${loginUrl}`, '', ...rows].join('\n');
+      try {
+        await navigator.clipboard.writeText(text);
+        if (status) status.textContent = 'Alle Zugangsdaten wurden kopiert.';
+      } catch (_) {
+        if (status) status.textContent = 'Kopieren war nicht möglich. Bitte nutzen Sie die Druckfunktion.';
+      }
+    });
+  }
+
   const favoriteCount = document.querySelector('[data-favorite-count]');
   const favoriteStatus = document.querySelector('[data-favorite-status]');
   document.querySelectorAll('[data-favorite-form]').forEach((form) => {
