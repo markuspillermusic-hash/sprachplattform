@@ -41,14 +41,30 @@ class AssistantProposal(models.Model):
 
 class AssistantConfiguration(models.Model):
     MODEL_CHOICES = (
-        ("gpt-5.6-luna", "GPT-5.6 Luna · sparsam"),
-        ("gpt-5.6-terra", "GPT-5.6 Terra · ausgewogen"),
-        ("gpt-5.6-sol", "GPT-5.6 Sol · höchste Qualität"),
+        ("gpt-6-luna", "GPT-6 Luna · sparsam"),
+        ("gpt-6-sol", "GPT-6 Sol · höhere Qualität"),
     )
+    REASONING_EFFORT_CHOICES = (
+        ("none", "Ohne zusätzlichen Reasoning-Aufwand"),
+        ("low", "Niedrig · empfohlen"),
+        ("medium", "Mittel"),
+        ("high", "Hoch"),
+    )
+    MODEL_PRICING_USD = {
+        "gpt-6-luna": ("0.1000", "0.5000"),
+        "gpt-6-sol": ("2.0000", "10.0000"),
+    }
 
     name = models.CharField(max_length=80, default="OpenAI / ChatGPT")
     active = models.BooleanField(default=True)
-    model = models.CharField(max_length=80, choices=MODEL_CHOICES, default="gpt-5.6-luna")
+    model = models.CharField(max_length=80, choices=MODEL_CHOICES, default="gpt-6-luna")
+    reasoning_effort = models.CharField(
+        "Reasoning-Aufwand",
+        max_length=16,
+        choices=REASONING_EFFORT_CHOICES,
+        default="low",
+        help_text="Niedrig ist für strukturierte Hörtexte normalerweise ausreichend und spart Zeit und Tokens.",
+    )
     base_url = models.URLField(default="https://api.openai.com/v1")
     encrypted_api_key = models.TextField(blank=True, editable=False)
     api_key_hint = models.CharField(max_length=16, blank=True, editable=False)
@@ -63,13 +79,13 @@ class AssistantConfiguration(models.Model):
         "Preis je 1 Mio. Eingabetokens",
         max_digits=10,
         decimal_places=4,
-        default=1,
+        default="0.1000",
     )
     output_price_per_million = models.DecimalField(
         "Preis je 1 Mio. Ausgabetokens",
         max_digits=10,
         decimal_places=4,
-        default=6,
+        default="0.5000",
     )
     updated_at = models.DateTimeField(auto_now=True)
 

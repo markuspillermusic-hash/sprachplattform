@@ -33,6 +33,7 @@ class AssistantConfigurationForm(forms.ModelForm):
             "name",
             "active",
             "model",
+            "reasoning_effort",
             "base_url",
             "max_output_tokens",
             "pricing_currency",
@@ -51,6 +52,17 @@ class AssistantConfigurationForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        selected_model = cleaned_data.get("model")
+        previous_model = None
+        if self.instance.pk:
+            previous_model = type(self.instance).objects.filter(pk=self.instance.pk).values_list(
+                "model", flat=True
+            ).first()
+        if selected_model and selected_model != previous_model:
+            input_price, output_price = AssistantConfiguration.MODEL_PRICING_USD[selected_model]
+            cleaned_data["pricing_currency"] = "USD"
+            cleaned_data["input_price_per_million"] = input_price
+            cleaned_data["output_price_per_million"] = output_price
         for name in (
             "pricing_currency",
             "input_price_per_million",
@@ -89,6 +101,7 @@ class AssistantConfigurationAdmin(admin.ModelAdmin):
                     "name",
                     "active",
                     "model",
+                    "reasoning_effort",
                     "base_url",
                     "max_output_tokens",
                     "pricing_currency",
@@ -101,7 +114,8 @@ class AssistantConfigurationAdmin(admin.ModelAdmin):
                 ),
                 "description": (
                     "Der Schlüssel wird verschlüsselt gespeichert und nach dem Sichern nicht erneut angezeigt. "
-                    "Die Modellprüfung erzeugt keinen Hörtext."
+                    "Die Modellprüfung erzeugt keinen Hörtext. Ein leeres Schlüsselfeld behält den vorhandenen Schlüssel bei. "
+                    "Beim Modellwechsel werden die aktuellen Standardpreise des gewählten Modells eingetragen."
                 ),
             },
         ),

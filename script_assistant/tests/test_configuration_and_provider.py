@@ -14,7 +14,7 @@ from .test_proposals import valid_payload
 
 class AssistantConfigurationTests(TestCase):
     def test_api_key_is_encrypted_and_can_be_read_by_provider(self):
-        configuration = AssistantConfiguration(model="gpt-5.6-luna")
+        configuration = AssistantConfiguration(model="gpt-6-luna")
         configuration.set_api_key("sk-test-secret-1234")
         configuration.save()
 
@@ -36,7 +36,8 @@ class AssistantConfigurationTests(TestCase):
             {
                 "name": "OpenAI / ChatGPT",
                 "active": "on",
-                "model": "gpt-5.6-luna",
+                "model": "gpt-6-luna",
+                "reasoning_effort": "low",
                 "base_url": "https://api.openai.com/v1",
                 "max_output_tokens": 8000,
                 "api_key": "sk-admin-secret-9876",
@@ -53,10 +54,51 @@ class AssistantConfigurationTests(TestCase):
         self.assertContains(change, "…9876")
         self.assertNotContains(change, "sk-admin-secret-9876")
 
+    def test_admin_model_change_keeps_key_and_applies_matching_prices(self):
+        admin_user = get_user_model().objects.create_superuser(
+            username="model-admin",
+            password="admin",
+            email="model-admin@example.test",
+            must_change_password=False,
+        )
+        configuration = AssistantConfiguration.objects.create(
+            model="gpt-6-luna",
+            reasoning_effort="low",
+        )
+        configuration.set_api_key("sk-existing-secret-4321")
+        configuration.save()
+        self.client.force_login(admin_user)
+
+        response = self.client.post(
+            reverse(
+                "admin:script_assistant_assistantconfiguration_change",
+                args=[configuration.pk],
+            ),
+            {
+                "name": "OpenAI / ChatGPT",
+                "active": "on",
+                "model": "gpt-6-sol",
+                "reasoning_effort": "low",
+                "base_url": "https://api.openai.com/v1",
+                "max_output_tokens": 8000,
+                "pricing_currency": "USD",
+                "input_price_per_million": "0.1000",
+                "output_price_per_million": "0.5000",
+                "_save": "Speichern",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        configuration.refresh_from_db()
+        self.assertEqual(configuration.model, "gpt-6-sol")
+        self.assertEqual(configuration.get_api_key(), "sk-existing-secret-4321")
+        self.assertEqual(str(configuration.input_price_per_million), "2.0000")
+        self.assertEqual(str(configuration.output_price_per_million), "10.0000")
+
 
 class OpenAIProviderTests(TestCase):
     def setUp(self):
-        self.configuration = AssistantConfiguration(model="gpt-5.6-luna")
+        self.configuration = AssistantConfiguration(model="gpt-6-luna", reasoning_effort="low")
         self.configuration.set_api_key("sk-provider-test")
         self.configuration.save()
 
@@ -70,7 +112,7 @@ class OpenAIProviderTests(TestCase):
                 200,
                 json={
                     "id": "resp_123",
-                    "model": "gpt-5.6-luna-2026-07-01",
+                    "model": "gpt-6-luna-2026-09-22",
                     "usage": {"input_tokens": 123, "output_tokens": 456},
                     "output": [
                         {
@@ -97,6 +139,7 @@ class OpenAIProviderTests(TestCase):
         self.assertEqual(result.output_tokens, 456)
         self.assertEqual(captured["authorization"], "Bearer sk-provider-test")
         self.assertFalse(captured["body"]["store"])
+        self.assertEqual(captured["body"]["reasoning"], {"effort": "low"})
         self.assertTrue(captured["body"]["text"]["format"]["strict"])
         speaker_schema = captured["body"]["text"]["format"]["schema"]["properties"]["speakers"]["items"]
         self.assertIn("age_group", speaker_schema["required"])
@@ -112,11 +155,11 @@ class OpenAIProviderTests(TestCase):
         def handler(request):
             captured["method"] = request.method
             captured["path"] = request.url.path
-            return httpx.Response(200, json={"id": "gpt-5.6-luna"})
+            return httpx.Response(200, json={"id": "gpt-6-luna"})
 
         provider = OpenAIScriptAssistantProvider(
             self.configuration,
             transport=httpx.MockTransport(handler),
         )
         self.assertTrue(provider.test_connection())
-        self.assertEqual(captured, {"method": "GET", "path": "/v1/models/gpt-5.6-luna"})
+        self.assertEqual(captured, {"method": "GET", "path": "/v1/models/gpt-6-luna"})

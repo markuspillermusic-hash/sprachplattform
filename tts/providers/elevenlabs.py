@@ -194,7 +194,13 @@ class ElevenLabsProvider(TTSProvider):
             "inputs": inputs,
             "model_id": self.model_id,
         }
-        for key in ("language_code", "seed", "settings", "apply_text_normalization"):
+        for key in (
+            "language_code",
+            "seed",
+            "settings",
+            "apply_text_normalization",
+            "previous_request_ids",
+        ):
             if key in options and options[key] is not None:
                 body[key] = options[key]
         params = {"output_format": options.get("output_format", "mp3_44100_128")}

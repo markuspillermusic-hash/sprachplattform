@@ -6,9 +6,10 @@
 2. Unter **Skript-Assistent** den Punkt **KI-Anbindung** öffnen.
 3. Falls noch kein Eintrag existiert, **KI-Anbindung hinzufügen** wählen.
 4. Den persönlichen OpenAI-API-Schlüssel in das Passwortfeld einfügen.
-5. Als Standardmodell zunächst **GPT-5.6 Luna · sparsam** verwenden. Terra und Sol sind für höhere Qualitätsanforderungen auswählbar.
-6. **Sichern** wählen.
-7. In der Liste den Eintrag markieren und unter **Aktion** den Punkt **OpenAI-Verbindung für Auswahl prüfen** ausführen.
+5. Als Standardmodell **GPT-6 Luna · sparsam** verwenden. **GPT-6 Sol** kann für besonders anspruchsvolle Hörtexte als Qualitätsoption ausgewählt werden.
+6. Den Reasoning-Aufwand normalerweise auf **Niedrig · empfohlen** belassen. Mittel oder Hoch sollte nur bei erkennbar komplexen Aufgaben verwendet werden.
+7. **Sichern** wählen.
+8. In der Liste den Eintrag markieren und unter **Aktion** den Punkt **OpenAI-Verbindung für Auswahl prüfen** ausführen.
 
 Die Prüfung ruft nur die Modellinformation ab und erzeugt keinen Hörtext. Nach dem Speichern wird der API-Schlüssel nicht mehr vollständig angezeigt. Ein leeres Schlüsselfeld behält den vorhandenen Schlüssel bei; die gesonderte Checkbox entfernt ihn.
 

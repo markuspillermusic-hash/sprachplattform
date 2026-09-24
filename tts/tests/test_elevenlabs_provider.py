@@ -48,7 +48,11 @@ class ElevenLabsProviderTests(SimpleTestCase):
                     accent="British accent",
                 )
             ],
-            {"language_code": "fr", "seed": 42},
+            {
+                "language_code": "fr",
+                "seed": 42,
+                "previous_request_ids": ["req-before-1", "req-before-2"],
+            },
         )
 
         self.assertEqual(captured["path"], "/v1/text-to-dialogue")
@@ -59,6 +63,10 @@ class ElevenLabsProviderTests(SimpleTestCase):
             {"text": "[British accent] [friendly] Bonjour !", "voice_id": "voice-a"},
         )
         self.assertEqual(captured["json"]["language_code"], "fr")
+        self.assertEqual(
+            captured["json"]["previous_request_ids"],
+            ["req-before-1", "req-before-2"],
+        )
         self.assertEqual(captured["headers"]["xi-api-key"], "test-key-never-log")
         self.assertEqual(result.audio, b"fake-mp3")
         self.assertEqual(result.provider_request_id, "req-123")

@@ -131,6 +131,24 @@ class GenerationPipelineTests(TestCase):
         self.assertEqual(job.usage_event.status, "committed")
         self.assertEqual(provider.calls[0][0][0].accent, "British accent")
 
+    def test_generation_passes_previous_request_ids_to_following_parts(self):
+        self.segment.text = ("A sentence that creates another audio part. " * 90).strip()
+        self.segment.save(update_fields=["text"])
+        job = create_generation_job(self.project, self.user)
+        provider = FakeProvider()
+
+        def fake_assembler(parts, output_path):
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"final-mp3")
+
+        with TemporaryDirectory() as audio_root:
+            run_generation_job(job.pk, provider=provider, audio_root=audio_root, assembler=fake_assembler)
+
+        self.assertGreater(len(provider.calls), 1)
+        self.assertNotIn("previous_request_ids", provider.calls[0][1])
+        self.assertEqual(provider.calls[1][1]["previous_request_ids"], ["request-1"])
+
     @mock.patch("generation.services.subprocess.run")
     def test_assembler_fades_and_pads_every_phrase_before_the_configured_pause(self, run):
         parts = [

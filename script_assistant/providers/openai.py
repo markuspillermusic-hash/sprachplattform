@@ -109,6 +109,7 @@ class OpenAIScriptAssistantProvider(ScriptAssistantProvider):
         user_id = request_payload.pop("_user_id", None) if isinstance(request_payload, dict) else None
         body = {
             "model": self.configuration.model,
+            "reasoning": {"effort": self.configuration.reasoning_effort},
             "instructions": SYSTEM_PROMPT,
             "input": json.dumps(request_payload, ensure_ascii=False, separators=(",", ":")),
             "max_output_tokens": self.configuration.max_output_tokens,

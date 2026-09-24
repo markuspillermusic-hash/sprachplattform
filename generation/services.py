@@ -342,7 +342,11 @@ def run_generation_job(job_id, provider=None, audio_root=None, assembler=assembl
             part.error_message = ""
             part.save(update_fields=["status", "error_message"])
             inputs = [DialogueInput(**item) for item in part.input_data]
-            result = provider.synthesize_dialogue(inputs, {"language_code": job.version.snapshot["language"]})
+            options = {"language_code": job.version.snapshot["language"]}
+            previous_request_ids = [item for item in request_ids if item][-3:]
+            if previous_request_ids:
+                options["previous_request_ids"] = previous_request_ids
+            result = provider.synthesize_dialogue(inputs, options)
             part_path = root / str(job.pk) / f"part-{part.position:04d}.mp3"
             part_path.parent.mkdir(parents=True, exist_ok=True)
             part_path.write_bytes(result.audio)

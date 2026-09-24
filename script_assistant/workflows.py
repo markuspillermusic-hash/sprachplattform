@@ -24,7 +24,7 @@ def _provider_request(data, user):
     request_data["_user_id"] = user.pk
     provider = get_script_assistant_provider()
     configuration = getattr(provider, "configuration", None)
-    model = getattr(configuration, "model", "gpt-5.6-luna")
+    model = getattr(configuration, "model", "gpt-6-luna")
     max_output_tokens = getattr(
         configuration,
         "max_output_tokens",
