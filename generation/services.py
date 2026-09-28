@@ -210,7 +210,9 @@ def create_generation_job(project, requested_by):
 
 @transaction.atomic
 def ensure_generation_reservation(job):
-    job = GenerationJob.objects.select_for_update().select_related("requested_by", "usage_event").get(pk=job.pk)
+    # Lock the job without joining its nullable usage event: PostgreSQL cannot
+    # apply FOR UPDATE to the nullable side of an outer join.
+    job = GenerationJob.objects.select_for_update().select_related("requested_by").get(pk=job.pk)
     if job.usage_event_id and job.usage_event.status != UsageEvent.Status.RELEASED:
         return job.usage_event
     try:

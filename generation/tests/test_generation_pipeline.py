@@ -131,6 +131,26 @@ class GenerationPipelineTests(TestCase):
         self.assertEqual(job.usage_event.status, "committed")
         self.assertEqual(provider.calls[0][0][0].accent, "British accent")
 
+    @mock.patch("generation.views.generate_audio.delay")
+    def test_retry_partially_completed_job_reuses_committed_reservation(self, delay):
+        job = create_generation_job(self.project, self.user)
+        job.status = GenerationJob.Status.FAILED
+        job.save(update_fields=["status"])
+        job.usage_event.status = "committed"
+        job.usage_event.save(update_fields=["status"])
+        part = job.parts.get()
+        part.status = "succeeded"
+        part.save(update_fields=["status"])
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("generation:retry", args=[job.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        job.refresh_from_db()
+        self.assertEqual(job.status, GenerationJob.Status.QUEUED)
+        self.assertEqual(job.usage_event.status, "committed")
+        delay.assert_called_once_with(str(job.pk))
+
     def test_eleven_v3_generation_omits_previous_request_ids_for_following_parts(self):
         self.segment.text = ("A sentence that creates another audio part. " * 90).strip()
         self.segment.save(update_fields=["text"])
