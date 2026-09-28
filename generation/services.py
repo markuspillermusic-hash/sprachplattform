@@ -343,9 +343,12 @@ def run_generation_job(job_id, provider=None, audio_root=None, assembler=assembl
             part.save(update_fields=["status", "error_message"])
             inputs = [DialogueInput(**item) for item in part.input_data]
             options = {"language_code": job.version.snapshot["language"]}
-            previous_request_ids = [item for item in request_ids if item][-3:]
-            if previous_request_ids:
-                options["previous_request_ids"] = previous_request_ids
+            # Eleven v3 does not support request stitching, even though the
+            # dialogue endpoint accepts this parameter for other models.
+            if job.model != "eleven_v3":
+                previous_request_ids = [item for item in request_ids if item][-3:]
+                if previous_request_ids:
+                    options["previous_request_ids"] = previous_request_ids
             result = provider.synthesize_dialogue(inputs, options)
             part_path = root / str(job.pk) / f"part-{part.position:04d}.mp3"
             part_path.parent.mkdir(parents=True, exist_ok=True)

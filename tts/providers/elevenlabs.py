@@ -201,6 +201,8 @@ class ElevenLabsProvider(TTSProvider):
             "apply_text_normalization",
             "previous_request_ids",
         ):
+            if key == "previous_request_ids" and self.model_id == "eleven_v3":
+                continue
             if key in options and options[key] is not None:
                 body[key] = options[key]
         params = {"output_format": options.get("output_format", "mp3_44100_128")}
