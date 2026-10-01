@@ -1,4 +1,7 @@
 import re
+import json
+import shutil
+from collections import defaultdict, deque
 import subprocess
 from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -119,6 +122,7 @@ def build_generation_parts(snapshot, max_characters=2_000):
                     ],
                     "character_count": rendered_length,
                     "pause_after_ms": segment["pause_after_ms"] if index == len(pieces) - 1 else 0,
+                    "playback_speed": Decimal(str(segment.get("speed", 1))),
                 }
             )
     return parts
@@ -133,8 +137,33 @@ def _period_usage(user, today):
     return user_month, organization_month, organization_year
 
 
+def reusable_parts(project, parts, reuse_job, model):
+    matches = {}
+    if not reuse_job or reuse_job.version_id is None or reuse_job.version.project_id != project.pk or reuse_job.model != model:
+        return matches
+    # Only reuse available parts of a finished attempt belonging to this project.
+    if reuse_job.status not in (GenerationJob.Status.SUCCEEDED, GenerationJob.Status.FAILED):
+        return matches
+    if reuse_job.created_at <= timezone.now() - timedelta(days=settings.AUDIO_RETENTION_DAYS):
+        return matches
+    if reuse_job.status == GenerationJob.Status.SUCCEEDED and not AudioAsset.objects.filter(
+            job=reuse_job, deleted_at__isnull=True, expires_at__gt=timezone.now()).exists():
+        return matches
+    root = Path(settings.AUDIO_STORAGE_ROOT).resolve()
+    candidates = defaultdict(deque)
+    for old in reuse_job.parts.filter(status="succeeded").exclude(audio_path=""):
+        path = Path(old.audio_path).resolve()
+        if path.is_relative_to(root) and path.is_file():
+            candidates[json.dumps(old.input_data, sort_keys=True)].append(old)
+    for index, part in enumerate(parts):
+        key = json.dumps(part["input_data"], sort_keys=True)
+        if candidates[key]:
+            matches[index] = candidates[key].popleft()
+    return matches
+
+
 @transaction.atomic
-def create_generation_job(project, requested_by):
+def create_generation_job(project, requested_by, *, reuse_job=None):
     project = Project.objects.select_for_update().get(pk=project.pk)
     get_user_model().objects.select_for_update().get(pk=requested_by.pk)
     manages_student_project = TemporaryStudentAccess.objects.filter(
@@ -149,7 +178,10 @@ def create_generation_job(project, requested_by):
         raise PermissionDenied
     snapshot = build_project_snapshot(project)
     parts = build_generation_parts(snapshot)
-    character_count = sum(len(segment["text"]) for segment in snapshot["segments"])
+    tts_provider = get_tts_provider("elevenlabs")
+    reused = reusable_parts(project, parts, reuse_job, tts_provider.model_id)
+    character_count = (sum(len(item["text"]) for index, part in enumerate(parts) if index not in reused for item in part["input_data"])
+                       if reuse_job else sum(len(segment["text"]) for segment in snapshot["segments"]))
     today = timezone.localdate()
     month_start = today.replace(day=1)
     user_month, organization_month, organization_year = _period_usage(requested_by, today)
@@ -167,7 +199,6 @@ def create_generation_job(project, requested_by):
         snapshot=snapshot,
         created_by=requested_by,
     )
-    tts_provider = get_tts_provider("elevenlabs")
     rate = tts_provider.estimated_rate
     estimated_cost = (Decimal(character_count) / Decimal(1000) * rate).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
     try:
@@ -179,7 +210,7 @@ def create_generation_job(project, requested_by):
             estimated_cost=estimated_cost,
             currency="EUR",
             character_count=character_count,
-            estimated_credits=sum(part["character_count"] for part in parts),
+            estimated_credits=sum(part["character_count"] for index, part in enumerate(parts) if index not in reused),
         )
     except (QuotaExceeded, QuotaConfigurationError) as exc:
         raise UsageLimitExceeded(str(exc)) from exc
@@ -195,7 +226,8 @@ def create_generation_job(project, requested_by):
     usage_event.reference = f"generation:{job.pk}"
     usage_event.save(update_fields=("reference", "updated_at"))
     GenerationPart.objects.bulk_create(
-        [GenerationPart(job=job, position=index, **part) for index, part in enumerate(parts, start=1)]
+        [GenerationPart(job=job, position=index + 1, reuse_source=reused.get(index), is_reused=index in reused, **part)
+         for index, part in enumerate(parts)]
     )
     UsageLedger.objects.create(
         user=requested_by,
@@ -236,7 +268,7 @@ def ensure_generation_reservation(job):
 
 
 def _provider_usage_for_job(job):
-    successful_parts = job.parts.filter(status=GenerationPart.Status.SUCCEEDED)
+    successful_parts = job.parts.filter(status=GenerationPart.Status.SUCCEEDED, is_reused=False)
     characters = successful_parts.aggregate(total=Sum("character_count"))["total"] or 0
     credits = successful_parts.aggregate(total=Sum("provider_credit_count"))["total"]
     cost_per_character = (
@@ -305,6 +337,9 @@ def assemble_mp3(
             f"[{index}:a]aresample=44100,"
             "aformat=sample_rates=44100:channel_layouts=stereo"
         )
+        speed = getattr(part, "playback_speed", 1)
+        if speed != 1:
+            audio_filter += f",atempo={float(speed):.2f}"
         if tail_fade_seconds:
             # Rückwärts ausblenden vermeidet eine vorherige Laufzeitanalyse der
             # TTS-Datei und setzt den Fade trotzdem exakt ans Ende der Phrase.
@@ -341,6 +376,19 @@ def run_generation_job(job_id, provider=None, audio_root=None, assembler=assembl
         for part in job.parts.all():
             if part.status == GenerationPart.Status.SUCCEEDED and Path(part.audio_path).exists():
                 request_ids.append(part.provider_request_id)
+                continue
+            if part.is_reused:
+                source = part.reuse_source
+                source_path = Path(source.audio_path).resolve() if source and source.audio_path else None
+                if not source_path or not source_path.is_relative_to(root) or not source_path.is_file():
+                    raise GenerationValidationError("Ein wiederverwendeter Sprachabschnitt ist inzwischen nicht mehr verfügbar. Bitte starten Sie die Hörtextphase erneut.")
+                part_path = root / str(job.pk) / f"part-{part.position:04d}.mp3"
+                part_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source_path, part_path)
+                part.audio_path = str(part_path)
+                part.status = GenerationPart.Status.SUCCEEDED
+                part.provider_credit_count = 0
+                part.save(update_fields=["audio_path", "status", "provider_credit_count"])
                 continue
             part.status = GenerationPart.Status.RUNNING
             part.error_message = ""

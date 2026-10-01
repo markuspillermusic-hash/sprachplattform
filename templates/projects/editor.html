@@ -117,6 +117,7 @@
 
   <details class="audio-history">
     <summary>Optional: Hörspiel-Produktion</summary>
+    {% if request.user.role != 'student' %}<a class="button button-primary" href="{% url 'production:detail' project.id %}">Mit Hörspiel-Assistent produzieren →</a>{% endif %}
     <p>Ergänzen Sie Ihren Hörtext mit Jingles, Musik und mehreren gleichzeitigen Geräuschen. Im Hörspiel-Studio können Sie Clips schneiden, mischen und gemeinsam exportieren.</p>
     <a class="button button-secondary" href="{% url 'audio_studio:editor' project.id %}">Hörspiel-Studio öffnen →</a>
   </details>

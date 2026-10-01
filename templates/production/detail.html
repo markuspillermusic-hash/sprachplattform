@@ -1,0 +1,77 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}{{ project.title }} · Hörspiel-Assistent{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/production.css' %}">{% endblock %}
+{% block content %}
+<section class="page-shell production-shell" data-production data-status-url="{% url 'production:status' project.pk %}" data-busy="{% if run %}true{% else %}false{% endif %}">
+  <header class="page-heading"><div><p class="eyebrow">Hörspiel-Assistent</p><h1>{% if production.draft %}{{ production.draft.title }}{% else %}{{ project.title }}{% endif %}</h1><p class="lead">{{ production.get_stage_display }} · Zwischenstände sind gespeichert.</p></div><a class="button button-secondary" href="{% url 'projects:list' %}">Meine Hörtexte</a></header>
+  <ol class="production-steps" aria-label="Produktionsphasen">
+    <li{% if production.stage == 'script' %} aria-current="step"{% endif %}><span>1</span>Skript</li>
+    <li{% if production.stage == 'speech' %} aria-current="step"{% endif %}><span>2</span>Hörtext</li>
+    <li{% if production.stage == 'plan' %} aria-current="step"{% endif %}><span>3</span>Klangplan</li>
+    <li{% if production.stage == 'mix' %} aria-current="step"{% endif %}><span>4</span>Mischung</li>
+    <li{% if production.stage == 'complete' %} aria-current="step"{% endif %}><span>5</span>Export</li>
+  </ol>
+  {% if run %}<div class="production-notice" role="status" aria-live="polite"><span class="activity-spinner" aria-hidden="true"></span><div><strong>{{ run.get_kind_display }}</strong><p data-production-progress>{{ run.progress|default:'Der Assistent bereitet die Phase vor.' }}</p><small>Sie können die Seite verlassen und später zurückkehren.</small></div></div>{% endif %}
+  {% if last_run.status == 'failed' %}<div class="production-notice production-error" role="alert"><div><strong>Diese Phase wurde nicht abgeschlossen.</strong><p>{{ last_run.error_message }}</p><small>Vorhandene Ergebnisse bleiben erhalten. Ein erneuter Erzeugungsversuch kann zusätzliche Credits verbrauchen.</small></div></div>{% endif %}
+  {% if dirty_script %}<p class="production-notice">Das Skript oder eine Stimme wurde geändert. Bitte prüfen Sie die Sprachfassung erneut, bevor Sie mit der Mischung weiterarbeiten.</p>{% endif %}
+  <div class="production-layout">
+    <div class="production-workspace">
+      <details class="production-panel"{% if production.stage == 'script' or dirty_script %} open{% endif %}>
+        <summary><span class="eyebrow">Skript</span><strong>{% if production.draft %}Entwurf zur Prüfung{% else %}Gespeicherter Sprechtext{% endif %}</strong></summary>
+        <p>Ändern Sie Sprechtexte direkt oder lassen Sie einen neuen Vorschlag erstellen. Ein Änderungswunsch überschreibt das bestehende Skript erst nach Ihrer Übernahme.</p>
+        {% if lines.forms %}
+        <form method="post" action="{% url 'production:action' project.pk %}" data-production-edit>{% csrf_token %}<input type="hidden" name="revision" value="{{ production.revision }}">{{ lines.management_form }}{{ lines.non_form_errors }}
+          <fieldset{% if run %} disabled{% endif %}>
+          {% for line in lines %}<article class="production-script-line"><p class="eyebrow">Beitrag {{ forloop.counter }}</p><div class="field"><label for="{{ line.speaker.id_for_label }}">Rolle</label>{{ line.speaker }}{{ line.speaker.errors }}</div><div class="field"><label for="{{ line.text.id_for_label }}">Sprechtext</label>{{ line.text }}{{ line.text.errors }}</div><details><summary>Regie, Pause und Tempo</summary><div class="production-fields">{% for field in line %}{% if field.name != 'speaker' and field.name != 'text' %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endif %}{% endfor %}</div></details></article>{% endfor %}
+          <p class="field-help">{{ character_count }} Zeichen · höchstens ca. {{ speech_cost }} € Tarifwert für die Sprachfassung. Verfügbare unveränderte Abschnitte werden wiederverwendet. Stimmen können Sie vorab im Skripteditor prüfen.</p>
+          <div class="production-actions"><button class="button button-primary" name="action" value="speech"{% if not provider_configured %} disabled{% endif %}>Skript freigeben und Hörtext erzeugen</button><button class="button button-secondary" name="action" value="save_script">Entwurf speichern</button><button class="button button-quiet" name="action" value="apply_script">Nur Skript übernehmen</button></div>
+          </fieldset>
+        </form>
+        {% else %}<p>Noch kein Skriptentwurf vorhanden.</p>{% if not run %}<form method="post" action="{% url 'production:action' project.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ production.revision }}"><button class="button button-primary" name="action" value="script">Skriptentwurf erneut vorbereiten</button></form>{% endif %}{% endif %}
+        <a class="button button-quiet" href="{% url 'projects:editor' project.pk %}">Skript und Stimmen im Editor bearbeiten →</a>
+        {% if lines.forms %}<form class="production-refinement" method="post" action="{% url 'production:action' project.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ production.revision }}"><fieldset{% if run %} disabled{% endif %}><div class="field"><label for="script-change">Änderungswunsch an den Assistenten</label><textarea id="script-change" name="instruction" rows="2" maxlength="2000" required placeholder="Zum Beispiel: einfacher formulieren und den Erzähler kürzen."></textarea><p class="field-help">Direkte Änderungen am Text zuerst speichern. Der neue Vorschlag nutzt Ihr KI-Kontingent.</p></div><button class="button button-secondary" name="action" value="refine"{% if not assistant_configured %} disabled{% endif %}>Änderungsvorschlag vorbereiten</button></fieldset></form>{% endif %}
+      </details>
+
+      <details class="production-panel"{% if production.stage == 'speech' %} open{% endif %}>
+        <summary><span class="eyebrow">Hörtext</span><strong>Sprachfassung anhören</strong></summary>
+        {% if speech %}<audio controls preload="metadata" aria-label="Sprachfassung anhören" src="{% url 'generation:play' speech.pk %}"></audio><a href="{% url 'generation:download' speech.pk %}">Sprachfassung herunterladen</a>{% else %}<p>Geben Sie zuerst das Skript frei und lassen Sie den Hörtext erzeugen.</p>{% endif %}
+        {% if audio_versions and not production.draft %}<details><summary>Vorhandene Sprachfassung verwenden</summary><form method="post" action="{% url 'production:action' project.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ production.revision }}"><fieldset{% if run %} disabled{% endif %}><div class="field"><label for="audio-version">Audioversion</label><select id="audio-version" name="audio_id">{% for audio in audio_versions %}<option value="{{ audio.pk }}">Version {{ audio.version.number }} · {{ audio.created_at|date:'d.m.Y H:i' }}</option>{% endfor %}</select></div><button class="button button-secondary" name="action" value="use_speech">Diese Sprachfassung prüfen</button><p class="field-help">Die Plattform prüft, ob Text und Stimmen zum aktuellen Skript passen.</p></fieldset></form></details>{% endif %}
+        {% if speech %}<p>Für sprachliche Korrekturen bearbeiten Sie das Skript oder die Stimmen und erzeugen anschließend eine neue Sprachfassung. Frühere Audios bleiben erhalten.</p>{% endif %}
+      </details>
+
+      <details class="production-panel"{% if production.stage == 'speech' %} open{% endif %}>
+        <summary><span class="eyebrow">Klangwünsche</span><strong>Musik und Atmosphäre festlegen</strong></summary>
+        <form method="post" action="{% url 'production:action' project.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ production.revision }}"><fieldset{% if run %} disabled{% endif %}>
+          {% for field in wishes %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+          <p class="field-help">Der nächste Schritt erstellt einen Klangvorschlag über Ihr KI-Kontingent. Musik und Geräusche werden dabei noch nicht erzeugt.</p>
+          <button class="button button-primary" name="action" value="plan"{% if not speech or dirty_script or not assistant_configured %} disabled{% endif %}>{% if production.plan %}Klangplan überarbeiten{% else %}Hörtext freigeben und Klangplan vorbereiten{% endif %}</button>
+        </fieldset></form>
+      </details>
+
+      {% if production.plan %}<details class="production-panel"{% if production.stage == 'plan' %} open{% endif %}>
+        <summary><span class="eyebrow">Klangplan</span><strong>Platzierung und Erzeugungswünsche prüfen</strong></summary>
+        <form method="post" action="{% url 'production:action' project.pk %}" data-production-edit>{% csrf_token %}<input type="hidden" name="revision" value="{{ production.revision }}">{{ items.management_form }}{{ items.non_form_errors }}{{ plan_settings.non_field_errors }}
+          <fieldset{% if run %} disabled{% endif %}>
+          <div class="production-fields">{% for field in plan_settings %}<div class="field{% if field.name == 'summary' %} production-wide{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div>
+          {% for item in items %}<details class="production-cue"{% if item.errors %} open{% endif %}><summary>{% if item.initial.title %}{{ item.initial.title }}{% else %}Optional: weiteres Element ergänzen{% endif %}</summary><div class="production-fields">{{ item.non_field_errors }}{% for field in item %}<div class="field{% if field.name == 'prompt' or field.name == 'title' %} production-wide{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div></details>{% endfor %}
+          <div class="production-consumption"><strong>Aktueller Plan: ca. {{ mix_estimate.credits }} neue Credits</strong><span>{{ mix_estimate.new }} neue Audios · {{ mix_estimate.reused }} vorhandene Audios. Direkte Änderungen können den Verbrauch verändern; vor dem Erzeugen den Plan speichern.</span></div>
+          <p class="field-help">Die Mischung erhält eine neue Studiorevision. Frühere Schnitte bleiben in der Studiohistorie. Prüfen Sie Geräuschzeitpunkte anschließend beim Anhören.</p>
+          <div class="production-actions"><button class="button button-primary" name="action" value="mix"{% if dirty_script %} disabled{% endif %}>Klangplan freigeben und Mischung erstellen</button><button class="button button-secondary" name="action" value="save_plan">Klangplan speichern und Verbrauch prüfen</button></div>
+          </fieldset>
+        </form>
+      </details>{% endif %}
+
+      {% if mix_asset or production.stage == 'mix' or production.stage == 'complete' %}<details class="production-panel" open>
+        <summary><span class="eyebrow">Mischung</span><strong>Gemeinsames Hörspiel prüfen</strong></summary>
+        {% if mix_asset %}<audio controls preload="metadata" aria-label="Hörspiel-Mischung anhören" src="{% url 'audio_studio:asset' project.pk mix_asset.pk %}"></audio>{% endif %}
+        {% if dirty_mix %}<p class="production-notice">Der gespeicherte Studioschnitt wurde verändert. Die Vorschau zeigt noch die frühere Fassung. Erzeugen Sie vor der Freigabe eine neue Vorschau.</p>{% endif %}
+        <div class="production-actions"><a class="button button-secondary" href="{% url 'audio_studio:editor' project.pk %}">Im Studio schneiden und feinjustieren →</a><form method="post" action="{% url 'production:action' project.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ production.revision }}"><button class="button button-secondary" name="action" value="preview"{% if run or dirty_script %} disabled{% endif %}>Gespeicherten Studioschnitt als Vorschau rendern</button></form></div>
+        <form class="production-export" method="post" action="{% url 'production:action' project.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ production.revision }}"><fieldset{% if run %} disabled{% endif %}><div class="field"><label for="export-format">Exportformat</label><select id="export-format" name="format"><option value="wav">WAV · zur Weiterbearbeitung</option><option value="mp3">MP3 · zum Teilen</option></select></div><button class="button button-primary" name="action" value="export"{% if dirty_mix or dirty_script or not mix_asset %} disabled{% endif %}>Mischung freigeben und final exportieren</button><p class="field-help">Vorschau und Export verbrauchen keine Anbieter-Credits.</p></fieldset></form>
+      </details>{% endif %}
+      {% if final_asset and production.stage == 'complete' %}<div class="production-panel production-finished"><p class="eyebrow">Fertiges Hörspiel</p><h2>Bereit für den Unterricht.</h2><audio controls preload="metadata" aria-label="Fertiges Hörspiel anhören" src="{% url 'audio_studio:asset' project.pk final_asset.pk %}"></audio><a class="button button-primary" href="{% url 'audio_studio:asset' project.pk final_asset.pk %}?download=1">{{ final_asset.format|upper }} herunterladen</a></div>{% endif %}
+    </div>
+    <aside class="production-sidebar"><div class="production-panel"><p class="eyebrow">Unterrichtsauftrag</p><h2>{{ production.brief.target_group|default:'Ihr Hörtext' }}</h2><p>{{ production.brief.topic }}</p>{% if production.brief.learning_goal %}<p><strong>Lernziel</strong><br>{{ production.brief.learning_goal }}</p>{% endif %}<p>{{ project.get_language_display }} · {{ project.level }}</p><p>Sie geben Skript, Sprachfassung und Klanggestaltung frei. Der Assistent arbeitet nur innerhalb dieser Freigaben.</p></div><details class="production-panel"><summary>Gespeicherte Arbeitsschritte</summary><ol class="production-history">{% for past in history %}<li><strong>{{ past.get_kind_display }}</strong><span>{{ past.get_status_display }} · {{ past.created_at|date:'d.m. H:i' }}</span></li>{% empty %}<li>Noch keine Arbeitsschritte.</li>{% endfor %}</ol></details></aside>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/production.js' %}" defer></script>{% endblock %}

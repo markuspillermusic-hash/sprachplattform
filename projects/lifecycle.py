@@ -23,8 +23,10 @@ class ProjectContentError(ValueError):
 
 
 def _check_idle(project):
+    from production.models import ProductionRun
     if (GenerationJob.objects.filter(version__project=project, status__in=("queued", "running")).exists()
-            or project.studio_jobs.filter(status__in=("queued", "running")).exists()):
+            or project.studio_jobs.filter(status__in=("queued", "running")).exists()
+            or ProductionRun.objects.filter(project=project, status__in=("queued", "running")).exists()):
         raise ProjectContentError("Für diesen Hörtext läuft noch eine Audioerzeugung oder ein Export. Bitte warten Sie bis zum Abschluss und versuchen Sie es dann erneut.")
 
 
@@ -75,7 +77,9 @@ def duplicate_project(project, owner=None):
                 for part in audio.job.parts.all():
                     GenerationPart.objects.create(
                         job=job, position=part.position, status="succeeded", input_data=deepcopy(part.input_data),
-                        character_count=part.character_count, pause_after_ms=part.pause_after_ms)
+                        character_count=part.character_count, pause_after_ms=part.pause_after_ms,
+                        playback_speed=part.playback_speed,
+                        audio_path=_copy_file(part.audio_path, folder, created_files) if part.audio_path else "")
             asset_map = {}
             for asset in live_assets(project):
                 asset_map[str(asset.pk)] = StudioAsset.objects.create(
@@ -96,6 +100,7 @@ def duplicate_project(project, owner=None):
                         continue
                     StudioRevision.objects.create(session=copied_session, number=revision.number,
                                                   state=previous_state, created_by=duplicate.owner)
+            _copy_production(project, duplicate, speech_map, asset_map)
             return duplicate
     except Exception as exc:
         for path in created_files:
@@ -103,6 +108,29 @@ def duplicate_project(project, owner=None):
         if isinstance(exc, (OSError, StudioError)):
             raise ProjectContentError("Die Audiodateien konnten nicht vollständig kopiert werden. Bitte prüfen Sie die verfügbaren Clips und versuchen Sie es erneut.") from exc
         raise
+
+
+def _copy_production(project, duplicate, speech_map, asset_map):
+    from production.models import Production
+    from script_assistant.services import editable_project_snapshot
+    original = Production.objects.filter(project=project).first()
+    if not original:
+        return
+    audio = speech_map.get(original.approved_audio_id)
+    job_audio = next((a for a in speech_map.values() if a.version.number == original.speech_job.version.number), None) if original.speech_job_id and original.speech_job.version_id else None
+    plan = deepcopy(original.plan)
+    for item in plan.get("items", []):
+        if item.get("asset_id"):
+            item["asset_id"] = str(asset_map[item["asset_id"]].pk) if item["asset_id"] in asset_map else ""
+    current = original.approved_script == editable_project_snapshot(project)
+    Production.objects.create(
+        project=duplicate, brief=deepcopy(original.brief), draft=deepcopy(original.draft), plan=plan,
+        approved_script=editable_project_snapshot(duplicate) if current and job_audio else {},
+        speech_job=job_audio.job if job_audio else None, approved_audio=audio if current else None,
+        stage=original.stage if current and job_audio else "script",
+        materials={key: str(asset_map[value].pk) for key, value in original.materials.items() if value in asset_map},
+        mix_asset=asset_map.get(str(original.mix_asset_id)), final_asset=asset_map.get(str(original.final_asset_id)),
+        mixed_revision=original.mixed_revision)
 
 
 def _delete_unreferenced_files(paths):

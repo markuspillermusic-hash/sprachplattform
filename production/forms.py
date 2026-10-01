@@ -1,0 +1,67 @@
+from django import forms
+from django.forms import formset_factory
+
+from projects.models import ScriptSegment
+from script_assistant.forms import AssistantBriefForm
+
+
+class ProductionBriefForm(AssistantBriefForm):
+    duration_seconds = forms.TypedChoiceField(choices=[(n, label) for n, label in
+        ((30, "30 Sekunden"), (60, "1 Minute"), (120, "2 Minuten"), (180, "3 Minuten"), (300, "5 Minuten"), (600, "10 Minuten"))],
+        coerce=int, initial=120, label="Gewünschte Länge")
+    target_group = forms.CharField(label="Klasse oder Zielgruppe", max_length=300,
+                                  widget=forms.TextInput(attrs={"placeholder": "Zum Beispiel: Klasse 7"}))
+    learning_goal = forms.CharField(label="Lernziel", max_length=1000, required=False,
+                                   widget=forms.Textarea(attrs={"rows": 2}))
+    music_wishes = forms.CharField(label="Musikwünsche", max_length=2000, required=False,
+                                  widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Zum Beispiel: kurzer Jingle, danach ruhige Klaviermusik"}))
+    effects_wishes = forms.CharField(label="Geräusche und Atmosphäre", max_length=2000, required=False,
+                                    widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Zum Beispiel: Bahnhofsatmosphäre und eine Tür am Anfang"}))
+
+
+class ScriptLineForm(forms.Form):
+    speaker = forms.ChoiceField(label="Rolle")
+    text = forms.CharField(label="Sprechtext", max_length=4000, widget=forms.Textarea(attrs={"rows": 3}))
+    direction = forms.ChoiceField(label="Regie", choices=ScriptSegment.Direction.choices, required=False)
+    pause_after_ms = forms.IntegerField(label="Pause danach (ms)", min_value=0, max_value=5000)
+    speed = forms.DecimalField(label="Tempo", min_value=.5, max_value=1.5, decimal_places=2)
+
+    def __init__(self, *args, speaker_names, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["speaker"].choices = [(name, name) for name in speaker_names]
+
+
+ScriptLines = formset_factory(ScriptLineForm, extra=0, max_num=500, validate_max=True, absolute_max=500)
+
+
+class WishesForm(forms.Form):
+    music_wishes = forms.CharField(label="Musikwünsche", max_length=2000, required=False, widget=forms.Textarea(attrs={"rows": 2}))
+    effects_wishes = forms.CharField(label="Geräusche und Atmosphäre", max_length=2000, required=False, widget=forms.Textarea(attrs={"rows": 2}))
+    instruction = forms.CharField(label="Was soll sich ändern?", max_length=2000, required=False, widget=forms.Textarea(attrs={"rows": 2}))
+
+
+class PlanSettingsForm(forms.Form):
+    summary = forms.CharField(label="Gestaltung", max_length=2000, required=False, widget=forms.Textarea(attrs={"rows": 2}))
+    speech_start = forms.FloatField(label="Sprache beginnt bei (Sekunden)", min_value=0, max_value=30)
+    music_duck_db = forms.FloatField(label="Musikabsenkung bei Sprache (dB)", min_value=0, max_value=8)
+    compression = forms.FloatField(label="Sprachkompression (0–100)", min_value=0, max_value=100)
+
+
+class PlanItemForm(forms.Form):
+    title = forms.CharField(label="Name", max_length=120)
+    kind = forms.ChoiceField(label="Audioart", choices=[("music", "Musik"), ("effects", "Geräusch")])
+    asset_id = forms.ChoiceField(label="Vorhandenes Audio", required=False)
+    prompt = forms.CharField(label="Beschreibung für neue Erzeugung", max_length=4100, required=False, widget=forms.Textarea(attrs={"rows": 2}))
+    duration = forms.FloatField(label="Dauer (Sekunden)", min_value=.01, max_value=1800)
+    start = forms.FloatField(label="Start (Sekunden)", min_value=0, max_value=1800)
+    gain_db = forms.FloatField(label="Lautstärke (dB)", min_value=-60, max_value=12)
+    fade_in = forms.FloatField(label="Einblenden (Sekunden)", min_value=0, max_value=30)
+    fade_out = forms.FloatField(label="Ausblenden (Sekunden)", min_value=0, max_value=30)
+    loop = forms.BooleanField(label="Nahtlose Geräuschschleife", required=False)
+
+    def __init__(self, *args, assets, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["asset_id"].choices = [("", "Neues Audio erzeugen")] + [(str(a.pk), a.title) for a in assets]
+
+
+PlanItems = formset_factory(PlanItemForm, extra=1, can_delete=True, max_num=12, validate_max=True, absolute_max=13)

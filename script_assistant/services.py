@@ -47,7 +47,9 @@ def editable_project_snapshot(project):
 
 
 def create_proposal(project, created_by, payload, *, conversation=None):
-    if project.owner_id != created_by.pk and not (created_by.is_staff or created_by.role == created_by.Role.ADMIN):
+    from accounts.models import TemporaryStudentAccess
+    manages_student = TemporaryStudentAccess.objects.filter(teacher=created_by, student_id=project.owner_id).exists()
+    if project.owner_id != created_by.pk and not (created_by.is_staff or created_by.role == created_by.Role.ADMIN or manages_student):
         raise PermissionDenied
     return AssistantProposal.objects.create(
         project=project,

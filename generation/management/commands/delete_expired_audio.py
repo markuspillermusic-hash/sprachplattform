@@ -13,6 +13,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from audio_studio.services import recover_stale_jobs
+        from production.services import recover_stale_runs
+        recover_stale_runs()
         recover_stale_jobs()
         root = Path(settings.AUDIO_STORAGE_ROOT).resolve()
         deleted = 0

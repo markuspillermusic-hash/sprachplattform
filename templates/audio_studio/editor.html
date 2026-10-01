@@ -16,6 +16,7 @@
  data-jobs-url="{% url 'audio_studio:jobs' project.id %}">
  <header class="studio-heading">
   <div><a class="back-link" href="{% url 'projects:editor' project.id %}">← Zum Skript</a>
+   {% if project.production and user.role != 'student' %}<a class="back-link" href="{% url 'production:detail' project.id %}">← Zum Hörspiel-Assistenten</a>{% endif %}
    <p class="eyebrow">Optional · Hörspiel-Produktion</p><h1>{{ project.title }}</h1>
    <p>Sprache, Musik und Atmosphäre auf einer gemeinsamen Zeitachse. Für reine Hörtexte genügt die Audioausgabe im Skript.</p></div>
   <div class="studio-save"><button type="button" class="button button-primary" id="studio-save" disabled>Stand speichern</button>

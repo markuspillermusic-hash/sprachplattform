@@ -57,6 +57,7 @@ main { flex: 1; }
 .button-secondary { color: var(--brand-dark); border-color: var(--line); background: var(--surface); }
 .button-quiet { min-height: 2.4rem; padding: 0.5rem 0.75rem; color: var(--brand-dark); background: transparent; }
 .button-wide { width: 100%; }
+.production-entry-actions {display: flex; flex-wrap: wrap; gap: .65rem;}
 
 .message-stack { width: min(100% - 2rem, 72rem); margin: 1rem auto 0; }
 .message { margin: 0 0 0.5rem; padding: 0.85rem 1rem; border: 1px solid var(--line); border-radius: 0.7rem; background: var(--surface); }

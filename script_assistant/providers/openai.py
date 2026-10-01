@@ -107,19 +107,26 @@ class OpenAIScriptAssistantProvider(ScriptAssistantProvider):
     def generate_proposal(self, request_data):
         request_payload = dict(request_data) if isinstance(request_data, dict) else request_data
         user_id = request_payload.pop("_user_id", None) if isinstance(request_payload, dict) else None
+        instructions, schema, schema_name = SYSTEM_PROMPT, SCRIPT_SCHEMA, "hoertext_entwurf"
+        if isinstance(request_payload, dict) and request_payload.get("production"):
+            from production.planning import GUIDE
+            instructions += "\n" + GUIDE
+        if isinstance(request_payload, dict) and request_payload.get("task") == "sound_plan":
+            from production.planning import PLAN_PROMPT, PLAN_SCHEMA
+            instructions, schema, schema_name = PLAN_PROMPT, PLAN_SCHEMA, "hoerspiel_klangplan"
         body = {
             "model": self.configuration.model,
             "reasoning": {"effort": self.configuration.effective_reasoning_effort},
-            "instructions": SYSTEM_PROMPT,
+            "instructions": instructions,
             "input": json.dumps(request_payload, ensure_ascii=False, separators=(",", ":")),
             "max_output_tokens": self.configuration.max_output_tokens,
             "store": False,
             "text": {
                 "format": {
                     "type": "json_schema",
-                    "name": "hoertext_entwurf",
+                    "name": schema_name,
                     "strict": True,
-                    "schema": SCRIPT_SCHEMA,
+                    "schema": schema,
                 }
             },
         }

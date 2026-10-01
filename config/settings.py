@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "generation",
     "audio_studio",
     "script_assistant",
+    "production",
     "usage_control",
     "core",
 ]
