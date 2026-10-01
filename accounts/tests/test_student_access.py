@@ -64,7 +64,7 @@ class TemporaryStudentAccessTests(TestCase):
             self.assertEqual(access.student.role, get_user_model().Role.STUDENT)
             self.assertFalse(access.student.must_change_password)
             self.assertEqual(access.student.character_limit, 3_000)
-            self.assertEqual(access.student.openai_daily_request_limit, 5)
+            self.assertEqual(access.student.openai_daily_request_limit, 15)
             self.assertContains(response, access.student.username)
 
     def test_active_student_can_log_in_without_password_change(self):

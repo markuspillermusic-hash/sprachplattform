@@ -8,7 +8,7 @@
   const db = (value) => Math.pow(10, value / 20);
   const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
   let state, revision = 0, saved = "", selected = null, position = 0, zoom = 12;
-  let assets = new Map(), history = [], jobs = [], generation = {}, undo = [], redo = [];
+  let assets = new Map(), history = [], jobs = [], generation = {}, creditBudget = null, undo = [], redo = [];
   let context, playing = false, nodes = [], started = 0, playFrom = 0, playUntil = 0, frame;
   let saving, polling, ready = false, loadingAudio = false, playbackToken = 0;
   const buffers = new Map();
@@ -262,6 +262,10 @@
         button.setAttribute("aria-label", `${asset?.title || "Datei abgelaufen"}, ${names[name]}, Position ${c.start.toFixed(2)} Sekunden, Dauer ${length(c).toFixed(2)} Sekunden`);
         button.append(el("span", asset?.title || "Datei abgelaufen", "studio-clip-title"));
         const canvas = el("canvas"); canvas.setAttribute("aria-hidden", "true"); button.append(canvas);
+        const gainHandle = el("span", null, "studio-gain-handle"); gainHandle.dataset.gain = "true";
+        gainHandle.setAttribute("aria-hidden", "true"); gainHandle.append(el("span", null, "studio-gain-value"));
+        gainHandle.addEventListener("dblclick", e => { e.stopPropagation(); change(() => { c.gain_db = 0; }); });
+        button.append(gainHandle);
         for (const side of ["in", "out"]) { const fade = el("span", null, `studio-fade studio-fade-${side}`); fade.style.width = `${c[`fade_${side}`] * zoom}px`; button.append(fade); }
         const curve = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         curve.classList.add("studio-fade-curve"); curve.setAttribute("aria-hidden", "true");
@@ -296,6 +300,10 @@
       left = clamp(midpoint - 16, 0, width - 32); right = left + 16;
     }
     button.classList.toggle("studio-clip-compact", width < 40);
+    const gainHandle = button.querySelector(".studio-gain-handle");
+    gainHandle.style.top = `${c.gain_db >= 0 ? 38 - c.gain_db * 1.1 : 38 - c.gain_db * .3}px`;
+    gainHandle.title = `Cliplautstärke: ${c.gain_db.toFixed(1)} dB · hoch/runter ziehen · Umschalt für feine Schritte · Doppelklick: 0 dB`;
+    gainHandle.firstChild.textContent = `${c.gain_db > 0 ? "+" : ""}${c.gain_db.toFixed(1)} dB`;
     for (const side of ["in", "out"]) {
       const value = side === "in" ? fadeIn : fadeOut;
       button.querySelector(`.studio-fade-${side}`).style.width = `${value}px`;
@@ -314,14 +322,21 @@
   function drag(event, c, button) {
     if (event.button !== 0) return;
     select(c.id); stop();
-    const old = clone(state), initial = clone(c), x = event.clientX, side = event.target.dataset.trim, fade = event.target.dataset.fade;
-    let moved = false; button.setPointerCapture(event.pointerId);
+    const old = clone(state), initial = clone(c), x = event.clientX, y = event.clientY,
+      side = event.target.dataset.trim, fade = event.target.dataset.fade,
+      gainDrag = Boolean(event.target.closest(".studio-gain-handle"));
+    let lastY = y, gainValue = initial.gain_db;
+    const captureElement = gainDrag ? event.target.closest(".studio-gain-handle") : button;
+    let moved = false, cancelled = false; captureElement.setPointerCapture(event.pointerId);
     const move = e => {
       const delta = Math.round((e.clientX - x) / zoom * 100) / 100;
-      if (Math.abs(e.clientX - x) < 3 && !moved) return;
+      if (Math.abs((gainDrag ? e.clientY - y : e.clientX - x)) < 3 && !moved) return;
       moved = true;
       Object.assign(c, initial);
-      if (fade) {
+      if (gainDrag) {
+        gainValue = clamp(gainValue + (lastY - e.clientY) * (e.shiftKey ? .05 : .4), -60, 12);
+        lastY = e.clientY; c.gain_db = Math.round(gainValue * 10) / 10;
+      } else if (fade) {
         const other = fade === "in" ? "fade_out" : "fade_in";
         c[`fade_${fade}`] = clamp(initial[`fade_${fade}`] + (fade === "in" ? delta : -delta), 0, length(initial) - initial[other]);
       } else if (side === "left") {
@@ -337,11 +352,12 @@
     };
     const end = e => {
       button.removeEventListener("pointermove", move); button.removeEventListener("pointerup", end); button.removeEventListener("pointercancel", cancel);
-      if (button.hasPointerCapture(event.pointerId)) button.releasePointerCapture(event.pointerId);
+      if (captureElement.hasPointerCapture(event.pointerId)) captureElement.releasePointerCapture(event.pointerId);
       if (moved) { undo.push(old); if (undo.length > 60) undo.shift(); redo = []; }
-      render();
+      if (moved || cancelled) render();
+      else { inspector(); mark(); }
     };
-    const cancel = e => { state = old; moved = false; end(e); };
+    const cancel = e => { state = old; moved = false; cancelled = true; end(e); };
     button.addEventListener("pointermove", move); button.addEventListener("pointerup", end); button.addEventListener("pointercancel", cancel);
   }
   function addAsset(asset) {
@@ -410,7 +426,7 @@
     $("loop-label").hidden = kind !== "effects";
     $("generate").disabled = !config?.enabled;
     $("generation-info").textContent = config?.enabled
-      ? `Geschätzter Tarifwert: ${(Number(form.elements.duration.value) / 60 * Number(config.rate)).toFixed(4)} € · Monatskontingent: ${config.seconds_limit} s. ${kind === "effects" ? "Für längere Atmosphäre den Clip duplizieren." : "Musik wird ohne Gesang erzeugt."}`
+      ? `Geschätzter Verbrauch: ${Math.ceil(Number(form.elements.duration.value) * config.credits_per_second).toLocaleString("de-DE")} Credits · persönliches Monatskontingent: ${(config.seconds_limit / 60).toLocaleString("de-DE")} min.${creditBudget ? ` Gemeinsamer Rahmen beim Laden: ${Math.floor(creditBudget.remaining).toLocaleString("de-DE")} Credits verfügbar.` : ""} ${kind === "effects" ? "Für längere Atmosphäre den Clip duplizieren." : "Musik wird ohne Gesang erzeugt."}`
       : "Die Administration muss diese Audioart unter Verwaltung → Musik- und Geräuschanbindung freigeben und einen Tarifwert hinterlegen.";
   }
   async function save() {
@@ -435,7 +451,7 @@
     const data = await api("state");
     state = data.state; revision = data.revision; saved = JSON.stringify(state); selected = null;
     assets = new Map(data.assets.map(a => [a.id,a])); buffers.clear(); undo = []; redo = [];
-    history = data.history; jobs = data.jobs; generation = data.generation;
+    history = data.history; jobs = data.jobs; generation = data.generation; creditBudget = data.credit_budget;
     zoom = clamp(($("timeline").clientWidth - (window.innerWidth <= 780 ? 130 : 156)) / Math.max(20, duration() + 8), 2, 60);
     $("zoom").value = zoom;
     $("speech").replaceChildren();

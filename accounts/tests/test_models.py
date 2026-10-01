@@ -11,4 +11,4 @@ class UserModelTests(TestCase):
 
         self.assertEqual(user.role, user.Role.TEACHER)
         self.assertTrue(user.must_change_password)
-        self.assertEqual(user.character_limit, 30_000)
+        self.assertEqual(user.character_limit, 100_000)

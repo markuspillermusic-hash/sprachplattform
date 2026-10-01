@@ -36,6 +36,12 @@
 .studio-clip.is-missing { background: #f5d8d8; color: #9c2929; border-color: #9c2929; }
 .studio-clip canvas { position: absolute; left: 0; top: 22px; height: 38px; max-width: none; pointer-events: none; }
 .studio-clip-title { display: block; padding: .3rem 1.2rem; font-size: .7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-gain-handle { position: absolute; left: 8px; right: 8px; height: 12px; transform: translateY(-50%); cursor: ns-resize; z-index: 2; touch-action: none; }
+.studio-gain-handle::before { content: ''; position: absolute; left: 0; right: 0; top: 5px; border-top: 2px solid currentColor; opacity: .7; }
+.studio-gain-handle:hover::before { opacity: 1; border-top-width: 3px; }
+.studio-gain-value { position: absolute; right: 0; top: -5px; padding: 1px 3px; background: var(--track-bg); border: 1px solid currentColor; border-radius: 3px; font-size: 9px; font-weight: 700; white-space: nowrap; pointer-events: none; }
+.studio-clip-compact .studio-gain-handle { left: 2px; right: 2px; }
+.studio-clip-compact .studio-gain-value { display: none; }
 .studio-trim-handle { position: absolute; top: 18px; bottom: 0; width: 7px; background: var(--track-color); opacity: .3; cursor: ew-resize; }
 .studio-trim-left { left: 0; }.studio-trim-right { right: 0; }
 .studio-fade { position: absolute; bottom: 0; height: 40px; background: var(--track-color); opacity: .14; pointer-events: none; }

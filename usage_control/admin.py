@@ -8,15 +8,15 @@ from django.http import HttpResponse
 from django.utils.html import format_html
 from django.utils import timezone
 
-from .models import ProviderBudget, UsageEvent, current_month_start, months_inclusive
+from .models import ProviderBudget, UsageEvent, current_month_start, months_inclusive, effective_credits_expression
 
 
 @admin.register(ProviderBudget)
 class ProviderBudgetAdmin(admin.ModelAdmin):
     list_display = (
         "provider",
-        "allocated_amount",
-        "currency",
+        "allocated_display",
+        "currency_display",
         "spent_display",
         "remaining_display",
         "monthly_target_display",
@@ -27,6 +27,8 @@ class ProviderBudgetAdmin(admin.ModelAdmin):
     list_editable = ("active",)
     fieldsets = (
         ("Anbieter", {"fields": ("provider", "active", "currency")}),
+        ("Abonnement-Credits", {"fields": ("monthly_credit_limit", "credit_cycle_day"),
+          "description": "Ein positiver ElevenLabs-Credit-Rahmen zählt Sprache, Musik und Geräusche gemeinsam. Er ersetzt die Geldgrenze; EUR-Kosten bleiben Schätzwerte. Externe Nutzung desselben Kontos muss separat berücksichtigt werden."}),
         (
             "Zwölfmonatsbudget",
             {
@@ -44,10 +46,22 @@ class ProviderBudgetAdmin(admin.ModelAdmin):
 
     @admin.display(description="Gebucht")
     def spent_display(self, budget):
+        if budget.monthly_credit_limit:
+            return f"{budget.spent_credits():,.0f} Credits"
         return f"{budget.spent_amount():.2f} {budget.currency}"
+
+    @admin.display(description="Zugewiesen")
+    def allocated_display(self, budget):
+        return f"{budget.monthly_credit_limit:,.0f}" if budget.monthly_credit_limit else f"{budget.allocated_amount:.2f}"
+
+    @admin.display(description="Einheit")
+    def currency_display(self, budget):
+        return "Credits / Zyklus" if budget.monthly_credit_limit else budget.currency
 
     @admin.display(description="Verfügbar")
     def remaining_display(self, budget):
+        if budget.monthly_credit_limit:
+            return f"{max(Decimal('0'), budget.spendable_credits - budget.spent_credits()):,.0f} Credits"
         return f"{max(Decimal('0'), budget.spendable_amount - budget.spent_amount()):.2f} {budget.currency}"
 
     @admin.display(description="Dynamischer Monatsrahmen")
@@ -55,6 +69,8 @@ class ProviderBudgetAdmin(admin.ModelAdmin):
         today = timezone.localdate()
         if today > budget.expires_on:
             return "abgelaufen"
+        if budget.monthly_credit_limit:
+            return f"{budget.spendable_credits:,.0f} Credits · {'31 Tage gleitend' if not budget.credit_cycle_day else 'Erneuerung am ' + str(budget.credit_cycle_day) + '.'}"
         month_start = current_month_start(max(today, budget.starts_on))
         before_month = budget.usage_queryset().filter(created_at__date__lt=month_start)
         spent_before = before_month.aggregate(
@@ -66,8 +82,9 @@ class ProviderBudgetAdmin(admin.ModelAdmin):
 
     @admin.display(description="Status")
     def status_display(self, budget):
-        spendable = budget.spendable_amount
-        percent = Decimal("100") if spendable <= 0 else budget.spent_amount() / spendable * 100
+        spendable = budget.spendable_credits if budget.monthly_credit_limit else budget.spendable_amount
+        spent = budget.spent_credits() if budget.monthly_credit_limit else budget.spent_amount()
+        percent = Decimal("100") if spendable <= 0 else spent / spendable * 100
         if percent >= 95:
             color, label = "#ba2121", "kritisch"
         elif percent >= 85:
@@ -112,7 +129,7 @@ class UsageEventAdmin(admin.ModelAdmin):
     @admin.display(description="Einheiten")
     def units_display(self, event):
         if event.provider == UsageEvent.Provider.ELEVENLABS:
-            credits = event.provider_credit_count or event.character_count
+            credits = event.effective_credits
             return f"{credits:g} Credits"
         return f"{event.input_tokens} In / {event.output_tokens} Out"
 
@@ -136,6 +153,7 @@ class UsageEventAdmin(admin.ModelAdmin):
             .annotate(
                 requests=Count("id"),
                 characters=Coalesce(Sum("character_count"), 0),
+                credits=Coalesce(Sum(effective_credits_expression(), filter=Q(provider="elevenlabs")), Decimal("0")),
                 input_tokens=Coalesce(Sum("input_tokens"), 0),
                 output_tokens=Coalesce(Sum("output_tokens"), 0),
                 elevenlabs_cost=Coalesce(
@@ -166,6 +184,7 @@ class UsageEventAdmin(admin.ModelAdmin):
         totals = month_events.aggregate(
             requests=Count("id"),
             characters=Coalesce(Sum("character_count"), 0),
+            credits=Coalesce(Sum(effective_credits_expression(), filter=Q(provider="elevenlabs")), Decimal("0")),
             input_tokens=Coalesce(Sum("input_tokens"), 0),
             output_tokens=Coalesce(Sum("output_tokens"), 0),
         )

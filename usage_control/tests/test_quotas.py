@@ -1,8 +1,10 @@
 import calendar
+import io
 from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -80,6 +82,68 @@ class QuotaServiceTests(TestCase):
 
         with self.assertRaisesMessage(QuotaExceeded, "dynamische Monatsrahmen"):
             self.reserve_openai(output_tokens=1, estimated_cost="2.00")
+
+    def credit_budget(self, **values):
+        today = timezone.localdate()
+        return ProviderBudget.objects.create(provider="elevenlabs", allocated_amount=0,
+            monthly_credit_limit=100, reserve_percent=0, starts_on=today.replace(month=1,day=1),
+            expires_on=date_after_months(today,11), **values)
+
+    def reserve_credits(self, amount, feature="audio", user=None):
+        return reserve_usage(user=user or self.user, provider="elevenlabs", feature=feature,
+            model="test", estimated_cost=Decimal("10"), currency="EUR", estimated_credits=amount)
+
+    def test_credit_pool_combines_all_users_and_features_and_reconciles_headers(self):
+        budget = self.credit_budget()
+        other = get_user_model().objects.create_user(username="second-credit-user", must_change_password=False)
+        speech = self.reserve_credits(60)
+        music = self.reserve_credits(25, "music", other)
+        with self.assertRaisesMessage(QuotaExceeded, "gemeinsame ElevenLabs"):
+            self.reserve_credits(20, "sound_effects", other)
+        self.assertEqual(budget.spent_credits(), 85)
+        commit_usage(speech, provider_credit_count=50)
+        effects = self.reserve_credits(25, "sound_effects", other)
+        self.assertEqual(budget.spent_credits(), 100)
+        release_usage(music)
+        self.assertEqual(budget.spent_credits(), 75)
+        self.assertEqual(effects.effective_credits, 25)
+
+    def test_credit_cycle_handles_reset_day_short_months_and_rolling_fallback(self):
+        budget = self.credit_budget(credit_cycle_day=31)
+        self.assertEqual(budget.credit_cycle_start(date(2027,2,27)), date(2027,1,31))
+        self.assertEqual(budget.credit_cycle_start(date(2027,2,28)), date(2027,2,28))
+        budget.credit_cycle_day = 0
+        self.assertEqual(budget.credit_cycle_start(date(2027,3,2)), date(2027,1,31))
+
+    def test_credit_reserve_and_period_boundary_are_enforced(self):
+        from datetime import timedelta
+        from unittest.mock import patch
+        today = timezone.localdate()
+        budget = self.credit_budget(); budget.reserve_percent = 5; budget.save()
+        first = self.reserve_credits(95)
+        with self.assertRaises(QuotaExceeded): self.reserve_credits(1)
+        old = timezone.now() - timedelta(days=31)
+        UsageEvent.objects.filter(pk=first.pk).update(created_at=old)
+        self.assertEqual(budget.spent_credits(), 0)
+        self.reserve_credits(95)
+
+    def test_generous_configuration_is_previewable_and_preserves_disabled_features(self):
+        from audio_studio.models import StudioConfiguration
+        output = io.StringIO()
+        call_command("configure_generous_limits", stdout=output)
+        self.assertFalse(ProviderBudget.objects.exists())
+        self.user.openai_daily_request_limit = 0; self.user.save()
+        call_command("configure_generous_limits", apply=True, stdout=output)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.character_limit,100000)
+        self.assertEqual(self.user.openai_daily_request_limit,0)
+        self.assertEqual(ProviderBudget.objects.get(provider="elevenlabs").spendable_credits,123500)
+        self.assertEqual(ProviderBudget.objects.get(provider="openai").allocated_amount,100)
+        studio = StudioConfiguration.objects.get()
+        self.assertTrue(studio.effects_enabled and studio.music_enabled)
+        call_command("configure_generous_limits", apply=True, stdout=output)
+        self.assertEqual(ProviderBudget.objects.count(),2)
+        self.assertFalse(UsageEvent.objects.exists())
 
 
 class UsagePrivacyAdminTests(TestCase):

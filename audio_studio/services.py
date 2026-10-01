@@ -156,7 +156,9 @@ def create_generation(project, user, data):
     cost = (Decimal(str(duration)) / 60 * getattr(config, f"{kind}_eur_per_minute")).quantize(Decimal("0.000001"))
     event = reserve_usage(user=locked_user, provider=UsageEvent.Provider.ELEVENLABS,
                           feature=UsageEvent.Feature.MUSIC if kind == "music" else UsageEvent.Feature.SOUND_EFFECTS,
-                          model=model, estimated_cost=cost, currency="EUR")
+                          model=model, estimated_cost=cost, currency="EUR",
+                          estimated_credits=Decimal(str(duration)) / 60 * config.music_credits_per_minute
+                          if kind == "music" else Decimal(str(duration)) * config.effects_credits_per_second)
     job = StudioJob.objects.create(project=project, requested_by=user, kind=kind, duration=duration, usage_event=event,
                                    input_data={"prompt": prompt.strip(), "duration": duration, "loop": loop,
                                                "model": model, "configuration_id": config.pk})

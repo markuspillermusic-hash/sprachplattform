@@ -14,6 +14,7 @@ from django.views.decorators.http import require_GET, require_POST
 from generation.models import AudioAsset
 from projects.views import owned_project
 from usage_control.services import QuotaExceeded
+from usage_control.models import ProviderBudget
 from .media import INPUT_FORMATS, StudioError, stored_path
 from .models import StudioConfiguration, StudioJob, StudioSession, empty_state
 from .providers import provider_ready
@@ -72,6 +73,7 @@ def state(request, project_id):
     project = owned_project(request, project_id)
     session = StudioSession.objects.filter(project=project).first()
     config = StudioConfiguration.objects.order_by("pk").first()
+    budget = ProviderBudget.objects.filter(provider="elevenlabs", active=True, monthly_credit_limit__gt=0).first()
     speech = AudioAsset.objects.filter(version__project=project, deleted_at__isnull=True,
                                        expires_at__gt=timezone.now()).select_related("version")[:30]
     return JsonResponse({"revision": session.revision if session else 0,
@@ -83,8 +85,13 @@ def state(request, project_id):
                          "jobs": [job_data(j) for j in project.studio_jobs.select_related("asset")[:20]],
                          "generation": {kind: {"enabled": provider_ready(config, kind),
                                                 "rate": str(getattr(config, f"{kind}_eur_per_minute", 0)),
+                                                "credits_per_second": getattr(config, "effects_credits_per_second", 20)
+                                                if kind == "effects" else getattr(config, "music_credits_per_minute", 1500) / 60,
                                                 "seconds_limit": getattr(config, f"{kind}_seconds_per_user_month", 0)}
-                                        for kind in ("music", "effects")}})
+                                        for kind in ("music", "effects")},
+                         "credit_budget": {"limit": float(budget.spendable_credits),
+                                           "remaining": float(max(0, budget.spendable_credits - budget.spent_credits()))}
+                         if budget else None})
 
 
 @require_POST

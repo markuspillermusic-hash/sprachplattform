@@ -58,8 +58,8 @@ def create_temporary_student_accesses(
         raise ValueError("Es können zwischen 1 und 35 Zugänge erstellt werden.")
     if duration_hours < 1 or duration_hours > 168:
         raise ValueError("Die Laufzeit darf höchstens sieben Tage betragen.")
-    if character_limit < 500 or character_limit > 20_000:
-        raise ValueError("Das Audio-Kontingent muss zwischen 500 und 20.000 Zeichen liegen.")
+    if character_limit < 500 or character_limit > 50_000:
+        raise ValueError("Das Audio-Kontingent muss zwischen 500 und 50.000 Zeichen liegen.")
     expires_at = timezone.now() + timedelta(hours=duration_hours)
     credentials = []
     for index in range(1, count + 1):
@@ -72,9 +72,9 @@ def create_temporary_student_accesses(
             role=users.Role.STUDENT,
             must_change_password=False,
             character_limit=character_limit,
-            openai_monthly_input_token_limit=60_000 if allow_ai else 0,
-            openai_monthly_output_token_limit=15_000 if allow_ai else 0,
-            openai_daily_request_limit=5 if allow_ai else 0,
+            openai_monthly_input_token_limit=200_000 if allow_ai else 0,
+            openai_monthly_output_token_limit=50_000 if allow_ai else 0,
+            openai_daily_request_limit=15 if allow_ai else 0,
         )
         access = TemporaryStudentAccess.objects.create(
             teacher=teacher,

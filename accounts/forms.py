@@ -39,15 +39,15 @@ class TemporaryStudentAccessForm(forms.Form):
     character_limit = forms.IntegerField(
         label="Audio-Kontingent je Zugang",
         min_value=500,
-        max_value=20_000,
-        initial=2_500,
+        max_value=50_000,
+        initial=10_000,
         step_size=500,
         help_text="Gesamtzahl der Zeichen, die dieser Zugang in Audio umwandeln darf.",
     )
     allow_ai = forms.BooleanField(
         label="KI-Textassistent freigeben",
         required=False,
-        help_text="Optional: höchstens fünf KI-Anfragen innerhalb der gesamten Laufzeit.",
+        help_text="Optional: höchstens 15 KI-Anfragen innerhalb der gesamten Laufzeit.",
     )
 
 

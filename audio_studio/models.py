@@ -26,8 +26,10 @@ class StudioConfiguration(models.Model):
                                              decimal_places=4, default=0, validators=[MinValueValidator(0)])
     effects_eur_per_minute = models.DecimalField("Geräusche: geschätzte EUR pro Minute", max_digits=10,
                                                decimal_places=4, default=0, validators=[MinValueValidator(0)])
-    music_seconds_per_user_month = models.PositiveIntegerField("Musiksekunden je Benutzer und Monat", default=600)
-    effects_seconds_per_user_month = models.PositiveIntegerField("Geräuschsekunden je Benutzer und Monat", default=300)
+    music_seconds_per_user_month = models.PositiveIntegerField("Musiksekunden je Benutzer und Monat", default=1800)
+    effects_seconds_per_user_month = models.PositiveIntegerField("Geräuschsekunden je Benutzer und Monat", default=1800)
+    music_credits_per_minute = models.PositiveIntegerField("Musik: geschätzte Credits pro Minute", default=1500)
+    effects_credits_per_second = models.PositiveIntegerField("Geräusche: geschätzte Credits pro Sekunde", default=20)
     # Optional separate key; otherwise reuse the existing encrypted TTS key.
     encrypted_api_key = models.TextField(blank=True, editable=False)
     api_key_hint = models.CharField(max_length=16, blank=True, editable=False)

@@ -16,6 +16,7 @@
   <section class="usage-summary" aria-label="Monatssummen">
     <div class="usage-card">Anfragen<strong>{{ usage_totals.requests }}</strong></div>
     <div class="usage-card">ElevenLabs-Zeichen<strong>{{ usage_totals.characters }}</strong></div>
+    <div class="usage-card">ElevenLabs-Credits<strong>{{ usage_totals.credits|floatformat:0 }}</strong></div>
     <div class="usage-card">OpenAI Input<strong>{{ usage_totals.input_tokens }}</strong></div>
     <div class="usage-card">OpenAI Output<strong>{{ usage_totals.output_tokens }}</strong></div>
   </section>
@@ -25,7 +26,7 @@
     <tbody>
       {% for row in usage_user_rows %}
         <tr>
-          <td>{{ row.user__username }}</td><td>{{ row.requests }}</td><td>{{ row.characters }} Zeichen</td>
+          <td>{{ row.user__username }}</td><td>{{ row.requests }}</td><td>{{ row.characters }} Zeichen · {{ row.credits|floatformat:0 }} Credits</td>
           <td>{{ row.input_tokens }}</td><td>{{ row.output_tokens }}</td>
           <td>TTS {{ row.tts_percent }} % · KI {{ row.openai_percent }} %</td>
           <td>{{ row.elevenlabs_cost|floatformat:4 }} EUR · {{ row.openai_cost|floatformat:4 }} USD</td>

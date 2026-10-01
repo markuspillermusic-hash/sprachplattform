@@ -89,7 +89,7 @@ def _check_user_quota(user, provider, character_count, input_tokens, output_toke
         raise QuotaExceeded("Ihr monatliches OpenAI-Ausgabekontingent ist erreicht.")
 
 
-def _check_provider_budget(provider, estimated_cost, currency, today):
+def _check_provider_budget(provider, estimated_cost, currency, today, estimated_credits=0):
     budget = (
         ProviderBudget.objects.select_for_update()
         .filter(provider=provider, active=True)
@@ -101,6 +101,12 @@ def _check_provider_budget(provider, estimated_cost, currency, today):
         raise QuotaExceeded("Das Anbieterbudget ist noch nicht freigegeben.")
     if today > budget.expires_on:
         raise QuotaExceeded("Das Anbieterbudget ist abgelaufen.")
+    if budget.monthly_credit_limit:
+        if estimated_credits <= 0:
+            raise QuotaConfigurationError("Für diesen Auftrag fehlt die Credit-Schätzung.")
+        if budget.spent_credits(today) + estimated_credits > budget.spendable_credits:
+            raise QuotaExceeded("Der gemeinsame ElevenLabs-Credit-Rahmen ist erreicht. Sprache, Musik und Geräusche teilen sich dieses Kontingent.")
+        return
     if budget.currency.upper() != currency.upper():
         raise QuotaConfigurationError(
             f"Die Abrechnungswährung für {budget.get_provider_display()} stimmt nicht mit der Preiskonfiguration überein."
@@ -139,10 +145,14 @@ def reserve_usage(
     input_tokens=0,
     output_tokens=0,
     reference="",
+    estimated_credits=None,
 ):
     today = timezone.localdate()
     locked_user = get_user_model().objects.select_for_update().get(pk=user.pk)
     estimated_cost = Decimal(estimated_cost)
+    estimated_credits = Decimal(character_count if estimated_credits is None else estimated_credits)
+    if not estimated_credits.is_finite() or estimated_credits < 0:
+        raise QuotaConfigurationError("Die Credit-Schätzung ist ungültig.")
     _check_user_quota(
         locked_user,
         provider,
@@ -151,7 +161,7 @@ def reserve_usage(
         output_tokens,
         today,
     )
-    _check_provider_budget(provider, estimated_cost, currency, today)
+    _check_provider_budget(provider, estimated_cost, currency, today, estimated_credits)
     return UsageEvent.objects.create(
         user=locked_user,
         provider=provider,
@@ -159,6 +169,7 @@ def reserve_usage(
         model=model,
         status=UsageEvent.Status.RESERVED,
         character_count=character_count,
+        estimated_credits=estimated_credits,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         estimated_cost=estimated_cost,

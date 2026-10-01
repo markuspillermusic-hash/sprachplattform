@@ -179,6 +179,7 @@ def create_generation_job(project, requested_by):
             estimated_cost=estimated_cost,
             currency="EUR",
             character_count=character_count,
+            estimated_credits=sum(part["character_count"] for part in parts),
         )
     except (QuotaExceeded, QuotaConfigurationError) as exc:
         raise UsageLimitExceeded(str(exc)) from exc
@@ -224,6 +225,7 @@ def ensure_generation_reservation(job):
             estimated_cost=job.estimated_cost_eur,
             currency="EUR",
             character_count=job.character_count,
+            estimated_credits=(job.usage_event.estimated_credits or job.character_count) if job.usage_event_id else job.character_count,
             reference=f"generation:{job.pk}:retry",
         )
     except (QuotaExceeded, QuotaConfigurationError) as exc:

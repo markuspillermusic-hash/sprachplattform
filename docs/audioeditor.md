@@ -26,6 +26,8 @@ Die automatische Musikabsenkung startet sanft mit 4 dB, 250 ms Attack und 900 ms
 
 **T** teilt einen markierten Clip an der roten Abspielposition; **Leertaste** startet und pausiert. In Eingabefeldern, nativen Audioplayern und bearbeitbaren Texten werden keine Hotkeys ausgelöst. Das Quell-Wellenbild bleibt beim Kürzen unverändert und wird nur angeschnitten beziehungsweise verschoben. Zoom ändert weiterhin den Zeitmaßstab.
 
+Jeder Clip besitzt einen horizontalen Lautstärkebalken. Vertikales Ziehen ändert ausschließlich den Clippegel zwischen −60 und +12 dB. Normal: 0,4 dB je Pixel; mit Umschalt: 0,05 dB je Pixel, gespeichert in 0,1-dB-Schritten. Doppelklick setzt auf 0 dB zurück. Die Änderung ist rückgängig machbar, wird gespeichert und wirkt in Vorschau und Export; Schnitt, Fades und Quell-Wellenbild bleiben unverändert.
+
 Grenzen der ersten Version: 60 Clips pro Stand, 30 Minuten Gesamtdauer, 200 verfügbare Bibliotheksdateien je Projekt und 50 MB pro Upload. Musik kann 3–600 Sekunden, ein Geräusch 0,5–30 Sekunden lang erzeugt werden. Es gibt keine automatische inhaltliche Szenenerkennung. Die Musikbeschreibung und die Platzierung werden durch den Benutzer festgelegt. Ein Export mischt die hörbaren Spuren; Einzelspurexporte sind über Solo und einen weiteren Export möglich.
 
 Die Browser-Vorschau und FFmpeg verwenden dieselben Schnitt-, Fade- und Pegelwerte. Die Übersteuerungsbegrenzung erfolgt im Browser über einen Kompressor und beim Export über einen FFmpeg-Limiter; nahe der Pegelgrenze können sich beide leicht unterscheiden. Für die finale Kontrolle den gerenderten Mix anhören.

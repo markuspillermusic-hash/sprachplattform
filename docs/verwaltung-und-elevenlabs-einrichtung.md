@@ -133,11 +133,12 @@ Die wichtigsten Bereiche sind:
 
 Aktuell vorgesehene Standardwerte:
 
-- persönliches Monatslimit: `30.000` Zeichen
-- Organisationslimit pro Monat: `600.000` Zeichen
-- Organisationslimit pro Jahr: `7.200.000` Zeichen
+- persönliches Monatslimit: `100.000` Zeichen
+- Organisationslimit pro Monat: `2.000.000` Zeichen als technische Obergrenze
+- Organisationslimit pro Jahr: `24.000.000` Zeichen als technische Obergrenze
+- gemeinsamer ElevenLabs-Credit-Rahmen: `130.000` Credits, davon `123.500` nach 5 % Reserve; Sprache, Musik und Geräusche werden gemeinsam gezählt
 - Audio-Aufbewahrung: `30` Tage
-- interner Tarifwert: `0,18 EUR` pro 1.000 Zeichen
+- aktuell hinterlegter interner Tarifwert: `0,10 EUR` pro 1.000 Credits
 
 Der angezeigte Eurobetrag ist ein anteiliger Schätzwert zur internen Planung, keine zusätzliche Einzelabbuchung. Innerhalb des ElevenLabs-Monatskontingents entstehen normalerweise nicht für jeden Auftrag gesonderte Kosten. Nach Tarifwechseln sollte der Wert mit dem effektiven Preis je 1.000 Credits verglichen und bei Bedarf angepasst werden.
 
