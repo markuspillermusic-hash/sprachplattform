@@ -185,11 +185,11 @@ def create_generation_job(project, requested_by, *, reuse_job=None):
     today = timezone.localdate()
     month_start = today.replace(day=1)
     user_month, organization_month, organization_year = _period_usage(requested_by, today)
-    if user_month + character_count > requested_by.character_limit:
+    if character_count and user_month + character_count > requested_by.character_limit:
         raise UsageLimitExceeded("Ihr monatliches Zeichenlimit ist erreicht.")
-    if organization_month + character_count > settings.ORGANIZATION_MONTHLY_CHARACTER_LIMIT:
+    if character_count and organization_month + character_count > settings.ORGANIZATION_MONTHLY_CHARACTER_LIMIT:
         raise UsageLimitExceeded("Das monatliche Organisationslimit ist erreicht.")
-    if organization_year + character_count > settings.ORGANIZATION_YEARLY_CHARACTER_LIMIT:
+    if character_count and organization_year + character_count > settings.ORGANIZATION_YEARLY_CHARACTER_LIMIT:
         raise UsageLimitExceeded("Das jährliche Organisationslimit ist erreicht.")
 
     number = (project.versions.aggregate(maximum=Max("number"))["maximum"] or 0) + 1
@@ -201,6 +201,7 @@ def create_generation_job(project, requested_by, *, reuse_job=None):
     )
     rate = tts_provider.estimated_rate
     estimated_cost = (Decimal(character_count) / Decimal(1000) * rate).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    usage_event = None
     try:
         usage_event = reserve_usage(
             user=requested_by,
@@ -211,7 +212,7 @@ def create_generation_job(project, requested_by, *, reuse_job=None):
             currency="EUR",
             character_count=character_count,
             estimated_credits=sum(part["character_count"] for index, part in enumerate(parts) if index not in reused),
-        )
+        ) if character_count else None
     except (QuotaExceeded, QuotaConfigurationError) as exc:
         raise UsageLimitExceeded(str(exc)) from exc
     job = GenerationJob.objects.create(
@@ -223,8 +224,9 @@ def create_generation_job(project, requested_by, *, reuse_job=None):
         estimated_cost_eur=estimated_cost,
         usage_event=usage_event,
     )
-    usage_event.reference = f"generation:{job.pk}"
-    usage_event.save(update_fields=("reference", "updated_at"))
+    if usage_event:
+        usage_event.reference = f"generation:{job.pk}"
+        usage_event.save(update_fields=("reference", "updated_at"))
     GenerationPart.objects.bulk_create(
         [GenerationPart(job=job, position=index + 1, reuse_source=reused.get(index), is_reused=index in reused, **part)
          for index, part in enumerate(parts)]
@@ -246,6 +248,8 @@ def ensure_generation_reservation(job):
     # Lock the job without joining its nullable usage event: PostgreSQL cannot
     # apply FOR UPDATE to the nullable side of an outer join.
     job = GenerationJob.objects.select_for_update().select_related("requested_by").get(pk=job.pk)
+    if job.character_count == 0 and job.parts.exists() and not job.parts.filter(is_reused=False).exists():
+        return None
     if job.usage_event_id and job.usage_event.status != UsageEvent.Status.RELEASED:
         return job.usage_event
     try:

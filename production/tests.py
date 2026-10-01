@@ -24,7 +24,7 @@ from projects.models import Project, ScriptSegment, Speaker
 from script_assistant.services import editable_project_snapshot
 from script_assistant.workflows import project_payload
 from tts.providers.base import SynthesisResult
-from usage_control.models import UsageEvent
+from usage_control.models import UsageEvent, ProviderBudget
 from accounts.models import TemporaryStudentAccess
 
 from .models import Production, ProductionRun
@@ -226,10 +226,23 @@ class ProductionTests(TestCase):
         job = create_generation_job(self.project, self.user, reuse_job=audio.job)
         run_generation_job(job.pk)
         self.provider.synthesize_dialogue.assert_not_called()
-        job.usage_event.refresh_from_db()
-        self.assertEqual(job.usage_event.estimated_credits, 0)
-        self.assertEqual(job.usage_event.provider_credit_count, 0)
+        self.assertIsNone(job.usage_event_id)
+        self.assertEqual(job.character_count, 0)
         self.assertNotEqual(job.parts.get().audio_path, audio.job.parts.get().audio_path)
+
+    def test_free_speech_reuse_works_with_exhausted_shared_credit_and_user_limits(self):
+        audio = self.speech()
+        ProviderBudget.objects.create(provider="elevenlabs", allocated_amount=0, monthly_credit_limit=1,
+            starts_on=timezone.localdate() - timedelta(days=1), expires_on=timezone.localdate() + timedelta(days=365))
+        self.user.character_limit = 1; self.user.save()
+        before = UsageEvent.objects.count()
+        self.provider.synthesize_dialogue.reset_mock()
+        job = create_generation_job(self.project, self.user, reuse_job=audio.job)
+        run_generation_job(job.pk)
+        self.provider.synthesize_dialogue.assert_not_called()
+        self.assertEqual(UsageEvent.objects.count(), before)
+        from generation.services import ensure_generation_reservation
+        self.assertIsNone(ensure_generation_reservation(job))
 
     def test_expired_speech_is_not_reused_or_approved(self):
         audio = self.speech(); audio.expires_at = timezone.now() - timedelta(seconds=1); audio.save()

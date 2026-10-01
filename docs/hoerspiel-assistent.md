@@ -29,4 +29,4 @@ Zwischenstände und Arbeitsschritte bleiben gespeichert. Seiten können während
 
 `Production` speichert Briefing, Entwurf, Freigaben, Audioversion, Klangplan und Vorschau. `ProductionRun` protokolliert die einzelnen Hintergrundphasen; pro Projekt ist genau ein aktiver Assistentenauftrag zulässig. Versionsprüfungen erkennen parallele Änderungen. Skript- oder Stimmenänderungen sperren die weitere Nutzung einer alten Sprachfreigabe. Geänderte Studioschnitte erfordern eine aktuelle Vorschau vor dem Export.
 
-Neue Migrationen: `generation/0005`, `production/0001`. Lokale Prüfung: 200 Tests, darunter 21 neue Prüfungen für Freigaben, Rechte, Versionskonflikte, vollständige Audioverarbeitung, Teilfehler, Wiederverwendung, Kopien und Export. Browserprüfung bei 1440 und 390 Pixeln: keine JavaScript-Fehler oder horizontalen Überläufe.
+Neue Migrationen: `generation/0005`, `production/0001`. Lokale Prüfung: 201 Tests, darunter 22 neue Prüfungen für Freigaben, Rechte, Versionskonflikte, vollständige Audioverarbeitung, Teilfehler, Wiederverwendung, Kopien und Export. Browserprüfung bei 1440 und 390 Pixeln: keine JavaScript-Fehler oder horizontalen Überläufe.
