@@ -46,7 +46,7 @@ def body(request):
 
 def asset_data(asset):
     return {"id": str(asset.pk), "title": asset.title, "kind": asset.kind, "duration": asset.duration,
-            "waveform": asset.waveform, "expires_at": asset.expires_at.isoformat(),
+            "waveform": asset.waveform, "expires_at": None if asset.is_demo_sample else asset.expires_at.isoformat(),
             "url": reverse("audio_studio:asset", args=[asset.project_id, asset.pk]),
             "download_url": reverse("audio_studio:asset", args=[asset.project_id, asset.pk]) + "?download=1"}
 
@@ -56,7 +56,7 @@ def job_data(job):
             "label": job.get_status_display(), "error": job.error_message,
             "revision": job.input_data.get("revision"),
             "asset": asset_data(job.asset) if job.asset and job.asset.deleted_at is None
-            and job.asset.expires_at > timezone.now() else None}
+            and (job.asset.is_demo_sample or job.asset.expires_at > timezone.now()) else None}
 
 
 @require_GET

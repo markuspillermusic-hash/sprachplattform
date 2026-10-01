@@ -32,6 +32,18 @@
     </form>
   {% endif %}
 
+  {% if drama_demo and drama_demo_asset %}
+    <aside class="drama-demo-preview" aria-labelledby="drama-demo-title">
+      <div>
+        <p class="eyebrow">Hörspiel ausprobieren</p>
+        <h2 id="drama-demo-title">Das Geheimnis der alten Uhr</h2>
+        <p>Eine fertige Szene mit Stimmen, Jingle, Musik und Geräuschen. Hören Sie den Mix an oder bearbeiten Sie Ihre eigene Demo mit allen drei Spuren.</p>
+        <audio controls preload="none" aria-label="Hörspiel-Demo anhören" src="{% url 'audio_studio:asset' drama_demo.id drama_demo_asset.id %}"></audio>
+      </div>
+      <a class="button button-primary" href="{% url 'audio_studio:editor' drama_demo.id %}">Hörspiel-Demo im Studio öffnen →</a>
+    </aside>
+  {% endif %}
+
   {% if projects %}
     <ul class="project-grid">
       {% for project in projects %}

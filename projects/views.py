@@ -15,6 +15,8 @@ from script_assistant.providers import AssistantProviderError, AssistantProvider
 from script_assistant.schema import ProposalValidationError
 from script_assistant.workflows import begin_assisted_project
 from usage_control.services import QuotaExceeded
+from audio_studio.demos import ensure_audio_drama_demo
+from audio_studio.services import live_assets
 from tts.providers import tts_provider_is_configured
 from .forms import (
     ProjectCreateForm,
@@ -54,6 +56,7 @@ def form_error_summary(form):
 @login_required
 def project_list(request):
     ensure_demo_projects(request.user)
+    drama_demo = ensure_audio_drama_demo(request.user)
     projects = visible_projects(request.user)
     admin_view = request.user.is_staff or request.user.role == request.user.Role.ADMIN
     owner_filter, content_filter, owner_options = "mine", "all", []
@@ -90,6 +93,8 @@ def project_list(request):
         "projects": projects, "admin_view": admin_view, "owner_options": owner_options,
         "owner_filter": owner_filter, "content_filter": content_filter,
         "project_count": projects.count(),
+        "drama_demo": drama_demo,
+        "drama_demo_asset": live_assets(drama_demo).filter(kind="mix", is_demo_sample=True).first() if drama_demo else None,
     })
 
 

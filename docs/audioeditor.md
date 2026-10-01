@@ -4,6 +4,14 @@ Unter **Meine Hörtexte** auf der gewünschten Hörtext-Karte **Hörspiel-Studio
 
 Admins sehen unter **Meine Hörtexte** zunächst ihre eigenen Hörtexte ohne Demos. Mit **Hörtexte von** lassen sich alle Nutzer, andere Nutzer oder ein einzelner Nutzer auswählen. Unter **Demos** können diese ausgeblendet, mit angezeigt oder allein angezeigt werden. **Filter anwenden** übernimmt die Auswahl; **Zurücksetzen** führt zur Standardansicht zurück. Die Hörtext-Karten zeigen für Admins den Besitzer. Normale Nutzer sehen weiterhin ihre eigenen Hörtexte einschließlich ihrer Demos.
 
+## Hörspiel-Demo
+
+**Das Geheimnis der alten Uhr** ist eine kurze, fertig gemischte Szene mit sechs Sprachabschnitten, Jingle und Hintergrundmusik sowie Uhrticken, Glockenschlag und einer knarrenden Tür. Unter **Meine Hörtexte → Hörspiel ausprobieren** lässt sich der Mix direkt anhören und die persönliche Demo im Studio öffnen. Dieser Einstieg bleibt auch für Admins mit ausgeblendeten Demos sichtbar. Die vorbereiteten Clips zeigen Fades, überlappende Geräusche, Musikabsenkung und Sprachkompression.
+
+Die Referenzaufnahmen werden einmal erzeugt und unter `AUDIO_STORAGE_ROOT/demos/clockwork-v1/` aufbewahrt. `python manage.py seed_audio_drama_demo` mischt die vorbereiteten Referenzen einmal und verteilt unabhängige Dateikopien und Bearbeitungsstände an aktive Konten. Dieser Befehl und die automatische Bereitstellung beim ersten Besuch neuer Nutzer lösen keine Anbieteraufrufe aus. Bereits bearbeitete Demos bleiben erhalten; bewusst gelöschte Demos werden nur mit der ausdrücklichen Option `--restore` neu angelegt.
+
+Die unveränderten Demo-Hörbeispiele bleiben dauerhaft verfügbar. Eigene Uploads, zusätzliche generierte Dateien und neue Exporte unterliegen weiterhin der normalen Aufbewahrungsfrist. Die Referenzdateien gehören in die Sicherung des Audio-Volumes. Die Demo hebt die allgemeinen Freigaben für Musik- und Geräuscherzeugung nicht auf.
+
 ## Bedienung
 
 1. Sprache im Skripteditor erzeugen und im Audioeditor über **Sprache übernehmen** hinzufügen. Die gewünschte Sprachversion ist auswählbar.

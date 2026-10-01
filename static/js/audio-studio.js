@@ -353,7 +353,8 @@
     if (!items.length) $("library").append(el("p", "Übernehmen Sie eine Sprachversion, laden Sie Audio hoch oder erzeugen Sie Musik und Geräusche.", "studio-hint"));
     for (const a of items) {
       const item = el("article", null, "studio-library-item"); const info = el("div");
-      info.append(el("strong", a.title), el("small", `${names[a.kind] || "Eigene Datei"} · ${a.duration.toFixed(1)} s · verfügbar bis ${new Date(a.expires_at).toLocaleDateString("de-DE")}`));
+      const availability = a.expires_at ? `verfügbar bis ${new Date(a.expires_at).toLocaleDateString("de-DE")}` : "Dauerhaftes Demo-Hörbeispiel";
+      info.append(el("strong", a.title), el("small", `${names[a.kind] || "Eigene Datei"} · ${a.duration.toFixed(1)} s · ${availability}`));
       item.append(info, action("＋ Einfügen", () => addAsset(a), "button button-secondary"));
       const audio = el("audio"); audio.controls = true; audio.preload = "none"; audio.src = a.url;
       audio.setAttribute("aria-label", a.title); audio.addEventListener("play", () => stop()); item.append(audio); $("library").append(item);

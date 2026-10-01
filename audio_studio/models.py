@@ -57,6 +57,12 @@ class StudioSession(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class StudioDemoEnrollment(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="studio_demo_enrollment")
+    project = models.OneToOneField("projects.Project", null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class StudioRevision(models.Model):
     session = models.ForeignKey(StudioSession, on_delete=models.CASCADE, related_name="revisions")
     number = models.PositiveIntegerField()
@@ -84,6 +90,7 @@ class StudioAsset(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     deleted_at = models.DateTimeField(null=True, blank=True)
+    is_demo_sample = models.BooleanField(default=False, editable=False)
 
     class Meta:
         ordering = ("-created_at",)

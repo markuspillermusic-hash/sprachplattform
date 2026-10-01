@@ -8,7 +8,7 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from projects.models import Project
 
@@ -39,7 +39,8 @@ def identifier(value):
 
 
 def live_assets(project):
-    return StudioAsset.objects.filter(project=project, deleted_at__isnull=True, expires_at__gt=timezone.now())
+    return StudioAsset.objects.filter(project=project, deleted_at__isnull=True).filter(
+        Q(is_demo_sample=True) | Q(expires_at__gt=timezone.now()))
 
 
 def validate_state(project, state):

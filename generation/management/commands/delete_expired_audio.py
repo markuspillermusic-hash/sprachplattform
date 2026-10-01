@@ -28,7 +28,7 @@ class Command(BaseCommand):
             deleted += 1
         self.stdout.write(self.style.SUCCESS(f"{deleted} abgelaufene Audioassets gelöscht."))
         studio_deleted = 0
-        for asset in StudioAsset.objects.filter(deleted_at__isnull=True, expires_at__lte=timezone.now()):
+        for asset in StudioAsset.objects.filter(deleted_at__isnull=True, expires_at__lte=timezone.now(), is_demo_sample=False):
             for raw_path in (asset.file_path, asset.original_path):
                 if not raw_path:
                     continue
