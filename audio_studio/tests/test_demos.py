@@ -13,7 +13,8 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from audio_studio.demos import (DEMO_KEY, SAMPLES, bundle_folder, demo_state,
-                               ensure_audio_drama_demo, prepare_bundle, read_bundle)
+                               ensure_audio_drama_demo, prepare_bundle, read_bundle, refresh_unedited_demo,
+                               repair_demo_effect_samples, refresh_demo_preview)
 from audio_studio.models import StudioAsset, StudioDemoEnrollment
 from audio_studio.services import live_assets
 from usage_control.models import UsageEvent
@@ -51,7 +52,7 @@ class AudioDramaDemoTests(TestCase):
         self.assertEqual(first.studio_jobs.get().status, "succeeded")
         self.assertSetEqual({c["track"] for c in first.studio.state["clips"]}, {"speech", "music", "effects"})
         self.assertTrue(first.studio.state["speech_compression"])
-        self.assertTrue(first.studio.state["effects_ducking"])
+        self.assertFalse(first.studio.state["effects_ducking"])
         first_ids = {c["asset_id"] for c in first.studio.state["clips"]}
         second_ids = {c["asset_id"] for c in second.studio.state["clips"]}
         self.assertFalse(first_ids & second_ids)
@@ -127,6 +128,48 @@ class AudioDramaDemoTests(TestCase):
         call_command("seed_audio_drama_demo", stdout=output)
         self.assertEqual(StudioDemoEnrollment.objects.count(), 2)
 
+    def test_refresh_preserves_edits_history_and_is_idempotent(self):
+        from audio_studio.services import save_state
+        original = json.loads(json.dumps(self.bundle))
+        original["state"]["effects_ducking"] = True
+        for clip in original["state"]["clips"]:
+            if clip["track"] == "effects": clip["gain_db"] -= 5
+        project = ensure_audio_drama_demo(self.user, bundle=original)
+        edited = ensure_audio_drama_demo(self.other, bundle=original)
+        state = json.loads(json.dumps(edited.studio.state)); state["clips"][0]["start"] = 2
+        save_state(edited, self.other, 1, state)
+        old_mix = project.studio_jobs.get().asset
+        self.assertTrue(refresh_unedited_demo(self.user, self.bundle))
+        self.assertFalse(refresh_unedited_demo(self.user, self.bundle))
+        self.assertFalse(refresh_unedited_demo(self.other, self.bundle))
+        project.refresh_from_db(); edited.refresh_from_db()
+        self.assertEqual(project.studio.revision, 2)
+        self.assertEqual(project.studio_jobs.count(), 2)
+        self.assertTrue(Path(old_mix.file_path).exists())
+        self.assertEqual(edited.studio.state["clips"][0]["start"], 2)
+
+    def test_sample_repair_preserves_user_cuts_and_old_exports(self):
+        from audio_studio.services import save_state
+        project = ensure_audio_drama_demo(self.user)
+        state = json.loads(json.dumps(project.studio.state)); state["clips"][0]["start"] = 2
+        saved = save_state(project, self.user, 1, state)
+        original_mix = project.studio_jobs.get().asset
+        (bundle_folder() / "clock.mp3").write_bytes(b"audible-ticking")
+        self.bundle["samples"]["clock"]["waveform"] = [.6]
+        repair_demo_effect_samples(self.user, self.bundle)
+        project.refresh_from_db()
+        self.assertEqual(project.studio.state, saved.state)
+        self.assertEqual(project.studio.revision, 2)
+        self.assertEqual(Path(original_mix.file_path).read_bytes(), b"fixture-mix")
+        clock = project.studio_assets.get(title=SAMPLES["clock"][0])
+        self.assertEqual(clock.waveform, [.6])
+        self.assertEqual(Path(clock.file_path).read_bytes(), b"audible-ticking")
+        self.bundle["samples"]["mix"]["title"] = "Überarbeitete Referenz"
+        refresh_demo_preview(self.user, self.bundle)
+        refresh_demo_preview(self.user, self.bundle)
+        self.assertEqual(project.studio_assets.filter(kind="mix").count(), 2)
+        self.assertEqual(project.studio_assets.filter(kind="mix").first().title, "Überarbeitete Referenz")
+        self.assertEqual(project.studio.state, saved.state)
     @skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg required")
     def test_reference_mix_is_rendered_once_from_real_audio(self):
         from audio_studio.media import normalize, probe

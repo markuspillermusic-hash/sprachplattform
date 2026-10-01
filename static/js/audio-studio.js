@@ -13,6 +13,10 @@
   let saving, polling, ready = false, loadingAudio = false, playbackToken = 0;
   const buffers = new Map();
   const length = (clip) => clip.trim_end - clip.trim_start;
+  const mixSettings = () => ({music_duck_db: state.ducking ? 4 : 0,
+    effects_duck_db: state.effects_ducking ? 2 : 0, compression: state.speech_compression ? 35 : 0,
+    duck_attack_ms: 250, duck_release_ms: 900, compressor_attack_ms: 25, compressor_release_ms: 350,
+    ...state.mix});
   const duration = () => state ? Math.max(0, ...state.clips.map(c => c.start + length(c))) : 0;
   const time = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
   const message = (value = "") => { $("message").textContent = value; $("message").hidden = !value; };
@@ -71,7 +75,7 @@
   }
   function stop(reset = false) {
     playbackToken++;
-    if (playing) position = clamp(playFrom + context.currentTime - started, 0, playUntil);
+    if (playing) position = clamp(playFrom + Math.max(0, context.currentTime - started), 0, playUntil);
     playing = false;
     nodes.forEach(n => { try { n.stop(); } catch {} try { n.disconnect(); } catch {} });
     nodes = [];
@@ -88,7 +92,7 @@
     const result = [];
     state.clips.filter(c => c.track === "speech").sort((a,b) => a.start - b.start).forEach(c => {
       const last = result[result.length - 1];
-      if (last && c.start <= last[1] + .3) last[1] = Math.max(last[1], c.start + length(c));
+      if (last && c.start <= last[1] + mixSettings().duck_release_ms / 1000) last[1] = Math.max(last[1], c.start + length(c));
       else result.push([c.start, c.start + length(c)]);
     });
     return result;
@@ -123,32 +127,37 @@
       if (token !== playbackToken) return;
       playFrom = position; playUntil = end; started = context.currentTime + .06;
       const master = context.createGain(); master.gain.value = .8;
+      const mix = mixSettings();
       const limiter = context.createDynamicsCompressor();
       limiter.threshold.value = -1; limiter.knee.value = 0; limiter.ratio.value = 20;
-      limiter.attack.value = .003; limiter.release.value = .05;
+      limiter.attack.value = .005; limiter.release.value = .25;
       master.connect(limiter); limiter.connect(context.destination);
       nodes.push(master, limiter);
       const trackNodes = {};
       for (const name of Object.keys(names)) {
         const gain = context.createGain();
         gain.gain.value = db(state.tracks[name].gain_db);
-        if (name === "speech" && state.speech_compression) {
+        if (name === "speech" && mix.compression > 0) {
           const compressor = context.createDynamicsCompressor(), makeup = context.createGain();
-          compressor.threshold.value = -18; compressor.ratio.value = 3; compressor.knee.value = 6;
-          compressor.attack.value = .01; compressor.release.value = .15; makeup.gain.value = db(3);
+          const amount = mix.compression / 100;
+          compressor.threshold.value = -18; compressor.ratio.value = 1 + 2 * amount; compressor.knee.value = 6;
+          compressor.attack.value = mix.compressor_attack_ms / 1000;
+          compressor.release.value = mix.compressor_release_ms / 1000; makeup.gain.value = db(2 * amount);
           gain.connect(compressor); compressor.connect(makeup); makeup.connect(master);
           nodes.push(compressor, makeup);
         } else gain.connect(master);
         trackNodes[name] = gain; nodes.push(gain);
-        const duck = (name === "music" && state.ducking) || (name === "effects" && state.effects_ducking);
-        if (!onlyId && duck && allowed.has("speech")) {
+        const duckDb = name === "music" ? mix.music_duck_db : name === "effects" ? mix.effects_duck_db : 0;
+        if (!onlyId && duckDb > 0 && allowed.has("speech")) {
           const speech = intervals();
+          const attack = mix.duck_attack_ms / 1000, release = mix.duck_release_ms / 1000;
           const count = Math.max(2, Math.ceil((end - position) / .02) + 1);
           const values = new Float32Array(count);
           for (let i = 0; i < count; i++) {
             const t = position + i / (count - 1) * (end - position);
-            const envelope = Math.max(0, ...speech.map(([s,e]) => Math.min(1, Math.max(0,(t - s + .15)/.15), Math.max(0,(e + .15 - t)/.15))));
-            values[i] = db(state.tracks[name].gain_db) * (1 - (name === "music" ? .75 : .5) * envelope);
+            const envelope = Math.max(0, ...speech.map(([s,e]) => Math.min(1, Math.max(0,(t - s + attack)/attack), Math.max(0,(e + release - t)/release))));
+            const smooth = envelope * envelope * (3 - 2 * envelope);
+            values[i] = db(state.tracks[name].gain_db - duckDb * smooth);
           }
           gain.gain.setValueCurveAtTime(values, started, end - position);
         }
@@ -182,12 +191,16 @@
   function drawWave(canvas, clip, width) {
     const asset = assets.get(clip.asset_id);
     if (!asset || !asset.waveform.length) return;
-    canvas.width = Math.max(1, Math.min(2000, Math.round(width))); canvas.height = 38;
+    // The canvas represents the entire source. Trimming only moves or crops it.
+    const sourceWidth = asset.duration * zoom;
+    canvas.style.width = `${sourceWidth}px`;
+    canvas.style.left = `${-clip.trim_start * zoom}px`;
+    canvas.width = Math.max(1, Math.min(8192, Math.round(sourceWidth))); canvas.height = 38;
     const ctx = canvas.getContext("2d");
     ctx.strokeStyle = getComputedStyle(canvas.parentElement).color;
     ctx.globalAlpha = .65; ctx.beginPath();
     for (let x = 0; x < canvas.width; x += 2) {
-      const t = clip.trim_start + x / canvas.width * length(clip);
+      const t = x / canvas.width * asset.duration;
       const peak = asset.waveform[Math.min(asset.waveform.length - 1, Math.floor(t / asset.duration * asset.waveform.length))];
       const h = Math.max(1, peak * 17);
       ctx.moveTo(x, 19 - h); ctx.lineTo(x, 19 + h);
@@ -267,9 +280,7 @@
       lane.style.height = `${Math.max(150, placed.length * 76 + 20)}px`;
       lane.append(el("div", null, "studio-playhead")); row.append(label, lane); $("timeline").append(row);
     }
-    $("ducking").checked = state.ducking;
-    $("effects-ducking").checked = Boolean(state.effects_ducking);
-    $("speech-compression").checked = Boolean(state.speech_compression);
+    renderMixSettings();
     inspector(); updatePosition(position); mark();
   }
   function fitFades(c) {
@@ -320,6 +331,7 @@
       else c.start = clamp(initial.start + delta, 0, 1800 - length(c));
       fitFades(c);
       button.style.left = `${c.start * zoom}px`; button.style.width = `${Math.max(14, length(c) * zoom)}px`;
+      button.querySelector("canvas").style.left = `${-c.trim_start * zoom}px`;
       updateFadeVisuals(button, c);
       inspector();
     };
@@ -349,7 +361,9 @@
   }
   function renderLibrary() {
     $("library").replaceChildren();
-    const items = [...assets.values()].filter(a => a.kind !== "mix");
+    const filter = $("library-filter").value;
+    const items = [...assets.values()].filter(a => a.kind !== "mix" && (filter === "all" || a.kind === filter));
+    $("library-summary").textContent = `Sprache: ${[...assets.values()].filter(a => a.kind === "speech").length} · Musik: ${[...assets.values()].filter(a => a.kind === "music").length} · Geräusche: ${[...assets.values()].filter(a => a.kind === "effects").length}`;
     if (!items.length) $("library").append(el("p", "Übernehmen Sie eine Sprachversion, laden Sie Audio hoch oder erzeugen Sie Musik und Geräusche.", "studio-hint"));
     for (const a of items) {
       const item = el("article", null, "studio-library-item"); const info = el("div");
@@ -436,10 +450,28 @@
   $("zoom").addEventListener("input", () => { zoom = Number($("zoom").value); render(); });
   $("undo").addEventListener("click", () => { if (!undo.length) return; stop(); redo.push(clone(state)); state = undo.pop(); render(); });
   $("redo").addEventListener("click", () => { if (!redo.length) return; stop(); undo.push(clone(state)); state = redo.pop(); render(); });
-  $("ducking").addEventListener("change", () => { if (ready) change(() => { state.ducking = $("ducking").checked; }); });
-  for (const [id, key] of [["effects-ducking", "effects_ducking"], ["speech-compression", "speech_compression"]]) {
-    $(id).addEventListener("change", () => { if (ready) change(() => { state[key] = $(id).checked; }); });
+  function renderMixSettings() {
+    const mix = mixSettings();
+    root.querySelectorAll("[data-mix]").forEach(input => {
+      const key = input.dataset.mix, value = mix[key]; input.value = value;
+      $(`${input.id.slice(7)}-value`).textContent = key.endsWith("_db") ? (value ? `${value} dB` : "Aus")
+        : key === "compression" ? (value ? `${value} %` : "Aus") : `${value} ms`;
+    });
   }
+  root.querySelectorAll("[data-mix]").forEach(input => {
+    input.addEventListener("input", () => {
+      if (!ready) return;
+      // One undo step per slider gesture, including keyboard changes.
+      if (!input.dataset.editing) { checkpoint(); input.dataset.editing = "true"; }
+      state.mix = {...mixSettings(), [input.dataset.mix]: Number(input.value)};
+      state.ducking = state.mix.music_duck_db > 0; state.effects_ducking = state.mix.effects_duck_db > 0;
+      state.speech_compression = state.mix.compression > 0;
+      renderMixSettings(); mark();
+    });
+    input.addEventListener("change", () => { delete input.dataset.editing; });
+    input.addEventListener("blur", () => { delete input.dataset.editing; });
+  });
+  $("library-filter").addEventListener("change", renderLibrary);
   $("reload").addEventListener("click", safe(async () => { if (!ready || JSON.stringify(state) === saved || window.confirm("Ungespeicherte Änderungen verwerfen und den gespeicherten Stand laden?")) await load(); }));
   $("history").addEventListener("change", safe(() => { if (!$("history").value) return; const h = history[Number($("history").value)]; change(() => { state = clone(h.state); selected = null; }); message(`Stand ${h.number} geladen. Speichern Sie ihn, um ihn als neuen Stand zu übernehmen.`); }));
   $("clip-form").addEventListener("submit", safe(() => {
@@ -457,7 +489,8 @@
     if (state.clips.length >= 60 || c.start + length(c) * 2 > 1800) throw new Error("Der duplizierte Clip überschreitet die zulässige Clipzahl oder Gesamtdauer.");
     change(() => { const copy = clone(c); copy.id = crypto.randomUUID(); copy.start += length(c); state.clips.push(copy); selected = copy.id; });
   }));
-  $("split").addEventListener("click", safe(() => {
+  function splitSelected() {
+    stop();
     const c = state.clips.find(c => c.id === selected); if (!c) return;
     const cut = position - c.start;
     if (state.clips.length >= 60 || cut < .01 || cut > length(c) - .01) throw new Error("Setzen Sie die Abspielposition innerhalb des Clips; maximal 60 Clips sind möglich.");
@@ -467,7 +500,17 @@
       c.trim_end = right.trim_start; c.fade_out = 0; fitFades(c); fitFades(right);
       state.clips.push(right); selected = right.id;
     });
-  }));
+  }
+  $("split").addEventListener("click", safe(splitSelected));
+  window.addEventListener("keydown", e => {
+    if (!ready || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    if (e.target.closest("input, textarea, select, audio, [contenteditable]:not([contenteditable=false])")) return;
+    const key = e.key.toLowerCase();
+    if (key !== "t" && key !== " ") return;
+    e.preventDefault();
+    if (e.repeat || (key === " " && loadingAudio)) return;
+    safe(key === "t" ? splitSelected : () => play())();
+  });
   $("clip-play").addEventListener("click", safe(() => { if (playing) stop(); return play(selected); }));
   async function busyForm(form, operation) {
     const button = form.querySelector("button[type=submit]"); button.disabled = true;

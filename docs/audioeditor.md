@@ -22,7 +22,9 @@ Die unveränderten Demo-Hörbeispiele bleiben dauerhaft verfügbar. Eigene Uploa
 6. **Stand speichern** sichert die Bearbeitung. Rückgängig/Wiederholen gilt für die laufende Sitzung. Frühere gespeicherte Stände können geladen und als neuer Stand gespeichert werden. Änderungen aus einem zweiten Fenster werden nicht still überschrieben.
 7. **Mix exportieren** speichert zunächst den aktuellen Stand und startet einen Hintergrundauftrag für MP3 (192 kbit/s) oder WAV (44,1 kHz, 16 Bit, Stereo). Der fertige Mix erscheint mit Wiedergabe und Download im Exportbereich. Währenddessen kann an einem neuen Stand weitergearbeitet werden.
 
-Die automatische Musikabsenkung senkt die Musik um etwa 12 dB während der platzierten Sprachclips; 150-ms-Übergänge vermeiden harte Pegelsprünge. Sie richtet sich nach den Clipgrenzen, einschließlich innerhalb eines Clips enthaltener Sprechpausen. Für längere Geräuschkulissen kann ein nahtlos wiederholbares Geräusch erzeugt und dupliziert werden.
+Die automatische Musikabsenkung startet sanft mit 4 dB, 250 ms Attack und 900 ms Release. Absenkung und Übergänge sind über Regler einstellbar; 0 dB schaltet die Absenkung aus. Eine weiche S-Kurve und das Überbrücken kurzer Pausen vermeiden hektisches Pumpen. Die Absenkung richtet sich nach den Clipgrenzen, einschließlich innerhalb eines Clips enthaltener Sprechpausen. Für längere Geräuschkulissen kann ein nahtlos wiederholbares Geräusch erzeugt und dupliziert werden.
+
+**T** teilt einen markierten Clip an der roten Abspielposition; **Leertaste** startet und pausiert. In Eingabefeldern, nativen Audioplayern und bearbeitbaren Texten werden keine Hotkeys ausgelöst. Das Quell-Wellenbild bleibt beim Kürzen unverändert und wird nur angeschnitten beziehungsweise verschoben. Zoom ändert weiterhin den Zeitmaßstab.
 
 Grenzen der ersten Version: 60 Clips pro Stand, 30 Minuten Gesamtdauer, 200 verfügbare Bibliotheksdateien je Projekt und 50 MB pro Upload. Musik kann 3–600 Sekunden, ein Geräusch 0,5–30 Sekunden lang erzeugt werden. Es gibt keine automatische inhaltliche Szenenerkennung. Die Musikbeschreibung und die Platzierung werden durch den Benutzer festgelegt. Ein Export mischt die hörbaren Spuren; Einzelspurexporte sind über Solo und einen weiteren Export möglich.
 
@@ -34,12 +36,15 @@ Beim Hochladen können mehrere Dateien gleichzeitig ausgewählt werden. Sie werd
 
 Mehrere Geräusche auf derselben Spur können zeitlich überlappen und werden gleichzeitig gemischt. Zur Übersicht erscheinen überlappende Clips untereinander innerhalb der Spur. Jeder Clip hat eigene Schnitt-, Lautstärke- und Fade-Werte. Die Grenze von 60 Clips gilt für alle drei Spuren gemeinsam.
 
-- **Sprache gleichmäßiger machen** schaltet eine sanfte Sprachkompression hinzu: Schwelle −18 dB, Verhältnis 3:1, Attack 10 ms, Release 150 ms und anschließend +3 dB Pegelanhebung. Das reduziert Lautstärkeunterschiede und hebt leise Passagen moderat an. Sehr leise oder bereits verzerrte Quelldateien werden dadurch nicht automatisch korrigiert; den Clippegel passend einstellen.
-- **Geräuschkulisse während der Sprache absenken** senkt die gesamte Geräuschspur während Sprachclips um ungefähr 6 dB. Die Option ist separat schaltbar, damit wichtige Hörspiel-Effekte bei Bedarf laut bleiben. Wie die Musikabsenkung arbeitet sie anhand der Clipgrenzen mit 150-ms-Übergängen.
-- Beide neuen Optionen sind zunächst ausgeschaltet und werden mit dem Bearbeitungsstand gespeichert. Bestehende Stände behalten ihr bisheriges Verhalten.
+- **Sprachkompressor** dosiert die Stärke von 0 bis 100 Prozent: Schwelle −18 dB, Verhältnis 1:1 bis 3:1 und maximal +2 dB Pegelanhebung. Attack startet mit 25 ms, Release mit 350 ms; beide sind einstellbar. FFmpeg verwendet RMS-Erkennung. Kompression wirkt auf die Sprachspur; Musik und Geräusche behalten ihre Dynamik bis zur Begrenzung von Gesamtmix-Spitzen.
+- **Geräusche während der Sprache absenken** ist von 0 bis 18 dB regelbar. Alte aktivierte Einstellungen erhalten als sanfteren Startwert 2 dB. Die überarbeitete Referenz-Demo lässt Geräusche ohne Absenkung hörbar.
+- Alle Werte werden im JSON-Bearbeitungsstand unter `mix` gespeichert und in Exportaufträge übernommen. Alte gespeicherte Haken werden auf sanfte Standardwerte abgebildet; vorhandene Clips, Versionen und Exporte bleiben erhalten.
+- Neu generierte Geräusche erhalten eine konstante Pegelanpassung auf etwa 0,6 Sample-Spitzenwert, höchstens +30 dB; Stille bleibt unverändert. Die Originaldatei bleibt erhalten. Eigene Uploads und Sprach- oder Musikdateien erhalten keine solche automatische Anpassung.
 - Der fertige Mix hat vor dem Limiter 20 Prozent Pegelreserve; der Export-Limiter begrenzt Sample-Spitzen auf 0,95 (ungefähr −0,45 dBFS). Das schützt den WAV-Mix auch bei mehreren gleichzeitig lauten Geräuschen. Viele sehr laute Clips können dennoch die gesamte Mischung hörbar herunterdrücken; dafür zunächst die einzelnen Effekte leiser stellen. Der Limiter ist keine automatische Lautheitsnormalisierung und repariert keine Verzerrung im Original. MP3-Codierung kann Spitzen verändern; eine garantierte True-Peak-Grenze nach der Codierung ist nicht implementiert.
 
 Die Sprachkompressoren im Browser und im Export verwenden ähnliche Einstellungen, können aber leicht unterschiedlich klingen. Für die finale Kontrolle den gerenderten Mix anhören.
+
+Die Audiodateien lassen sich nach Audioart filtern; die Übersicht zeigt die Zahl der verfügbaren Geräuschbeispiele. `python manage.py seed_audio_drama_demo --refresh-mix` passt die vorhandenen Referenz-Geräusche im Pegel an und mischt die Referenz neu, ohne Anbieteraufrufe. Nur unveränderte Erststände erhalten die neuen Clippegel und einen zusätzlichen Export. Eigene Schnittbearbeitungen sowie historische Exportdateien bleiben erhalten. Der vorherige Referenzsatz muss vor dem Aufruf gesichert werden.
 
 ## Einrichtung
 

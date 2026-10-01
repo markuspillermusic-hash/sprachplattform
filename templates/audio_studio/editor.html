@@ -24,9 +24,9 @@
  <p id="studio-message" class="studio-message" role="status" aria-live="polite" hidden></p>
  <noscript><p>Der Audioeditor benötigt JavaScript. Aktivieren Sie JavaScript, um die Spuren zu bearbeiten.</p></noscript>
  <div class="studio-transport">
-  <button type="button" class="button button-primary" id="studio-play" disabled>▶ Abspielen</button>
+  <button type="button" class="button button-primary" id="studio-play" aria-keyshortcuts="Space" title="Leertaste: Abspielen / Pause" disabled>▶ Abspielen</button>
   <button type="button" class="button button-secondary" id="studio-stop" disabled>■ Zum Anfang</button>
-  <label>Abspielposition <input id="studio-position" type="number" min="0" max="1800" step="0.1" value="0"> s</label>
+  <label>Abspielposition <input id="studio-position" type="number" min="0" max="1800" step="0.01" value="0"> s</label>
   <output id="studio-time">00:00 / 00:00</output>
   <label>Zoom <input id="studio-zoom" type="range" min="2" max="60" value="12"></label>
   <button type="button" class="button button-quiet" id="studio-undo" disabled>Rückgängig</button>
@@ -34,14 +34,26 @@
  </div>
  <div class="studio-timeline" id="studio-timeline" aria-label="Drei Audiospuren"><p>Spuren werden geladen …</p></div>
  <p class="studio-hint">Die oberen Clip-Ecken nach innen ziehen: links zum Einblenden, rechts zum Ausblenden. Die Linien zeigen den Lautstärkeverlauf. An den seitlichen Rändern kürzen oder unten genaue Werte eingeben. Bei sehr schmalen Clips zuerst hineinzoomen. Überlappende Clips auf derselben Spur spielen gleichzeitig – zum Beispiel Regen, Schritte und eine Tür. Zeiten werden in Sekunden angegeben.</p>
+ <p class="studio-hint"><kbd>T</kbd> teilt den markierten Clip am roten Abspielcursor. <kbd>Leertaste</kbd> startet oder pausiert. Beim Schreiben in Eingabefeldern bleiben die Tasten frei.</p>
+ <div class="studio-mix-controls">
+  <label>Musik während der Sprache absenken <output id="studio-ducking-value" for="studio-ducking"></output><input id="studio-ducking" data-mix="music_duck_db" type="range" min="0" max="18" step="1" value="4"></label>
+  <label>Geräusche während der Sprache absenken <output id="studio-effects-ducking-value" for="studio-effects-ducking"></output><input id="studio-effects-ducking" data-mix="effects_duck_db" type="range" min="0" max="18" step="1" value="0"></label>
+  <label>Sprachkompressor <output id="studio-speech-compression-value" for="studio-speech-compression"></output><input id="studio-speech-compression" data-mix="compression" type="range" min="0" max="100" step="1" value="0"></label>
+ </div>
+ <details class="studio-mix-details"><summary>Attack und Release einstellen</summary>
+  <p class="studio-hint">Attack bestimmt, wie sanft die Absenkung einsetzt; Release, wie langsam Musik und Atmosphäre zurückkehren. Kurze Sprachpausen lassen die Hintergrundlautstärke ruhig. Die Kompressorzeiten steuern nur die Sprache.</p>
+  <div class="studio-mix-controls">
+   <label>Absenkung · Attack <output id="studio-duck-attack-value" for="studio-duck-attack"></output><input id="studio-duck-attack" data-mix="duck_attack_ms" type="range" min="50" max="2000" step="50" value="250"></label>
+   <label>Absenkung · Release <output id="studio-duck-release-value" for="studio-duck-release"></output><input id="studio-duck-release" data-mix="duck_release_ms" type="range" min="100" max="3000" step="50" value="900"></label>
+   <label>Kompressor · Attack <output id="studio-compressor-attack-value" for="studio-compressor-attack"></output><input id="studio-compressor-attack" data-mix="compressor_attack_ms" type="range" min="5" max="100" step="5" value="25"></label>
+   <label>Kompressor · Release <output id="studio-compressor-release-value" for="studio-compressor-release"></output><input id="studio-compressor-release" data-mix="compressor_release_ms" type="range" min="100" max="1500" step="50" value="350"></label>
+  </div>
+ </details>
  <div class="studio-options">
-  <label><input id="studio-ducking" type="checkbox" checked> Musik während der Sprache automatisch absenken</label>
-  <label><input id="studio-effects-ducking" type="checkbox"> Geräuschkulisse während der Sprache absenken</label>
-  <label><input id="studio-speech-compression" type="checkbox"> Sprache gleichmäßiger machen</label>
   <label>Gespeicherter Stand <select id="studio-history"><option value="">Stand auswählen …</option></select></label>
   <button type="button" class="button button-quiet" id="studio-reload">Aktuellen Stand neu laden</button>
  </div>
- <p class="studio-hint">Der Export begrenzt Pegelspitzen im Gesamtmix. Die zuschaltbare Sprachkompression zähmt laute Passagen und hebt den Sprachpegel etwas an. Stellen Sie sehr leise Aufnahmen zusätzlich über den Clippegel ein und halten Sie Musik und Geräusche im Hintergrund.</p>
+ <p class="studio-hint">0 schaltet den jeweiligen Regler aus. Der Sprachkompressor gleicht laute Sprachpassagen dosiert aus. Die Musik bleibt außerhalb dieses Kompressors. Ein Limiter fängt Pegelspitzen im Gesamtmix ab. Alle Regler werden gespeichert und beim Export berücksichtigt.</p>
  <section class="studio-inspector" aria-labelledby="studio-clip-title">
   <div><p class="eyebrow">Ausgewählter Clip</p><h2 id="studio-clip-title">Clip auf der Zeitachse auswählen</h2></div>
   <form id="studio-clip-form" hidden>
@@ -57,7 +69,7 @@
    <div class="studio-actions">
     <button type="submit" class="button button-secondary">Werte übernehmen</button>
     <button type="button" class="button button-quiet" id="studio-clip-play">Clip anhören</button>
-    <button type="button" class="button button-quiet" id="studio-split">An Abspielposition teilen</button>
+    <button type="button" class="button button-quiet" id="studio-split" aria-keyshortcuts="T">An Abspielposition teilen · T</button>
     <button type="button" class="button button-quiet" id="studio-duplicate">Duplizieren</button>
     <button type="button" class="button button-danger" id="studio-remove">Clip entfernen</button>
    </div>
@@ -76,6 +88,8 @@
    </form>
    <small>Mehrere Dateien auswählbar; sie werden an derselben Abspielposition eingefügt. MP3, WAV, OGG, FLAC oder M4A · je Datei maximal 50 MB und 30 Minuten. Originaldateien bleiben erhalten; Clips verwenden Ihre Schnittwerte.</small>
    <label class="studio-library-track">Dateien einfügen auf <select id="studio-add-track"><option value="auto">Passende Spur</option><option value="speech">Sprache</option><option value="music">Musik</option><option value="effects">Geräusche</option></select></label>
+   <label class="studio-library-track">Audiodateien anzeigen <select id="studio-library-filter"><option value="all">Alle Audioarten</option><option value="speech">Sprache</option><option value="music">Musik</option><option value="effects">Geräusche</option><option value="upload">Eigene Dateien</option></select></label>
+   <p id="studio-library-summary" class="studio-hint"></p>
    <div id="studio-library" class="studio-library"></div>
   </section>
   <section class="studio-panel" aria-labelledby="generate-title">

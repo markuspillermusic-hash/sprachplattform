@@ -16,6 +16,7 @@ from usage_control.models import UsageEvent
 from usage_control.services import commit_usage, reserve_usage, release_usage
 from .media import StudioError, audible_tracks, normalize, render_mix, stored_path
 from .models import StudioAsset, StudioConfiguration, StudioJob, StudioRevision, StudioSession
+from .mixing import MIX_RANGES, mix_settings
 from .providers import ElevenLabsAudioProvider, ProviderRejected, provider_ready
 
 TRACKS = ("speech", "music", "effects")
@@ -56,6 +57,10 @@ def validate_state(project, state):
         if type(value) is not bool:
             raise StudioError("Die Klangoptionen müssen ein- oder ausgeschaltet sein.")
         options[key] = value
+    if not isinstance(state.get("mix", {}), dict):
+        raise StudioError("Die Klangregler sind ungültig.")
+    mix = {key: number(value, *MIX_RANGES[key]) for key, value in mix_settings(state).items()
+           if key in MIX_RANGES}
     tracks = {}
     for name in TRACKS:
         track = state["tracks"].get(name)
@@ -81,7 +86,9 @@ def validate_state(project, state):
                 or clip["fade_in"] + clip["fade_out"] > length + .000001):
             raise StudioError("Schnittgrenzen und Fades müssen innerhalb des Clips liegen. Die Gesamtdauer darf 30 Minuten nicht überschreiten.")
         clips.append(clip)
-    return {"clips": clips, "tracks": tracks, "ducking": state["ducking"], **options}
+    return {"clips": clips, "tracks": tracks, "ducking": mix["music_duck_db"] > 0,
+            **options, "effects_ducking": mix["effects_duck_db"] > 0,
+            "speech_compression": mix["compression"] > 0, "mix": mix}
 
 
 @transaction.atomic
@@ -109,7 +116,7 @@ def create_asset(project, source, title, kind, source_audio=None):
     original = asset_folder(project) / f"{asset_id}-original{Path(source).suffix.lower()}"
     try:
         shutil.copyfile(source, original)
-        duration, peaks = normalize(original, target)
+        duration, peaks = normalize(original, target, target_peak=.6 if kind == "effects" else None)
         expires = timezone.now() + timedelta(days=settings.AUDIO_RETENTION_DAYS)
         if source_audio:
             expires = min(expires, source_audio.expires_at)

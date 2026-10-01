@@ -129,6 +129,23 @@ class StudioTests(StudioFixture):
         self.assertContains(response,"Optional: Hörspiel-Produktion")
         self.assertContains(response,"Hörspiel-Studio öffnen")
 
+    def test_mix_knobs_validate_and_survive_export_snapshots(self):
+        from audio_studio.mixing import mix_settings, MIX_RANGES
+        state = self.state()
+        self.assertEqual(mix_settings(state)["music_duck_db"], 4)
+        state["mix"] = {"music_duck_db": 6, "effects_duck_db": 0, "compression": 62,
+                        "duck_attack_ms": 400, "duck_release_ms": 1200}
+        saved = save_state(self.project, self.user, 0, state)
+        job = create_export(self.project, self.user, saved.revision, "wav")
+        self.assertEqual(job.input_data["state"]["mix"]["compression"], 62)
+        for key, (low, high) in MIX_RANGES.items():
+            for value in (low - 1, high + 1, True, float("nan"), "50"):
+                state["mix"] = {key: value}
+                with self.subTest(key=key, value=value), self.assertRaises(StudioError):
+                    validate_state(self.project, state)
+        state["mix"] = []
+        with self.assertRaises(StudioError): validate_state(self.project, state)
+
     def test_export_snapshot_and_revision_validation(self):
         session = save_state(self.project, self.user, 0, self.state())
         job = create_export(self.project, self.user, session.revision, "wav")
@@ -288,7 +305,7 @@ class AudioIntegrationTests(StudioFixture):
             values = samples[round(start*44100):round(end*44100)]
             return math.sqrt(sum(x*x for x in values)/len(values))
         self.assertAlmostEqual(job.asset.duration,6,places=2)
-        self.assertLess(rms(2.5,3.5), rms(1.2,1.8)*.35)
+        self.assertAlmostEqual(rms(2.5,3.5) / rms(1.2,1.8), 10 ** (-4/20), delta=.03)
         self.assertLess(rms(.05,.15), rms(1.2,1.8)*.2)
         self.assertGreater(rms(5.1,5.3), rms(4.5,4.8))
         self.assertLess(rms(5.9,5.99), rms(4.5,4.8)*.2)
@@ -331,11 +348,12 @@ class AudioIntegrationTests(StudioFixture):
                           "trim_start":0,"trim_end":4,"gain_db":0,"fade_in":0,"fade_out":0}]
         plain=self.render_samples(state,"plain.wav")
         state["speech_compression"]=True
+        state["mix"]={"compression":100}
         compressed=self.render_samples(state,"compressed.wav")
         def rms(samples,start,end):
             segment=samples[round(start*44100):round(end*44100)]
             return math.sqrt(sum(x*x for x in segment)/len(segment))
-        self.assertGreater(rms(compressed,.5,1.5),rms(plain,.5,1.5)*1.3)
+        self.assertGreater(rms(compressed,.5,1.5),rms(plain,.5,1.5)*1.2)
         ratio=lambda samples:rms(samples,2.5,3.5)/rms(samples,.5,1.5)
         self.assertLess(ratio(compressed),ratio(plain)*.7)
 
@@ -354,8 +372,51 @@ class AudioIntegrationTests(StudioFixture):
         def rms(samples):
             data=samples[round(1.5*44100):round(2.5*44100)]
             return math.sqrt(sum(x*x for x in data)/len(data))
-        self.assertAlmostEqual(rms(ducked)/rms(plain),.5,delta=.02)
+        self.assertAlmostEqual(rms(ducked)/rms(plain),10 ** (-2/20),delta=.02)
         self.assertAlmostEqual(rms(muted)/rms(plain),1,delta=.02)
+
+    def test_duck_attack_release_and_short_pauses_are_gentle_in_actual_export(self):
+        from audio_studio.media import speech_intervals
+        effects = self.upload_wav("Kulisse", 5)
+        speech = self.upload_wav("Stille Sprache", 1, amplitude=0)
+        state = empty_state()
+        state["mix"] = {"effects_duck_db": 6, "duck_attack_ms": 400, "duck_release_ms": 1000}
+        state["clips"] = [{"id":str(uuid.uuid4()),"asset_id":str(a.pk),"track":track,"start":start,
+                           "trim_start":0,"trim_end":end,"gain_db":0,"fade_in":0,"fade_out":0}
+                          for a,track,start,end in ((effects,"effects",0,5),(speech,"speech",1,1),
+                                                   (speech,"speech",2.5,1))]
+        self.assertEqual(speech_intervals(state), [[1, 3.5]])
+        samples = self.render_samples(state, "natural-duck.wav")
+        def rms(start, end):
+            data = samples[round(start*44100):round(end*44100)]
+            return math.sqrt(sum(x*x for x in data)/len(data))
+        base = rms(.2,.4)
+        self.assertAlmostEqual(rms(1.5,1.7)/base, 10 ** (-6/20), delta=.02)
+        self.assertAlmostEqual(rms(2.2,2.3)/base, 10 ** (-6/20), delta=.02)
+        self.assertGreater(rms(.8,.9), rms(1.5,1.7))
+        self.assertLess(rms(.8,.9), base)
+        self.assertLess(rms(3.6,3.7), rms(4.2,4.3))
+        self.assertAlmostEqual(rms(4.6,4.8)/base, 1, delta=.02)
+
+    def test_speech_compressor_does_not_compress_solo_music(self):
+        music = self.upload_wav("Music", 2, amplitude=.4)
+        state = empty_state()
+        state["tracks"]["music"]["solo"] = True
+        state["clips"] = [{"id":str(uuid.uuid4()),"asset_id":str(music.pk),"track":"music","start":0,
+                           "trim_start":0,"trim_end":2,"gain_db":0,"fade_in":0,"fade_out":0}]
+        plain = self.render_samples(state, "music-no-compression.wav")
+        state["mix"] = {"compression": 100}
+        compressed = self.render_samples(state, "music-with-speech-compression.wav")
+        self.assertEqual(plain, compressed)
+
+    def test_generated_quiet_effects_get_audible_peaks_and_keep_the_original(self):
+        from audio_studio.services import create_asset
+        source = Path(self.folder.name) / "quiet-effect.wav"
+        source.write_bytes(wav_bytes(2, amplitude=.02))
+        asset = create_asset(self.project, source, "Leises KI-Geräusch", "effects")
+        self.assertGreater(max(asset.waveform), .5)
+        self.assertLess(max(asset.waveform), .7)
+        self.assertEqual(Path(asset.original_path).read_bytes(), source.read_bytes())
 
     def test_provider_result_normalized_and_duplicate_delivery_ignored(self):
         from audio_studio.media import run

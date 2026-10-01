@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 from django.conf import settings
+from .mixing import mix_settings
 
 
 class StudioError(ValueError):
@@ -59,11 +60,18 @@ def waveform(path):
     return [round(min(1, max(samples[i:i + step])), 4) for i in range(0, len(samples), step)]
 
 
-def normalize(source, target):
+def normalize(source, target, *, target_peak=None):
     probe(source)
-    run(["ffmpeg", "-v", "error", *input_options(source), "-vn", "-map_metadata", "-1",
-         "-t", str(settings.AUDIO_STUDIO_MAX_DURATION), "-ar", "44100", "-ac", "2",
-         "-c:a", "libmp3lame", "-b:a", "192k", "-y", str(target)])
+    command = ["ffmpeg", "-v", "error", *input_options(source), "-vn", "-map_metadata", "-1",
+               "-t", str(settings.AUDIO_STUDIO_MAX_DURATION), "-ar", "44100", "-ac", "2"]
+    if target_peak:
+        data = run(["ffmpeg", "-v", "error", *input_options(source), "-vn", "-t",
+                    str(settings.AUDIO_STUDIO_MAX_DURATION), "-ac", "2", "-ar", "44100", "-f", "f32le", "pipe:1"])
+        peak = max((abs(x[0]) for x in struct.iter_unpack("<f", data)), default=0)
+        # Leave silence untouched; never boost more than 30 dB.
+        factor = min(10 ** (30 / 20), target_peak / peak) if peak > .0001 else 1
+        command += ["-af", f"volume={factor:.8f},alimiter=limit=0.7:level=0:latency=1"]
+    run(command + ["-c:a", "libmp3lame", "-b:a", "192k", "-y", str(target)])
     return probe(target), waveform(target)
 
 
@@ -78,7 +86,7 @@ def speech_intervals(state):
                        for c in state["clips"] if c["track"] == "speech")
     result = []
     for start, end in intervals:
-        if result and start <= result[-1][1] + 0.3:
+        if result and start <= result[-1][1] + mix_settings(state)["duck_release_ms"] / 1000:
             result[-1][1] = max(result[-1][1], end)
         else:
             result.append([start, end])
@@ -86,6 +94,7 @@ def speech_intervals(state):
 
 
 def render_mix(state, assets, target, output_format):
+    mix = mix_settings(state)
     audible = audible_tracks(state)
     clips = [c for c in state["clips"] if c["track"] in audible]
     if not clips:
@@ -112,23 +121,27 @@ def render_mix(state, assets, target, output_format):
             continue
         f = "".join(inputs) + f"amix=inputs={len(inputs)}:normalize=0:dropout_transition=0,apad,atrim=duration={duration},"
         f += f"volume={10 ** (state['tracks'][track]['gain_db'] / 20):.8f}"
-        if track == "speech" and state.get("speech_compression", False):
-            f += ",acompressor=threshold=0.12589254:ratio=3:attack=10:release=150:knee=2:makeup=1.41253754:link=maximum:detection=peak"
-        duck = ((track == "music" and state["ducking"])
-                or (track == "effects" and state.get("effects_ducking", False)))
+        if track == "speech" and mix["compression"]:
+            amount = mix["compression"] / 100
+            f += (f",acompressor=threshold=0.12589254:ratio={1 + 2 * amount:.6f}:"
+                  f"attack={mix['compressor_attack_ms']}:release={mix['compressor_release_ms']}:"
+                  f"knee=2:makeup={10 ** (2 * amount / 20):.8f}:link=maximum:detection=rms")
+        duck_db = mix["music_duck_db"] if track == "music" else mix["effects_duck_db"] if track == "effects" else 0
+        duck = duck_db > 0
         if duck and "speech" in audible:
-            envelopes = [f"min(1,min(max(0,(t-{start - .15:.6f})/0.15),max(0,({end + .15:.6f}-t)/0.15)))"
+            attack, release = mix["duck_attack_ms"] / 1000, mix["duck_release_ms"] / 1000
+            envelopes = [f"min(1,min(max(0,(t-{start - attack:.6f})/{attack}),max(0,({end + release:.6f}-t)/{release})))"
                          for start, end in speech_intervals(state)]
             if envelopes:
                 envelope = envelopes[0]
                 for expression in envelopes[1:]:
                     envelope = f"max({envelope},{expression})"
-                reduction = 0.75 if track == "music" else 0.5
-                f += f",volume='1-{reduction}*({envelope})':eval=frame"
+                smooth = f"(({envelope})*({envelope})*(3-2*({envelope})))"
+                f += f",volume='pow(10,-{duck_db}*{smooth}/20)':eval=frame"
         filters.append(f + f"[{track}]")
         output_labels.append(f"[{track}]")
     filters.append("".join(output_labels) + f"amix=inputs={len(output_labels)}:normalize=0:dropout_transition=0,"
-                   "volume=0.8,alimiter=limit=0.95:level=0:latency=1[out]")
+                   "volume=0.8,alimiter=limit=0.95:level=0:attack=5:release=250:latency=1[out]")
     command += ["-filter_complex", ";".join(filters), "-map", "[out]", "-t", str(duration),
                 "-map_metadata", "-1"]
     command += (["-c:a", "pcm_s16le"] if output_format == "wav" else ["-c:a", "libmp3lame", "-b:a", "192k"])

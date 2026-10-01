@@ -34,7 +34,7 @@
 .studio-clip { position: absolute; height: 62px; border: 1px solid var(--track-color); border-radius: .45rem; background: var(--track-bg); color: var(--track-color); cursor: grab; touch-action: none; overflow: hidden; padding: 0; text-align: left; }
 .studio-clip.is-selected { outline: 3px solid var(--track-color); outline-offset: 2px; z-index: 1; }
 .studio-clip.is-missing { background: #f5d8d8; color: #9c2929; border-color: #9c2929; }
-.studio-clip canvas { position: absolute; left: 0; top: 22px; width: 100%; height: 38px; pointer-events: none; }
+.studio-clip canvas { position: absolute; left: 0; top: 22px; height: 38px; max-width: none; pointer-events: none; }
 .studio-clip-title { display: block; padding: .3rem 1.2rem; font-size: .7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .studio-trim-handle { position: absolute; top: 18px; bottom: 0; width: 7px; background: var(--track-color); opacity: .3; cursor: ew-resize; }
 .studio-trim-left { left: 0; }.studio-trim-right { right: 0; }
@@ -51,6 +51,12 @@
 .studio-hint { color: var(--muted); font-size: .85rem; line-height: 1.5; }
 .studio-options { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; margin: 1rem 0; }
 .studio-options > label:has(input[type=checkbox]) { display: flex; align-items: center; }
+.studio-mix-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 1rem; margin: 1rem 0; }
+.studio-mix-controls label { padding: .85rem; background: var(--surface); border: 1px solid var(--line); border-radius: .65rem; }
+.studio-mix-controls output { color: var(--brand); font-variant-numeric: tabular-nums; }
+.studio-mix-controls input { width: 100%; padding: 0; accent-color: var(--brand); }
+.studio-mix-details summary { cursor: pointer; font-weight: 650; }
+.studio kbd { padding: .1rem .3rem; border: 1px solid var(--line); border-radius: .25rem; background: var(--surface); }
 .studio-inspector, .studio-panel { padding: 1.3rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
 .studio h2 { font-size: 1.25rem; margin: .4rem 0 1rem; }
 .studio-fields { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .8rem; }
