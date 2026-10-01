@@ -103,7 +103,7 @@ class AudioLifecycleTests(TestCase):
         self.assertTrue(all(Path(a.file_path).is_file() for a in duplicate.studio_assets.all()))
         response = self.client.get(reverse("generation:play", args=[speech.pk]))
         self.assertEqual(response.status_code, 200)
-        response.close()
+        self.assertEqual(b"".join(response.streaming_content), b"audio")
 
     def test_delete_preserves_all_usage_and_removes_content_and_files(self):
         before = _period_usage(self.user, timezone.localdate())
