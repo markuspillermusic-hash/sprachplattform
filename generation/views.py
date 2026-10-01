@@ -3,6 +3,7 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -12,6 +13,7 @@ from usage_control.services import release_usage
 from tts.providers import tts_provider_is_configured
 
 from projects.views import owned_project, visible_projects
+from projects.models import Project
 
 from .models import AudioAsset, GenerationJob
 from .services import (
@@ -53,12 +55,17 @@ def start_generation(request, project_id):
 
 @require_POST
 @login_required
+@transaction.atomic
 def retry_generation(request, job_id):
     job = get_object_or_404(
         GenerationJob,
         pk=job_id,
         version__project__in=visible_projects(request.user),
     )
+    # Serialize retries against project deletion and duplication, just like new jobs.
+    get_object_or_404(Project.objects.select_for_update(), pk=job.version.project_id)
+    job = get_object_or_404(GenerationJob.objects.select_for_update(), pk=job.pk,
+                          version__project__in=visible_projects(request.user))
     if job.status != GenerationJob.Status.FAILED:
         messages.error(request, "Nur fehlgeschlagene Aufträge können erneut gestartet werden.")
     else:
@@ -71,7 +78,7 @@ def retry_generation(request, job_id):
         job.error_message = ""
         job.finished_at = None
         job.save(update_fields=["status", "error_message", "finished_at"])
-        generate_audio.delay(str(job.pk))
+        transaction.on_commit(lambda: generate_audio.delay(str(job.pk)))
         messages.success(request, "Fehlgeschlagene Teile werden erneut versucht.")
     editor_url = reverse("projects:editor", args=[job.version.project_id])
     return redirect(f"{editor_url}#audio-output")

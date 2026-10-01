@@ -27,6 +27,7 @@ from .forms import (
     user_favorite_voice_ids,
 )
 from .models import Project, ScriptSegment, Speaker
+from .lifecycle import ProjectContentError, delete_project
 from .services import duplicate_project, ensure_demo_projects, move_segment, next_position
 
 
@@ -255,8 +256,12 @@ def project_autosave(request, project_id):
 @login_required
 def project_duplicate(request, project_id):
     project = owned_project(request, project_id)
-    copied = duplicate_project(project, owner=request.user)
-    messages.success(request, "Das Projekt wurde vollständig dupliziert.")
+    try:
+        copied = duplicate_project(project, owner=request.user)
+    except ProjectContentError as exc:
+        messages.error(request, str(exc))
+        return redirect("projects:list")
+    messages.success(request, "Der Hörtext wurde mit allen verfügbaren Audiodateien und dem gespeicherten Hörspiel-Schnitt dupliziert.")
     return redirect("projects:editor", project_id=copied.pk)
 
 
@@ -264,7 +269,11 @@ def project_duplicate(request, project_id):
 @login_required
 def project_delete(request, project_id):
     project = owned_project(request, project_id)
-    project.delete()
+    try:
+        delete_project(project)
+    except ProjectContentError as exc:
+        messages.error(request, str(exc))
+        return redirect("projects:list")
     messages.success(request, "Das Projekt wurde gelöscht.")
     return redirect("projects:list")
 

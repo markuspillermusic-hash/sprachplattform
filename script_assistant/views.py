@@ -109,7 +109,12 @@ def conversation_discard(request, conversation_id):
     conversation.status = AssistantConversation.Status.DISCARDED
     conversation.save(update_fields=["status", "updated_at"])
     if started_from_empty and not project.segments.exists():
-        project.delete()
+        from projects.lifecycle import ProjectContentError, delete_project
+        try:
+            delete_project(project)
+        except ProjectContentError as exc:
+            messages.error(request, str(exc))
+            return redirect("projects:editor", project_id=project.pk)
         messages.info(request, "Der KI-Entwurf wurde verworfen.")
         return redirect("projects:list")
     messages.info(request, "Der KI-Vorschlag wurde verworfen; Ihr bisheriger Hörtext bleibt unverändert.")

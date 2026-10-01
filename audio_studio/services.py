@@ -93,6 +93,7 @@ def validate_state(project, state):
 
 @transaction.atomic
 def save_state(project, user, revision, state):
+    Project.objects.select_for_update().get(pk=project.pk)
     session, _ = StudioSession.objects.get_or_create(project=project)
     session = StudioSession.objects.select_for_update().get(pk=session.pk)
     if type(revision) is not int or revision != session.revision:

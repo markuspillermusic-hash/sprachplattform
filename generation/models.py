@@ -32,7 +32,7 @@ class GenerationJob(models.Model):
         CANCELLED = "cancelled", "Abgebrochen"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    version = models.ForeignKey(ProjectVersion, on_delete=models.PROTECT, related_name="jobs")
+    version = models.ForeignKey(ProjectVersion, on_delete=models.SET_NULL, related_name="jobs", null=True, blank=True)
     requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="generation_jobs")
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
     provider = models.CharField(max_length=40)
@@ -49,6 +49,7 @@ class GenerationJob(models.Model):
         blank=True,
     )
     provider_request_ids = models.JSONField(default=list)
+    is_copy = models.BooleanField(default=False, editable=False)
     error_message = models.CharField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)

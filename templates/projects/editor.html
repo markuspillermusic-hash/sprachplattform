@@ -37,6 +37,7 @@
         </div>
         <div class="featured-job-main">
           <span class="version-label">Version {{ latest_job.version.number }}</span>
+          {% if latest_job.is_copy %}<small>Übernommene Audiokopie · keine neue Generierung</small>{% endif %}
           <h3 data-job-title>
             {% if latest_job.status == 'queued' %}Die Audioerzeugung startet gleich
             {% elif latest_job.status == 'running' %}Ihre Audiodatei wird erstellt
@@ -99,7 +100,7 @@
           {% for job in latest_jobs|slice:"1:" %}
             <li>
               <div><strong>Version {{ job.version.number }}</strong><span class="status-badge status-{{ job.status }}">{{ job.get_status_display }}</span></div>
-              <small>{{ job.character_count }} Zeichen · ca. {{ job.estimated_cost_eur }} € Tarifwert</small>
+              <small>{% if job.is_copy %}Übernommene Audiokopie · keine neue Generierung{% else %}{{ job.character_count }} Zeichen · ca. {{ job.estimated_cost_eur }} € Tarifwert{% endif %}</small>
               {% if job.status == 'succeeded' %}
                 <audio controls preload="metadata" aria-label="Audioversion {{ job.version.number }}" src="{% url 'generation:play' job.audio_asset.id %}"></audio>
                 <a class="button button-secondary" href="{% url 'generation:download' job.audio_asset.id %}">MP3 herunterladen</a>

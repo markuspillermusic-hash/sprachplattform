@@ -143,7 +143,8 @@ class GenerationPipelineTests(TestCase):
         part.save(update_fields=["status"])
         self.client.force_login(self.user)
 
-        response = self.client.post(reverse("generation:retry", args=[job.pk]))
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(reverse("generation:retry", args=[job.pk]))
 
         self.assertEqual(response.status_code, 302)
         job.refresh_from_db()

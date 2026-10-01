@@ -106,7 +106,7 @@ class StudioJob(models.Model):
         FAILED = "failed", "Fehlgeschlagen"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project = models.ForeignKey("projects.Project", on_delete=models.CASCADE, related_name="studio_jobs")
+    project = models.ForeignKey("projects.Project", on_delete=models.SET_NULL, related_name="studio_jobs", null=True, blank=True)
     requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     kind = models.CharField(max_length=16, choices=[("music", "Musik"), ("effects", "Geräusche"), ("export", "Export")])
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)

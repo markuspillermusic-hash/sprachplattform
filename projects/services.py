@@ -276,10 +276,10 @@ def ensure_demo_projects(user, *, force=False):
 
 
 @transaction.atomic
-def duplicate_project(project, owner=None):
+def _duplicate_script(project, owner=None):
     duplicate = Project.objects.create(
         owner=owner or project.owner,
-        title=f"{project.title} – Kopie",
+        title=f"{project.title[:152]} – Kopie",
         language=project.language,
         level=project.level,
     )
@@ -311,6 +311,11 @@ def duplicate_project(project, owner=None):
         ]
     )
     return duplicate
+
+
+def duplicate_project(project, owner=None):
+    from .lifecycle import duplicate_project as duplicate_with_audio
+    return duplicate_with_audio(project, owner=owner)
 
 
 def next_position(queryset):
