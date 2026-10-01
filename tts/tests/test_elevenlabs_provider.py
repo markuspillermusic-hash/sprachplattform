@@ -182,7 +182,7 @@ class ElevenLabsProviderTests(SimpleTestCase):
         self.assertEqual(estimate.characters, 250)
         self.assertEqual(estimate.estimated_cost_eur, Decimal("0.0500"))
 
-    def test_connection_check_verifies_voices_and_selected_model_without_generation(self):
+    def test_connection_check_verifies_selected_model_without_voice_read_permission(self):
         captured = []
 
         def handler(request):
@@ -193,7 +193,7 @@ class ElevenLabsProviderTests(SimpleTestCase):
         provider = self.provider_with_handler(handler)
 
         self.assertTrue(provider.test_connection())
-        self.assertEqual(captured, [("GET", "/v2/voices"), ("GET", "/v1/models")])
+        self.assertEqual(captured, [("GET", "/v1/models")])
 
     def test_v4_sends_continuity_and_keeps_credit_accounting(self):
         captured = {}

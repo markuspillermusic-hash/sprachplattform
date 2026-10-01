@@ -18,6 +18,8 @@ Für Music v2.5 nutzt die API `output_format=auto`, damit sie die passende MP3-Q
 
 Vor der Umstellung wurden die echten Schlüssel durch Modellabfragen geprüft und je ein kurzer Auftrag mit Eleven v4, Music v2.5 und GPT-6.1 Sol erfolgreich ausgeführt. Audio wurde mit ffprobe überprüft und die Textantwort gegen das Plattform-Schema validiert. Die Testnutzung ist im normalen Verbrauchsprotokoll gebucht. Diese technische Prüfung ersetzt keinen umfangreichen Hörvergleich aller Sprachen und Stimmen.
 
+Die administrative ElevenLabs-Verbindungsprüfung fragt ausschließlich `/v1/models` ab und kontrolliert das gewählte Sprachmodell. Sie benötigt keine Kontostimmen-Leseberechtigung und erzeugt kein Audio. Der bestehende Produktionsschlüssel erlaubt die echten Generierungsaufrufe und Modellabfragen, lehnt `/v2/voices` jedoch mit HTTP 401 ab. Ein künftiger Kontostimmen-Import benötigt weiterhin die entsprechende Berechtigung. Die Modellprüfung allein bestätigt keine Schreibberechtigung; dafür wurden die kurzen echten Aufträge ausgeführt.
+
 Quellen:
 
 - [OpenAI: Modelle](https://developers.openai.com/api/docs/models)

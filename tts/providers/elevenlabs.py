@@ -148,23 +148,19 @@ class ElevenLabsProvider(TTSProvider):
 
     def test_connection(self):
         try:
-            response = self.client.get(
-                "/v2/voices",
-                params={"page_size": 1, "include_total_count": "false"},
-                headers=self._headers(),
-            )
+            response = self.client.get("/v1/models", headers=self._headers())
         except httpx.TimeoutException:
             raise ProviderTemporaryError("Die ElevenLabs-Verbindung hat zu lange gedauert.") from None
         except httpx.RequestError:
             raise ProviderTemporaryError("ElevenLabs ist derzeit nicht erreichbar.") from None
         self._raise_safe(response)
         try:
-            response = self.client.get("/v1/models", headers=self._headers())
-        except httpx.RequestError:
-            raise ProviderTemporaryError("Die ElevenLabs-Modellliste ist derzeit nicht erreichbar.") from None
-        self._raise_safe(response)
-        if not any(model.get("model_id") == self.model_id and model.get("can_do_text_to_speech")
-                   for model in response.json()):
+            models = response.json()
+        except ValueError:
+            raise ProviderError("Die ElevenLabs-Modellliste konnte nicht gelesen werden.") from None
+        if not isinstance(models, list) or not any(
+                isinstance(model, dict) and model.get("model_id") == self.model_id
+                and model.get("can_do_text_to_speech") for model in models):
             raise ProviderConfigurationError("Das gewählte Sprachmodell ist über diesen Zugang nicht verfügbar.")
         return True
 
