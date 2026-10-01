@@ -55,10 +55,42 @@ def form_error_summary(form):
 def project_list(request):
     ensure_demo_projects(request.user)
     projects = visible_projects(request.user)
-    if not (request.user.is_staff or request.user.role == request.user.Role.ADMIN):
+    admin_view = request.user.is_staff or request.user.role == request.user.Role.ADMIN
+    owner_filter, content_filter, owner_options = "mine", "all", []
+    if admin_view:
+        owners = projects.order_by("owner__username").values(
+            "owner_id", "owner__username", "owner__first_name", "owner__last_name"
+        ).distinct()
+        for owner in owners:
+            full_name = f"{owner['owner__first_name']} {owner['owner__last_name']}".strip()
+            username = owner["owner__username"]
+            owner_options.append({"id": str(owner["owner_id"]),
+                                  "label": f"{full_name} ({username})" if full_name else username})
+        owner_filter = request.GET.get("owner", "mine")
+        allowed_owners = {"mine", "all", "other", *(owner["id"] for owner in owner_options)}
+        if owner_filter not in allowed_owners:
+            owner_filter = "mine"
+        content_filter = request.GET.get("content", "text")
+        if content_filter not in ("text", "all", "demo"):
+            content_filter = "text"
+        if owner_filter == "mine":
+            projects = projects.filter(owner=request.user)
+        elif owner_filter == "other":
+            projects = projects.exclude(owner=request.user)
+        elif owner_filter != "all":
+            projects = projects.filter(owner_id=owner_filter)
+        if content_filter == "text":
+            projects = projects.filter(demo_key="")
+        elif content_filter == "demo":
+            projects = projects.exclude(demo_key="")
+    else:
         projects = projects.filter(owner=request.user)
-    projects = projects.prefetch_related("segments", "speakers")
-    return render(request, "projects/project_list.html", {"projects": projects})
+    projects = projects.select_related("owner").prefetch_related("segments", "speakers")
+    return render(request, "projects/project_list.html", {
+        "projects": projects, "admin_view": admin_view, "owner_options": owner_options,
+        "owner_filter": owner_filter, "content_filter": content_filter,
+        "project_count": projects.count(),
+    })
 
 
 @login_required

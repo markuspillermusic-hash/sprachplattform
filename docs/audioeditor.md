@@ -1,6 +1,8 @@
 # Optionale Hörspiel-Produktion mit drei Spuren
 
-Im Hörtext den Bereich **Optional: Hörspiel-Produktion** aufklappen und **Hörspiel-Studio öffnen** wählen. Reine Sprachaufnahmen werden weiterhin über die normale Audioausgabe erzeugt und heruntergeladen; das Studio ist ein zusätzliches Werkzeug.
+Unter **Meine Hörtexte** auf der gewünschten Hörtext-Karte **Hörspiel-Studio öffnen** wählen. Derselbe Einstieg steht auch oben im Skripteditor; der Bereich **Optional: Hörspiel-Produktion** unter der Audioausgabe enthält weitere Hinweise. Reine Sprachaufnahmen werden weiterhin über die normale Audioausgabe erzeugt und heruntergeladen; das Studio ist ein zusätzliches Werkzeug.
+
+Admins sehen unter **Meine Hörtexte** zunächst ihre eigenen Hörtexte ohne Demos. Mit **Hörtexte von** lassen sich alle Nutzer, andere Nutzer oder ein einzelner Nutzer auswählen. Unter **Demos** können diese ausgeblendet, mit angezeigt oder allein angezeigt werden. **Filter anwenden** übernimmt die Auswahl; **Zurücksetzen** führt zur Standardansicht zurück. Die Hörtext-Karten zeigen für Admins den Besitzer. Normale Nutzer sehen weiterhin ihre eigenen Hörtexte einschließlich ihrer Demos.
 
 ## Bedienung
 

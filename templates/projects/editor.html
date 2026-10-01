@@ -4,7 +4,10 @@
 {{ voice_preview_data|json_script:"voice-preview-data" }}
 <section class="editor-shell" aria-labelledby="editor-title">
   <header class="editor-heading">
-    <a class="back-link" href="{% url 'projects:list' %}">← Alle Hörtexte</a>
+    <div class="editor-navigation">
+      <a class="back-link" href="{% url 'projects:list' %}">← Meine Hörtexte</a>
+      <a class="button button-secondary" href="{% url 'audio_studio:editor' project.id %}">Hörspiel-Studio öffnen →</a>
+    </div>
     <form class="project-meta" method="post" action="{% url 'projects:autosave' project.id %}" data-autosave>
       {% csrf_token %}
       <div class="field field-title"><label for="{{ project_form.title.id_for_label }}">Projekttitel</label>{{ project_form.title }}</div>

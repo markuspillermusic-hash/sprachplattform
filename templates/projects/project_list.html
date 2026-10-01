@@ -3,9 +3,34 @@
 {% block content %}
 <section class="page-shell" aria-labelledby="projects-title">
   <header class="page-heading">
-    <div><p class="eyebrow">Arbeitsbereich</p><h1 id="projects-title">Meine Hörtexte</h1><p class="lead">Dialoge und Hörtexte bleiben nur in Ihrem persönlichen Bereich sichtbar. Die markierten Demos können Sie frei verändern oder duplizieren.</p></div>
+    <div><p class="eyebrow">Arbeitsbereich</p><h1 id="projects-title">Meine Hörtexte</h1><p class="lead">{% if admin_view %}Standardmäßig sehen Sie Ihre eigenen Hörtexte ohne Demos. Als Admin können Sie auch die Hörtexte anderer Nutzer auswählen.{% else %}Dialoge und Hörtexte bleiben in Ihrem persönlichen Bereich. Die markierten Demos können Sie frei verändern oder duplizieren.{% endif %}</p></div>
     <a class="button button-primary" href="{% url 'projects:create' %}">Neuen Hörtext erstellen</a>
   </header>
+
+  {% if admin_view %}
+    <form class="project-filters" method="get" action="{% url 'projects:list' %}" aria-label="Hörtexte filtern">
+      <div class="field">
+        <label for="project-owner-filter">Hörtexte von</label>
+        <select id="project-owner-filter" name="owner">
+          <option value="mine"{% if owner_filter == 'mine' %} selected{% endif %}>Mir selbst</option>
+          <option value="all"{% if owner_filter == 'all' %} selected{% endif %}>Allen Nutzern</option>
+          <option value="other"{% if owner_filter == 'other' %} selected{% endif %}>Anderen Nutzern</option>
+          {% for owner in owner_options %}<option value="{{ owner.id }}"{% if owner_filter == owner.id %} selected{% endif %}>{{ owner.label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="project-content-filter">Demos</label>
+        <select id="project-content-filter" name="content">
+          <option value="text"{% if content_filter == 'text' %} selected{% endif %}>Ausblenden</option>
+          <option value="all"{% if content_filter == 'all' %} selected{% endif %}>Mit anzeigen</option>
+          <option value="demo"{% if content_filter == 'demo' %} selected{% endif %}>Nur Demos</option>
+        </select>
+      </div>
+      <button class="button button-secondary" type="submit">Filter anwenden</button>
+      <a class="button button-quiet" href="{% url 'projects:list' %}">Zurücksetzen</a>
+      <span class="project-filter-count" role="status">{{ project_count }} Hörtext{% if project_count != 1 %}e{% endif %}</span>
+    </form>
+  {% endif %}
 
   {% if projects %}
     <ul class="project-grid">
@@ -16,8 +41,10 @@
             <h2>{{ project.title }}{% if project.demo_key %} <span class="demo-badge">Demo</span>{% endif %}</h2>
             <span>{{ project.segments.count }} Beiträge · {{ project.character_count }} Zeichen</span>
             <span>Bearbeitet {{ project.updated_at|date:"d.m.Y, H:i" }}</span>
+            {% if admin_view %}<span>Von {% if project.owner.get_full_name %}{{ project.owner.get_full_name }} · {% endif %}{{ project.owner.username }}</span>{% endif %}
           </a>
           <div class="card-actions">
+            <a class="button button-secondary" href="{% url 'audio_studio:editor' project.id %}">Hörspiel-Studio öffnen →</a>
             <form method="post" action="{% url 'projects:duplicate' project.id %}">{% csrf_token %}<button class="button button-quiet" type="submit">Duplizieren</button></form>
             <form method="post" action="{% url 'projects:delete' project.id %}" data-confirm="Dieses Projekt wirklich löschen?">{% csrf_token %}<button class="button button-danger" type="submit">Löschen</button></form>
           </div>
@@ -27,9 +54,15 @@
   {% else %}
     <div class="empty-state">
       <span class="empty-icon" aria-hidden="true">＋</span>
-      <h2>Ihr erster Hörtext beginnt hier.</h2>
-      <p>Starten Sie mit Titel und Zielsprache. Sprecher und einzelne Beiträge folgen direkt im Editor.</p>
-      <a class="button button-primary" href="{% url 'projects:create' %}">Ersten Hörtext anlegen</a>
+      {% if admin_view %}
+        <h2>Keine Hörtexte für diese Auswahl.</h2>
+        <p>Wählen Sie einen anderen Nutzer oder blenden Sie die Demos ein.</p>
+        <a class="button button-secondary" href="{% url 'projects:list' %}?owner={{ owner_filter|urlencode }}&amp;content=all">Demos mit anzeigen</a>
+      {% else %}
+        <h2>Ihr erster Hörtext beginnt hier.</h2>
+        <p>Starten Sie mit Titel und Zielsprache. Sprecher und einzelne Beiträge folgen direkt im Editor.</p>
+        <a class="button button-primary" href="{% url 'projects:create' %}">Ersten Hörtext anlegen</a>
+      {% endif %}
     </div>
   {% endif %}
 </section>
