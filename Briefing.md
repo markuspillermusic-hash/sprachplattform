@@ -729,6 +729,8 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 
 ## 22. Aktueller Stand
 
+**Hörspiel-Assistent 1. Oktober 2026:** Der integrierte, optionale Produktionsablauf ist öffentlich aktiv. Einstieg: Meine Hörtexte → Hörspiel mit Assistent erstellen, direkt `/produktion/neu/`. Gespeicherte Phasen: Skriptentwurf und Korrekturen, explizite Skriptfreigabe, Sprachfassung, Freigabe für Klangplanung, editierbarer Klangplan, Musik-/Geräuscherzeugung und Studiomischung, Prüfung und MP3-/WAV-Export. Bestehende Projekte können den Ablauf ebenfalls verwenden. 201 Tests im Produktionsimage und öffentlicher Ablauf mit echten OpenAI-/ElevenLabs-Audios erfolgreich; vollständig wiederverwendete Sprachabschnitte benötigen keine Anbieterbuchung. Zentrale Anleitung: `production/AGENT_GUIDE.md`; Details: `docs/hoerspiel-assistent.md`. Arbeitsblätter bleiben ein möglicher späterer Ausbau.
+
 **Projektkorrekturen 1. Oktober 2026:** Vollständige Audiokopien mit eigenständigen Dateien, gespeicherten Schnittständen und verfügbaren Sprachversionen sind öffentlich aktiv. Löschen entfernt Inhalte und eigene Dateien, erhält aber Sprach-, Musik- und Geräuschverbrauch. Laufende Aufträge verhindern Kopieren und Löschen. 179 Tests bestehen im Produktionsimage; der öffentliche Ablauf mit elf Demoaudios, Löschen des Originals und anschließendem Celery-WAV-Export der Kopie ist erfolgreich. Details: `docs/projekte-kopieren-und-loeschen.md`.
 
 **Modellstand 1. Oktober 2026:** Eleven v4 und Music v2.5 sind für die bestehenden Schnittstellen geprüft und implementiert. GPT-6 Luna bleibt die sparsame Standardwahl; GPT-6.1 Sol ersetzt die höhere Qualitätsstufe. Geräuschmodell v2 ist aktuell. Das Update ist öffentlich auf dem Server aktiv. Echte Modellaufrufe mit den produktiven Schlüsseln sowie 167 Tests lokal und im Produktionsimage sind erfolgreich; die angepasste Verbindungsprüfung wurde zusätzlich mit 53 betroffenen Tests lokal und auf dem Server geprüft. Der öffentliche Drei-Spur-Ablauf einschließlich WAV-Export ist erfolgreich; Stimmen/Favoriten und historische Modellzuordnungen werden berücksichtigt. Details: `docs/api-modellstand.md`. Diese Ergänzung ist aktueller als die folgenden Pilotangaben.
@@ -752,6 +754,8 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 
 ## 23. Nächste konkrete Aufgabe
 
+**Nach der Assistenten-Veröffentlichung:** Den gespeicherten Hörspielablauf an Unterrichtsaufträgen erproben und insbesondere Rollen, Verständlichkeit und Geräuschzeitpunkte pädagogisch beurteilen. Der integrierte Assistent ist umgesetzt; Lehrkräfte benötigen keinen lokalen Skill. Ein Arbeitsblattgenerator oder externer Browseragent ist weiterhin kein Bestandteil der veröffentlichten Funktion.
+
 **Neuer Vorschlag zur Abstimmung:** Einen Agentenpilot an einem konkreten Unterrichtsauftrag erproben: Browserbedienung der Sprachplattform für Hörspielproduktion und frei gestaltbare, editierbare Begleitmaterialien. Didaktische Qualität, Lösungen, Layout und Bearbeitbarkeit an Unterrichtsbeispielen beurteilen. Arbeitsblattgenerator und Agentenverfahren sind noch nicht implementiert. Die pädagogischen Hörvergleiche bleiben offen.
 
 **Aktuelle nächste Aufgabe (1. Oktober 2026):** Hörvergleiche mit Eleven v4 in den Kernsprachen durchführen und Regieanweisungen/Stimmkonstanz pädagogisch beurteilen. Die folgenden Integrationspilot-Angaben dokumentieren den früheren Stand.
@@ -769,6 +773,8 @@ Ein neuer Arbeitschat soll:
 7. danach den LLM-Anbieter für Phase 5 auswählen oder den Assistenten weiter deaktiviert lassen.
 
 ## 24. Entscheidungsprotokoll
+
+- **2026-10-01:** Integrierten Hörspiel-Assistenten nach ausdrücklichem Auftrag umgesetzt. Serverseitig gesteuerte Freigaben verbinden die bestehenden Anbieter- und Studiofunktionen; zentral gepflegte Anleitung statt Installation auf Lehrergeräten. KI erstellt strukturierte Vorschläge, während Freigaben, Projektzugriff, Budgets und Versionen durch die Plattform kontrolliert werden. Alte Audiofassungen und Studioschnitte bleiben verfügbar; unveränderte Audios werden bevorzugt wiederverwendet.
 
 - **2026-10-01:** Duplizieren übernimmt verfügbare Audios ohne Anbieteraufruf, mit unabhängigen Dateien und unveränderten Ablaufdaten. Löschen erhält Verbrauchsnachweise und die für Musik-/Geräuschkontingente benötigte Dauer, entfernt aber Skriptteile und gespeicherte Anfragen. Ein externer Agent für Unterrichtsmaterial und Browserbedienung ist als möglicher Ausbau diskutiert, noch nicht beauftragt oder umgesetzt.
 
@@ -802,6 +808,8 @@ Ein neuer Arbeitschat soll:
 | 2026-07-26 | Nginx lauscht für die Sprachplattform nur auf `127.0.0.1:8085` | Cloudflared erreicht den Dienst lokal; der zusätzliche Proxyport wird nicht im LAN geöffnet. |
 
 ## 25. Änderungsprotokoll
+
+- **2026-10-01:** Optionalen Hörspiel-Assistenten mit Unterrichtsbriefing, Skriptkorrekturen, separaten Freigaben, Klangplanung, Hintergrundverarbeitung, automatischer Clipanordnung, Studioübergang und MP3-/WAV-Export veröffentlicht. Wiederverwendung unveränderter Sprachabschnitte einschließlich unabhängig kopierter Dateien und kostenfreier Pausen-/Tempoanpassung ergänzt. 201 PostgreSQL-Tests erfolgreich, Desktop-/Mobiloberfläche geprüft, öffentlicher echter Drei-Spur-Export und kostenfreie Sprachwiederverwendung bei aktivem Credit-Budget bestätigt. Testprojekte entfernt; Nutzungsnachweise bleiben erhalten.
 
 - **2026-10-01:** Projektkopien einschließlich Sprachversionen, Studioaudios, Schnitt, Fades, Lautstärken und Klangreglern umgesetzt; Löschablauf mit Dateibereinigung und unverändertem Verbrauch korrigiert. Migrationen veröffentlicht, 179 Tests im PostgreSQL-Produktionsimage erfolgreich, öffentlicher Drei-Spur-WAV-Export nach Löschen des Originals abgenommen. Temporäre Testprojekte entfernt; keine neuen Anbieteraufrufe für die Abnahme.
 
