@@ -20,6 +20,8 @@ Vor der Umstellung wurden die echten Schlüssel durch Modellabfragen geprüft un
 
 Die administrative ElevenLabs-Verbindungsprüfung fragt ausschließlich `/v1/models` ab und kontrolliert das gewählte Sprachmodell. Sie benötigt keine Kontostimmen-Leseberechtigung und erzeugt kein Audio. Der bestehende Produktionsschlüssel erlaubt die echten Generierungsaufrufe und Modellabfragen, lehnt `/v2/voices` jedoch mit HTTP 401 ab. Ein künftiger Kontostimmen-Import benötigt weiterhin die entsprechende Berechtigung. Die Modellprüfung allein bestätigt keine Schreibberechtigung; dafür wurden die kurzen echten Aufträge ausgeführt.
 
+Serverabnahme: 167 Tests im Produktionsimage bestanden; nach Anpassung der Verbindungsprüfung alle 53 betroffenen Tests erneut lokal und auf PostgreSQL bestanden. Migrationen angewendet, Web/Worker neu gestartet und öffentliche Plattform geprüft: zwei v4-Sprachabschnitte mit Request-Fortsetzung und MP3-Download, v2.5-Musik mit automatischem Ausgabeformat sowie ein neuer v2-Geräuscheffekt. Alle drei Spuren wurden mit feinem Clippegel und Fades als WAV exportiert und heruntergeladen. Die 260 Stimmen (81 freigegeben) bleiben verfügbar; Budgetrahmen bleiben unverändert. Temporäre Testprojekte und Audiodateien wurden entfernt, die API-Verbrauchsbuchungen bleiben bestehen. Der öffentliche Adminbereich bleibt durch Cloudflare Access geschützt; seine Modellfelder wurden zusätzlich über den authentifizierten Serverclient geprüft.
+
 Quellen:
 
 - [OpenAI: Modelle](https://developers.openai.com/api/docs/models)

@@ -729,7 +729,7 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 
 ## 22. Aktueller Stand
 
-**Modellstand 1. Oktober 2026:** Eleven v4 und Music v2.5 sind für die bestehenden Schnittstellen geprüft und implementiert. GPT-6 Luna bleibt die sparsame Standardwahl; GPT-6.1 Sol ersetzt die höhere Qualitätsstufe. Geräuschmodell v2 ist aktuell. Echte Modellaufrufe mit den produktiven Schlüsseln sowie 167 lokale Tests sind erfolgreich; Stimmen/Favoriten und historische Modellzuordnungen werden berücksichtigt. Details: `docs/api-modellstand.md`. Diese Ergänzung ist aktueller als die folgenden Pilotangaben.
+**Modellstand 1. Oktober 2026:** Eleven v4 und Music v2.5 sind für die bestehenden Schnittstellen geprüft und implementiert. GPT-6 Luna bleibt die sparsame Standardwahl; GPT-6.1 Sol ersetzt die höhere Qualitätsstufe. Geräuschmodell v2 ist aktuell. Das Update ist öffentlich auf dem Server aktiv. Echte Modellaufrufe mit den produktiven Schlüsseln sowie 167 Tests lokal und im Produktionsimage sind erfolgreich; die angepasste Verbindungsprüfung wurde zusätzlich mit 53 betroffenen Tests lokal und auf dem Server geprüft. Der öffentliche Drei-Spur-Ablauf einschließlich WAV-Export ist erfolgreich; Stimmen/Favoriten und historische Modellzuordnungen werden berücksichtigt. Details: `docs/api-modellstand.md`. Diese Ergänzung ist aktueller als die folgenden Pilotangaben.
 
 - Phase 0 ist abgeschlossen: Django 5.2 LTS, Python 3.12, PostgreSQL, Redis, Celery, Gunicorn, FFmpeg und Docker Compose sind als reproduzierbares Grundgerüst vorhanden.
 - Phase 1 ist lokal abgeschlossen: Login, POST-Logout, Sperrung, Rate-Limit, einmalig sichtbare temporäre Passwörter, erzwungener Erstwechsel und Adminverwaltung sind implementiert und getestet.
@@ -750,7 +750,7 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 
 ## 23. Nächste konkrete Aufgabe
 
-**Aktuelle nächste Aufgabe (1. Oktober 2026):** Nach der Serverabnahme Hörvergleiche mit Eleven v4 in den Kernsprachen durchführen und Regieanweisungen/Stimmkonstanz pädagogisch beurteilen. Die folgenden Integrationspilot-Angaben dokumentieren den früheren Stand.
+**Aktuelle nächste Aufgabe (1. Oktober 2026):** Hörvergleiche mit Eleven v4 in den Kernsprachen durchführen und Regieanweisungen/Stimmkonstanz pädagogisch beurteilen. Die folgenden Integrationspilot-Angaben dokumentieren den früheren Stand.
 
 **ElevenLabs-Integrationspilot durchführen: API-Zugang sicher konfigurieren, Stimmen kuratieren und die reale mehrsprachige Audiokette end-to-end abnehmen.**
 
@@ -797,7 +797,7 @@ Ein neuer Arbeitschat soll:
 
 ## 25. Änderungsprotokoll
 
-- **2026-10-01:** Aktuelle Modelle, kompatible Reasoning-Einstellungen, automatische Musikausgabequalität und modellgebundene Sprach-Retries umgesetzt. Datenmigrationen und 167 Tests erfolgreich lokal geprüft; je ein realer v4-Dialog, v2.5-Jingle und GPT-6.1-Sol-Entwurf erfolgreich validiert. Betriebsdokumentation unter `docs/api-modellstand.md`.
+- **2026-10-01:** Aktuelle Modelle, kompatible Reasoning-Einstellungen, automatische Musikausgabequalität und modellgebundene Sprach-Retries umgesetzt. Datenmigrationen und 167 Tests lokal sowie im Produktionsimage erfolgreich geprüft; Modellupdate veröffentlicht, Verbindungsprüfung für den eingeschränkten Schlüssel korrigiert und öffentlicher Drei-Spur-WAV-Export erfolgreich abgenommen; je ein realer v4-Dialog, v2.5-Jingle und GPT-6.1-Sol-Entwurf erfolgreich validiert. Betriebsdokumentation unter `docs/api-modellstand.md`.
 
 ### 2026-07-22 – Initiale Fassung
 
