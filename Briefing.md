@@ -729,6 +729,8 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 
 ## 22. Aktueller Stand
 
+**Projektkorrekturen 1. Oktober 2026:** Vollständige Audiokopien mit eigenständigen Dateien, gespeicherten Schnittständen und verfügbaren Sprachversionen sind öffentlich aktiv. Löschen entfernt Inhalte und eigene Dateien, erhält aber Sprach-, Musik- und Geräuschverbrauch. Laufende Aufträge verhindern Kopieren und Löschen. 179 Tests bestehen im Produktionsimage; der öffentliche Ablauf mit elf Demoaudios, Löschen des Originals und anschließendem Celery-WAV-Export der Kopie ist erfolgreich. Details: `docs/projekte-kopieren-und-loeschen.md`.
+
 **Modellstand 1. Oktober 2026:** Eleven v4 und Music v2.5 sind für die bestehenden Schnittstellen geprüft und implementiert. GPT-6 Luna bleibt die sparsame Standardwahl; GPT-6.1 Sol ersetzt die höhere Qualitätsstufe. Geräuschmodell v2 ist aktuell. Das Update ist öffentlich auf dem Server aktiv. Echte Modellaufrufe mit den produktiven Schlüsseln sowie 167 Tests lokal und im Produktionsimage sind erfolgreich; die angepasste Verbindungsprüfung wurde zusätzlich mit 53 betroffenen Tests lokal und auf dem Server geprüft. Der öffentliche Drei-Spur-Ablauf einschließlich WAV-Export ist erfolgreich; Stimmen/Favoriten und historische Modellzuordnungen werden berücksichtigt. Details: `docs/api-modellstand.md`. Diese Ergänzung ist aktueller als die folgenden Pilotangaben.
 
 - Phase 0 ist abgeschlossen: Django 5.2 LTS, Python 3.12, PostgreSQL, Redis, Celery, Gunicorn, FFmpeg und Docker Compose sind als reproduzierbares Grundgerüst vorhanden.
@@ -750,6 +752,8 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 
 ## 23. Nächste konkrete Aufgabe
 
+**Neuer Vorschlag zur Abstimmung:** Einen Agentenpilot an einem konkreten Unterrichtsauftrag erproben: Browserbedienung der Sprachplattform für Hörspielproduktion und frei gestaltbare, editierbare Begleitmaterialien. Didaktische Qualität, Lösungen, Layout und Bearbeitbarkeit an Unterrichtsbeispielen beurteilen. Arbeitsblattgenerator und Agentenverfahren sind noch nicht implementiert. Die pädagogischen Hörvergleiche bleiben offen.
+
 **Aktuelle nächste Aufgabe (1. Oktober 2026):** Hörvergleiche mit Eleven v4 in den Kernsprachen durchführen und Regieanweisungen/Stimmkonstanz pädagogisch beurteilen. Die folgenden Integrationspilot-Angaben dokumentieren den früheren Stand.
 
 **ElevenLabs-Integrationspilot durchführen: API-Zugang sicher konfigurieren, Stimmen kuratieren und die reale mehrsprachige Audiokette end-to-end abnehmen.**
@@ -765,6 +769,8 @@ Ein neuer Arbeitschat soll:
 7. danach den LLM-Anbieter für Phase 5 auswählen oder den Assistenten weiter deaktiviert lassen.
 
 ## 24. Entscheidungsprotokoll
+
+- **2026-10-01:** Duplizieren übernimmt verfügbare Audios ohne Anbieteraufruf, mit unabhängigen Dateien und unveränderten Ablaufdaten. Löschen erhält Verbrauchsnachweise und die für Musik-/Geräuschkontingente benötigte Dauer, entfernt aber Skriptteile und gespeicherte Anfragen. Ein externer Agent für Unterrichtsmaterial und Browserbedienung ist als möglicher Ausbau diskutiert, noch nicht beauftragt oder umgesetzt.
 
 - **2026-10-01:** Provider-Modelle anhand offizieller Dokumentation und realer Schlüssel prüfen. Eleven v4 und Music v2.5 übernehmen; OpenAI-Kostentrennung beibehalten (Luna als Standard, GPT-6.1 Sol als Qualitätsoption). Budget und Nutzerkontingente unverändert lassen. Alte Aufträge behalten ihre gespeicherten Modelle; Stimmen und Favoriten werden übernommen.
 
@@ -796,6 +802,8 @@ Ein neuer Arbeitschat soll:
 | 2026-07-26 | Nginx lauscht für die Sprachplattform nur auf `127.0.0.1:8085` | Cloudflared erreicht den Dienst lokal; der zusätzliche Proxyport wird nicht im LAN geöffnet. |
 
 ## 25. Änderungsprotokoll
+
+- **2026-10-01:** Projektkopien einschließlich Sprachversionen, Studioaudios, Schnitt, Fades, Lautstärken und Klangreglern umgesetzt; Löschablauf mit Dateibereinigung und unverändertem Verbrauch korrigiert. Migrationen veröffentlicht, 179 Tests im PostgreSQL-Produktionsimage erfolgreich, öffentlicher Drei-Spur-WAV-Export nach Löschen des Originals abgenommen. Temporäre Testprojekte entfernt; keine neuen Anbieteraufrufe für die Abnahme.
 
 - **2026-10-01:** Aktuelle Modelle, kompatible Reasoning-Einstellungen, automatische Musikausgabequalität und modellgebundene Sprach-Retries umgesetzt. Datenmigrationen und 167 Tests lokal sowie im Produktionsimage erfolgreich geprüft; Modellupdate veröffentlicht, Verbindungsprüfung für den eingeschränkten Schlüssel korrigiert und öffentlicher Drei-Spur-WAV-Export erfolgreich abgenommen; je ein realer v4-Dialog, v2.5-Jingle und GPT-6.1-Sol-Entwurf erfolgreich validiert. Betriebsdokumentation unter `docs/api-modellstand.md`.
 
