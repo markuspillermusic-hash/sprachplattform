@@ -98,6 +98,10 @@ Die Audioerzeugung wird erst aktiv, wenn `ELEVENLABS_API_KEY` serverseitig geset
 
 Weitere Betriebs- und Pilotvorgaben stehen in [docs/operations.md](docs/operations.md) und [docs/pilot-checklist.md](docs/pilot-checklist.md).
 
+## Audioeditor
+
+Hörtexte lassen sich über **Optional: Hörspiel-Produktion → Hörspiel-Studio öffnen** mit Musik und mehreren gleichzeitigen Geräuschen ergänzen. Der Editor unterstützt eigene Audiodateien, Schnitt, Fades, Lautstärke, optionale Sprachkompression, gemeinsame Vorschau, gespeicherte Bearbeitungsstände und MP3-/WAV-Export. ElevenLabs Music und Sound Effects werden separat in der Verwaltung freigegeben. Einrichtung und Bedienung: [docs/audioeditor.md](docs/audioeditor.md).
+
 ## Kontingente und Monitoring
 
 Die Plattform reserviert Nutzung vor Anbieteraufrufen und gleicht sie anschlieÃŸend mit den tatsÃ¤chlichen OpenAI-Tokens beziehungsweise ElevenLabs-Credits ab. Anbieterbudgets werden dynamisch Ã¼ber ihre Restlaufzeit verteilt; individuelle Grenzen werden im Benutzerkonto gepflegt. Die Einrichtung ist in [docs/kontingente-und-monitoring.md](docs/kontingente-und-monitoring.md) beschrieben.

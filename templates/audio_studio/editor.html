@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Hörspiel-Produktion · {{ project.title }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/audio-studio.css' %}">
+<script src="{% static 'js/audio-studio.js' %}" defer></script>
+{% endblock %}
+{% block content %}
+<section class="studio" id="audio-studio"
+ data-state-url="{% url 'audio_studio:state' project.id %}"
+ data-save-url="{% url 'audio_studio:save' project.id %}"
+ data-upload-url="{% url 'audio_studio:upload' project.id %}"
+ data-import-url="{% url 'audio_studio:import' project.id %}"
+ data-generate-url="{% url 'audio_studio:generate' project.id %}"
+ data-export-url="{% url 'audio_studio:export' project.id %}"
+ data-jobs-url="{% url 'audio_studio:jobs' project.id %}">
+ <header class="studio-heading">
+  <div><a class="back-link" href="{% url 'projects:editor' project.id %}">← Zum Skript</a>
+   <p class="eyebrow">Optional · Hörspiel-Produktion</p><h1>{{ project.title }}</h1>
+   <p>Sprache, Musik und Atmosphäre auf einer gemeinsamen Zeitachse. Für reine Hörtexte genügt die Audioausgabe im Skript.</p></div>
+  <div class="studio-save"><button type="button" class="button button-primary" id="studio-save" disabled>Stand speichern</button>
+   <span id="studio-save-status" role="status">Wird geladen …</span></div>
+ </header>
+ <p id="studio-message" class="studio-message" role="status" aria-live="polite" hidden></p>
+ <noscript><p>Der Audioeditor benötigt JavaScript. Aktivieren Sie JavaScript, um die Spuren zu bearbeiten.</p></noscript>
+ <div class="studio-transport">
+  <button type="button" class="button button-primary" id="studio-play" disabled>▶ Abspielen</button>
+  <button type="button" class="button button-secondary" id="studio-stop" disabled>■ Zum Anfang</button>
+  <label>Abspielposition <input id="studio-position" type="number" min="0" max="1800" step="0.1" value="0"> s</label>
+  <output id="studio-time">00:00 / 00:00</output>
+  <label>Zoom <input id="studio-zoom" type="range" min="2" max="60" value="12"></label>
+  <button type="button" class="button button-quiet" id="studio-undo" disabled>Rückgängig</button>
+  <button type="button" class="button button-quiet" id="studio-redo" disabled>Wiederholen</button>
+ </div>
+ <div class="studio-timeline" id="studio-timeline" aria-label="Drei Audiospuren"><p>Spuren werden geladen …</p></div>
+ <p class="studio-hint">Die oberen Clip-Ecken nach innen ziehen: links zum Einblenden, rechts zum Ausblenden. Die Linien zeigen den Lautstärkeverlauf. An den seitlichen Rändern kürzen oder unten genaue Werte eingeben. Bei sehr schmalen Clips zuerst hineinzoomen. Überlappende Clips auf derselben Spur spielen gleichzeitig – zum Beispiel Regen, Schritte und eine Tür. Zeiten werden in Sekunden angegeben.</p>
+ <div class="studio-options">
+  <label><input id="studio-ducking" type="checkbox" checked> Musik während der Sprache automatisch absenken</label>
+  <label><input id="studio-effects-ducking" type="checkbox"> Geräuschkulisse während der Sprache absenken</label>
+  <label><input id="studio-speech-compression" type="checkbox"> Sprache gleichmäßiger machen</label>
+  <label>Gespeicherter Stand <select id="studio-history"><option value="">Stand auswählen …</option></select></label>
+  <button type="button" class="button button-quiet" id="studio-reload">Aktuellen Stand neu laden</button>
+ </div>
+ <p class="studio-hint">Der Export begrenzt Pegelspitzen im Gesamtmix. Die zuschaltbare Sprachkompression zähmt laute Passagen und hebt den Sprachpegel etwas an. Stellen Sie sehr leise Aufnahmen zusätzlich über den Clippegel ein und halten Sie Musik und Geräusche im Hintergrund.</p>
+ <section class="studio-inspector" aria-labelledby="studio-clip-title">
+  <div><p class="eyebrow">Ausgewählter Clip</p><h2 id="studio-clip-title">Clip auf der Zeitachse auswählen</h2></div>
+  <form id="studio-clip-form" hidden>
+   <div class="studio-fields">
+    <label>Spur <select name="track"><option value="speech">Sprache</option><option value="music">Musik</option><option value="effects">Geräusche</option></select></label>
+    <label>Position (s) <input name="start" type="number" min="0" max="1800" step="0.01" required></label>
+    <label>Schnittanfang (s) <input name="trim_start" type="number" min="0" max="1800" step="0.01" required></label>
+    <label>Schnittende (s) <input name="trim_end" type="number" min="0.01" max="1800" step="0.01" required></label>
+    <label>Lautstärke (dB) <input name="gain_db" type="number" min="-60" max="12" step="1" required></label>
+    <label>Einblenden (s) <input name="fade_in" type="number" min="0" max="1800" step="0.01" required></label>
+    <label>Ausblenden (s) <input name="fade_out" type="number" min="0" max="1800" step="0.01" required></label>
+   </div>
+   <div class="studio-actions">
+    <button type="submit" class="button button-secondary">Werte übernehmen</button>
+    <button type="button" class="button button-quiet" id="studio-clip-play">Clip anhören</button>
+    <button type="button" class="button button-quiet" id="studio-split">An Abspielposition teilen</button>
+    <button type="button" class="button button-quiet" id="studio-duplicate">Duplizieren</button>
+    <button type="button" class="button button-danger" id="studio-remove">Clip entfernen</button>
+   </div>
+  </form>
+ </section>
+ <div class="studio-workspace">
+  <section class="studio-panel" aria-labelledby="library-title">
+   <p class="eyebrow">Audiodateien</p><h2 id="library-title">Zum Projekt hinzufügen</h2>
+   <form id="studio-import-form" class="studio-inline">{% csrf_token %}
+    <label>Generierte Sprache <select id="studio-speech"><option value="">Noch keine Sprachversion</option></select></label>
+    <button type="submit" class="button button-secondary">Sprache übernehmen</button>
+   </form>
+   <form id="studio-upload-form" class="studio-inline">
+    <label>Eigene Audiodateien <input type="file" name="audio" accept=".mp3,.wav,.ogg,.flac,.m4a" multiple required></label>
+    <button type="submit" class="button button-secondary">Hochladen</button>
+   </form>
+   <small>Mehrere Dateien auswählbar; sie werden an derselben Abspielposition eingefügt. MP3, WAV, OGG, FLAC oder M4A · je Datei maximal 50 MB und 30 Minuten. Originaldateien bleiben erhalten; Clips verwenden Ihre Schnittwerte.</small>
+   <label class="studio-library-track">Dateien einfügen auf <select id="studio-add-track"><option value="auto">Passende Spur</option><option value="speech">Sprache</option><option value="music">Musik</option><option value="effects">Geräusche</option></select></label>
+   <div id="studio-library" class="studio-library"></div>
+  </section>
+  <section class="studio-panel" aria-labelledby="generate-title">
+   <p class="eyebrow">Musik und Atmosphäre</p><h2 id="generate-title">Audio erzeugen</h2>
+   <form id="studio-generate-form">
+    <label>Audioart <select name="kind"><option value="music">Musik / Jingle (instrumental)</option><option value="effects">Geräusche / Atmosphäre</option></select></label>
+    <label>Beschreibung <textarea name="prompt" rows="3" maxlength="4100" required placeholder="Zum Beispiel: ruhige instrumentale Hintergrundmusik für einen französischen Café-Dialog"></textarea></label>
+    <div class="studio-inline"><label>Dauer (s) <input name="duration" type="number" min="3" max="600" step="0.5" value="15" required></label>
+     <label id="studio-loop-label" hidden><input name="loop" type="checkbox"> Nahtlos wiederholbares Geräusch</label></div>
+    <p id="studio-generation-info" class="studio-hint"></p>
+    <button type="submit" class="button button-secondary" id="studio-generate" disabled>Audio erzeugen</button>
+   </form>
+  </section>
+ </div>
+ <section class="studio-panel studio-export" aria-labelledby="export-title">
+  <div><p class="eyebrow">Fertiges Ergebnis</p><h2 id="export-title">Alle hörbaren Spuren exportieren</h2><p>Der Export verwendet den gespeicherten Stand inklusive Schnitt, Lautstärke und Fades.</p></div>
+  <form id="studio-export-form" class="studio-inline"><label>Format <select name="format"><option value="mp3">MP3 · 192 kbit/s</option><option value="wav">WAV · 44,1 kHz / 16 Bit</option></select></label><button type="submit" class="button button-primary" id="studio-export" disabled>Mix exportieren</button></form>
+  <div id="studio-jobs" class="studio-jobs" aria-live="polite"></div>
+ </section>
+</section>
+{% endblock %}

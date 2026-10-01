@@ -7,6 +7,7 @@ urlpatterns = [
     path("projekte/", include("projects.urls")),
     path("stimmen/", include("tts.urls")),
     path("audio/", include("generation.urls")),
+    path("studio/", include("audio_studio.urls")),
     path("assistent/", include("script_assistant.urls")),
     path("", include("core.urls")),
 ]

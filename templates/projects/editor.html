@@ -111,6 +111,12 @@
     {% endif %}
   </section>
 
+  <details class="audio-history">
+    <summary>Optional: Hörspiel-Produktion</summary>
+    <p>Ergänzen Sie Ihren Hörtext mit Jingles, Musik und mehreren gleichzeitigen Geräuschen. Im Hörspiel-Studio können Sie Clips schneiden, mischen und gemeinsam exportieren.</p>
+    <a class="button button-secondary" href="{% url 'audio_studio:editor' project.id %}">Hörspiel-Studio öffnen →</a>
+  </details>
+
   <div class="editor-grid">
     <section class="script-column" aria-labelledby="script-title">
       <div class="column-heading"><div><p class="eyebrow">Skript</p><h1 id="script-title">Sprechbeiträge</h1></div><span class="character-count">{{ project.character_count }} Zeichen</span></div>

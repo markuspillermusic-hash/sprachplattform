@@ -97,6 +97,8 @@ class UsageEvent(models.Model):
 
     class Feature(models.TextChoices):
         AUDIO = "audio", "Audioerzeugung"
+        MUSIC = "music", "Musikerzeugung"
+        SOUND_EFFECTS = "sound_effects", "Geräuscherzeugung"
         SCRIPT_ASSISTANT = "script_assistant", "KI-Hörtextassistent"
 
     class Status(models.TextChoices):

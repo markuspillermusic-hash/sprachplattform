@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "projects",
     "tts",
     "generation",
+    "audio_studio",
     "script_assistant",
     "usage_control",
     "core",
@@ -133,6 +134,9 @@ CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 
 AUDIO_STORAGE_ROOT = Path(env("AUDIO_STORAGE_ROOT", default=str(BASE_DIR / "var" / "audio")))
 AUDIO_RETENTION_DAYS = env("AUDIO_RETENTION_DAYS")
+AUDIO_STUDIO_MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+AUDIO_STUDIO_MAX_DURATION = 1800
+AUDIO_STUDIO_MAX_CLIPS = 60
 AUDIO_TAIL_FADE_MS = max(0, env("AUDIO_TAIL_FADE_MS"))
 AUDIO_TAIL_PADDING_MS = max(0, env("AUDIO_TAIL_PADDING_MS"))
 ORGANIZATION_MONTHLY_CHARACTER_LIMIT = env.int("ORGANIZATION_MONTHLY_CHARACTER_LIMIT", default=600_000)
