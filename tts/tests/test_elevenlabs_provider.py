@@ -16,6 +16,7 @@ class ElevenLabsProviderTests(SimpleTestCase):
         )
         return ElevenLabsProvider(
             api_key="test-key-never-log",
+            model_id="eleven_v3",
             client=client,
             estimated_eur_per_1000_characters=Decimal("0.20"),
         )
@@ -181,18 +182,36 @@ class ElevenLabsProviderTests(SimpleTestCase):
         self.assertEqual(estimate.characters, 250)
         self.assertEqual(estimate.estimated_cost_eur, Decimal("0.0500"))
 
-    def test_connection_check_uses_account_endpoint_without_generation(self):
-        captured = {}
+    def test_connection_check_verifies_voices_and_selected_model_without_generation(self):
+        captured = []
 
         def handler(request):
-            captured["method"] = request.method
-            captured["path"] = request.url.path
-            return httpx.Response(200, json={"user_id": "school"})
+            captured.append((request.method, request.url.path))
+            return httpx.Response(200, json=[{"model_id": "eleven_v3", "can_do_text_to_speech": True}]
+                                  if request.url.path == "/v1/models" else {"voices": []})
 
         provider = self.provider_with_handler(handler)
 
         self.assertTrue(provider.test_connection())
-        self.assertEqual(captured, {"method": "GET", "path": "/v2/voices"})
+        self.assertEqual(captured, [("GET", "/v2/voices"), ("GET", "/v1/models")])
+
+    def test_v4_sends_continuity_and_keeps_credit_accounting(self):
+        captured = {}
+        def handler(request):
+            captured.update(json.loads(request.content))
+            return httpx.Response(200, content=b"audio", headers={"character-cost": "0"})
+        provider = self.provider_with_handler(handler)
+        provider.model_id = "eleven_v4"
+        result = provider.synthesize_dialogue([DialogueInput(text="Hallo!", voice_id="a")],
+                                            {"previous_request_ids": ["before"]})
+        self.assertEqual(captured["model_id"], "eleven_v4")
+        self.assertEqual(captured["previous_request_ids"], ["before"])
+        self.assertEqual(result.provider_credit_count, 0)
+
+    def test_connection_rejects_unavailable_model_safely(self):
+        provider = self.provider_with_handler(lambda request: httpx.Response(200, json=[]))
+        with self.assertRaisesMessage(ProviderError, "Sprachmodell"):
+            provider.test_connection()
 
     def test_http_error_does_not_expose_api_key_or_response_body(self):
         provider = self.provider_with_handler(

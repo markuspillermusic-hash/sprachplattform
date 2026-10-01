@@ -17,7 +17,7 @@ def tts_provider_is_configured():
     )
 
 
-def get_tts_provider(name="elevenlabs"):
+def get_tts_provider(name="elevenlabs", *, model_id=None):
     if name != "elevenlabs":
         raise ValueError("Unbekannter TTS-Provider.")
     configuration = get_tts_configuration()
@@ -25,13 +25,13 @@ def get_tts_provider(name="elevenlabs"):
         return ElevenLabsProvider(
             api_key=configuration.get_api_key(),
             base_url=configuration.base_url,
-            model_id=configuration.model,
+            model_id=model_id or configuration.model,
             estimated_eur_per_1000_characters=configuration.estimated_eur_per_1000_characters,
         )
     return ElevenLabsProvider(
         api_key=settings.ELEVENLABS_API_KEY,
         base_url=settings.ELEVENLABS_BASE_URL,
-        model_id=settings.ELEVENLABS_MODEL_ID,
+        model_id=model_id or settings.ELEVENLABS_MODEL_ID,
         estimated_eur_per_1000_characters=settings.TTS_ESTIMATED_EUR_PER_1000_CHARACTERS,
     )
 

@@ -55,7 +55,8 @@ class ElevenLabsAudioProvider:
         client = self.client or httpx.Client(base_url=self.base_url.rstrip("/"),
                                             timeout=httpx.Timeout(600, connect=10), follow_redirects=False)
         try:
-            with client.stream("POST", endpoint, json=payload, params={"output_format": "mp3_44100_128"},
+            with client.stream("POST", endpoint, json=payload,
+                               params={"output_format": "auto" if kind == "music" else "mp3_44100_128"},
                                headers={"xi-api-key": self.api_key, "Accept": "audio/mpeg"}) as response:
                 if response.status_code >= 300:
                     if response.status_code < 500:

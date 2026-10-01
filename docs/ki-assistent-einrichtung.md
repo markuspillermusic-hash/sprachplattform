@@ -6,12 +6,14 @@
 2. Unter **Skript-Assistent** den Punkt **KI-Anbindung** öffnen.
 3. Falls noch kein Eintrag existiert, **KI-Anbindung hinzufügen** wählen.
 4. Den persönlichen OpenAI-API-Schlüssel in das Passwortfeld einfügen.
-5. Als Standardmodell **GPT-6 Luna · sparsam** verwenden. **GPT-6 Sol** kann für besonders anspruchsvolle Hörtexte als Qualitätsoption ausgewählt werden.
+5. Als Standardmodell **GPT-6 Luna · sparsam** verwenden. **GPT-6.1 Sol** kann für besonders anspruchsvolle Hörtexte als Qualitätsoption ausgewählt werden. GPT-6 Sol bleibt als vorherige Version auswählbar.
 6. Den Reasoning-Aufwand normalerweise auf **Niedrig · empfohlen** belassen. Mittel oder Hoch sollte nur bei erkennbar komplexen Aufgaben verwendet werden.
 7. **Sichern** wählen.
 8. In der Liste den Eintrag markieren und unter **Aktion** den Punkt **OpenAI-Verbindung für Auswahl prüfen** ausführen.
 
 Die Prüfung ruft nur die Modellinformation ab und erzeugt keinen Hörtext. Nach dem Speichern wird der API-Schlüssel nicht mehr vollständig angezeigt. Ein leeres Schlüsselfeld behält den vorhandenen Schlüssel bei; die gesonderte Checkbox entfernt ihn.
+
+Modellstand vom 1. Oktober 2026: GPT-6 Luna kostet im Standardmodus 0,10 USD je Million Eingabe- und 0,50 USD je Million Ausgabetokens. GPT-6.1 Sol kostet 2 beziehungsweise 10 USD. Die Plattform verwendet die Responses API mit striktem JSON-Schema und `store=False`. Bei GPT-6.1 Sol wird „Ohne zusätzlichen Reasoning-Aufwand“ auf „Niedrig“ angehoben, da das Modell `none` nicht unterstützt. Ein bereits gewähltes GPT-6 Sol wird beim Update auf GPT-6.1 Sol umgestellt; Luna, individuelle Preise und Anbieterbudgets bleiben erhalten. Siehe [OpenAI-Modellkatalog](https://developers.openai.com/api/docs/models) und [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
 
 ## Hörtext mit KI-Unterstützung erstellen
 

@@ -252,18 +252,22 @@ class ProviderTests(TestCase):
     def test_music_and_effects_request_contracts(self):
         seen = []
         def respond(request):
-            seen.append((request.url.path, json.loads(request.content), request.headers["xi-api-key"]))
+            seen.append((request.url.path, json.loads(request.content), request.headers["xi-api-key"], dict(request.url.params)))
             return httpx.Response(200, content=b"audio", headers={"character-cost": "80", "request-id": "test-request"})
         config = StudioConfiguration()
         with httpx.Client(base_url="https://api.elevenlabs.io", transport=httpx.MockTransport(respond)) as client:
             provider = ElevenLabsAudioProvider(config, client)
-            result = provider.generate("music", {"prompt": "Jingle", "duration": 6, "model": "music_v1"})
+            result = provider.generate("music", {"prompt": "Jingle", "duration": 6, "model": config.music_model})
             provider.generate("effects", {"prompt": "Regen", "duration": 2, "loop": True})
         self.assertEqual(seen[0][0], "/v1/music")
         self.assertEqual(seen[0][1]["music_length_ms"], 6000)
         self.assertTrue(seen[0][1]["force_instrumental"])
+        self.assertEqual(seen[0][1]["model_id"], "music_v2_5")
+        self.assertEqual(seen[0][3]["output_format"], "auto")
         self.assertEqual(seen[1][0], "/v1/sound-generation")
         self.assertTrue(seen[1][1]["loop"])
+        self.assertEqual(seen[1][1]["model_id"], "eleven_text_to_sound_v2")
+        self.assertEqual(seen[1][3]["output_format"], "mp3_44100_128")
         self.assertEqual(result.credits, Decimal(80))
 
     @override_settings(ELEVENLABS_API_KEY="provider-test-key")

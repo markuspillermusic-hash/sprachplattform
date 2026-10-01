@@ -155,6 +155,8 @@ class GenerationPipelineTests(TestCase):
         self.segment.text = ("A sentence that creates another audio part. " * 90).strip()
         self.segment.save(update_fields=["text"])
         job = create_generation_job(self.project, self.user)
+        job.model = "eleven_v3"
+        job.save(update_fields=["model"])
         provider = FakeProvider()
 
         def fake_assembler(parts, output_path):
@@ -168,6 +170,32 @@ class GenerationPipelineTests(TestCase):
         self.assertGreater(len(provider.calls), 1)
         self.assertNotIn("previous_request_ids", provider.calls[0][1])
         self.assertNotIn("previous_request_ids", provider.calls[1][1])
+
+    def test_old_job_retry_uses_original_model_after_default_update(self):
+        job = create_generation_job(self.project, self.user)
+        job.model = "eleven_v3"
+        job.save(update_fields=["model"])
+        def fake_assembler(parts, output_path):
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"audio")
+        with TemporaryDirectory() as audio_root, mock.patch("generation.services.get_tts_provider", return_value=FakeProvider()) as factory:
+            run_generation_job(job.pk, audio_root=audio_root, assembler=fake_assembler)
+        factory.assert_called_once_with("elevenlabs", model_id="eleven_v3")
+
+    def test_v4_generation_stitches_following_parts(self):
+        self.segment.text = "A sentence that creates another audio part. " * 90
+        self.segment.save(update_fields=["text"])
+        job = create_generation_job(self.project, self.user)
+        job.model = "eleven_v4"
+        job.save(update_fields=["model"])
+        provider = FakeProvider()
+        def fake_assembler(parts, output_path):
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"audio")
+        with TemporaryDirectory() as audio_root:
+            run_generation_job(job.pk, provider=provider, audio_root=audio_root, assembler=fake_assembler)
+        self.assertNotIn("previous_request_ids", provider.calls[0][1])
+        self.assertEqual(provider.calls[1][1]["previous_request_ids"], ["request-1"])
 
     @mock.patch("generation.services.subprocess.run")
     def test_assembler_fades_and_pads_every_phrase_before_the_configured_pause(self, run):

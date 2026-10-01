@@ -330,7 +330,7 @@ def assemble_mp3(
 
 def run_generation_job(job_id, provider=None, audio_root=None, assembler=assemble_mp3):
     job = GenerationJob.objects.select_related("version__project", "requested_by").get(pk=job_id)
-    provider = provider or get_tts_provider(job.provider)
+    provider = provider or get_tts_provider(job.provider, model_id=job.model)
     root = Path(audio_root or settings.AUDIO_STORAGE_ROOT).resolve()
     job.status = GenerationJob.Status.RUNNING
     job.started_at = timezone.now()

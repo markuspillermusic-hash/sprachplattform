@@ -42,7 +42,8 @@ class AssistantProposal(models.Model):
 class AssistantConfiguration(models.Model):
     MODEL_CHOICES = (
         ("gpt-6-luna", "GPT-6 Luna · sparsam"),
-        ("gpt-6-sol", "GPT-6 Sol · höhere Qualität"),
+        ("gpt-6.1-sol", "GPT-6.1 Sol · höhere Qualität"),
+        ("gpt-6-sol", "GPT-6 Sol · vorherige Version"),
     )
     REASONING_EFFORT_CHOICES = (
         ("none", "Ohne zusätzlichen Reasoning-Aufwand"),
@@ -52,6 +53,7 @@ class AssistantConfiguration(models.Model):
     )
     MODEL_PRICING_USD = {
         "gpt-6-luna": ("0.1000", "0.5000"),
+        "gpt-6.1-sol": ("2.0000", "10.0000"),
         "gpt-6-sol": ("2.0000", "10.0000"),
     }
 
@@ -63,7 +65,7 @@ class AssistantConfiguration(models.Model):
         max_length=16,
         choices=REASONING_EFFORT_CHOICES,
         default="low",
-        help_text="Niedrig ist für strukturierte Hörtexte normalerweise ausreichend und spart Zeit und Tokens.",
+        help_text="Niedrig genügt normalerweise für Hörtexte. GPT-6.1 Sol benötigt mindestens Niedrig.",
     )
     base_url = models.URLField(default="https://api.openai.com/v1")
     encrypted_api_key = models.TextField(blank=True, editable=False)
@@ -95,6 +97,12 @@ class AssistantConfiguration(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def effective_reasoning_effort(self):
+        if self.model == "gpt-6.1-sol" and self.reasoning_effort == "none":
+            return "low"
+        return self.reasoning_effort
 
     @property
     def is_configured(self):

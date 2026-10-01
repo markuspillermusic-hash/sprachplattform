@@ -53,6 +53,8 @@ class AssistantConfigurationForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         selected_model = cleaned_data.get("model")
+        if selected_model == "gpt-6.1-sol" and cleaned_data.get("reasoning_effort") == "none":
+            cleaned_data["reasoning_effort"] = "low"
         previous_model = None
         if self.instance.pk:
             previous_model = type(self.instance).objects.filter(pk=self.instance.pk).values_list(

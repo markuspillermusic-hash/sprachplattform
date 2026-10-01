@@ -5,7 +5,9 @@ from django.db import models
 class TTSConfiguration(models.Model):
     name = models.CharField(max_length=80, default="ElevenLabs")
     active = models.BooleanField(default=True)
-    model = models.CharField(max_length=80, default="eleven_v3")
+    model = models.CharField(max_length=80, default="eleven_v4",
+                             choices=(("eleven_v4", "Eleven v4 · empfohlen"),
+                                      ("eleven_v3", "Eleven v3 · vorherige Version")))
     base_url = models.URLField(default="https://api.elevenlabs.io")
     estimated_eur_per_1000_characters = models.DecimalField(
         "Geschätzte Kosten je 1.000 Credits in EUR",

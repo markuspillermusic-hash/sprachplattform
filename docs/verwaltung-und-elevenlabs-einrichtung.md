@@ -32,7 +32,7 @@ Geheimnisse niemals in Git, Chats, Tickets, Screenshots oder die Django-Verwaltu
 1. Bei ElevenLabs anmelden.
 2. Den Bereich **Developers → API Keys** öffnen.
 3. Einen neuen eingeschränkten Schlüssel mit einem eindeutigen Namen wie `sprachplattform-prod` erstellen.
-4. Mindestens Berechtigungen für **Text to Speech/Text to Dialogue** und lesenden Zugriff auf **Voices** vergeben. Die genaue Bezeichnung kann sich in der ElevenLabs-Oberfläche unterscheiden.
+4. Mindestens Berechtigungen für **Text to Speech/Text to Dialogue** und lesenden Zugriff auf **Voices** sowie **Models** vergeben. Für Hörspiele zusätzlich **Music** und **Sound Effects** freigeben. Die genaue Bezeichnung kann sich in der ElevenLabs-Oberfläche unterscheiden.
 5. Wenn ElevenLabs es anbietet, ein sinnvolles Credit- oder Nutzungslimit für den Schlüssel setzen.
 6. Den Schlüssel sicher zwischenspeichern. Er wird nur einmal auf der Serverkonsole benötigt.
 
@@ -58,7 +58,7 @@ Die folgenden Einträge suchen oder ergänzen:
 ```dotenv
 ELEVENLABS_API_KEY=HIER_DEN_ECHTEN_SCHLUESSEL_EINTRAGEN
 ELEVENLABS_BASE_URL=https://api.elevenlabs.io
-ELEVENLABS_MODEL_ID=eleven_v3
+ELEVENLABS_MODEL_ID=eleven_v4
 TTS_ESTIMATED_EUR_PER_1000_CHARACTERS=0.18
 AUDIO_TAIL_FADE_MS=45
 AUDIO_TAIL_PADDING_MS=80
@@ -98,7 +98,7 @@ Die eingelesenen Stimmen bleiben zunächst absichtlich deaktiviert. Bei `401` od
 1. <https://sprachplattform.markuspiller.de/admin/> öffnen.
 2. Mit dem Administratorkonto anmelden.
 3. Im Bereich **TTS** die **Provider Voices/Provider-Stimmen** öffnen.
-4. Nach dem Modell `eleven_v3` filtern.
+4. Nach dem Modell `eleven_v4` filtern.
 5. Sprache, Bezeichnungen und – falls vorhanden – die Vorschau jeder Stimme prüfen.
 6. Für den Anfang nur etwa zwei bis vier geeignete Stimmen je Sprache aktivieren.
 
@@ -163,7 +163,7 @@ Der KI-Assistent ist technisch noch nicht vollständig an einen LLM-Anbieter ang
 ## Checkliste für den ersten Pilot
 
 - [ ] eingeschränkten ElevenLabs-API-Schlüssel erstellt
-- [ ] API-Schlüssel und `eleven_v3` in der Server-`.env` hinterlegt
+- [ ] API-Schlüssel und `eleven_v4` in der Server-`.env` hinterlegt
 - [ ] `web` und `worker` neu erstellt und Zustand geprüft
 - [ ] Stimmen für Deutsch, Englisch, Französisch, Spanisch und Italienisch synchronisiert
 - [ ] wenige geeignete Stimmen je Sprache freigeschaltet

@@ -24,7 +24,7 @@ class ElevenLabsProvider(TTSProvider):
         *,
         api_key,
         base_url="https://api.elevenlabs.io",
-        model_id="eleven_v3",
+        model_id="eleven_v4",
         estimated_eur_per_1000_characters=Decimal("0.18"),
         client=None,
     ):
@@ -158,6 +158,14 @@ class ElevenLabsProvider(TTSProvider):
         except httpx.RequestError:
             raise ProviderTemporaryError("ElevenLabs ist derzeit nicht erreichbar.") from None
         self._raise_safe(response)
+        try:
+            response = self.client.get("/v1/models", headers=self._headers())
+        except httpx.RequestError:
+            raise ProviderTemporaryError("Die ElevenLabs-Modellliste ist derzeit nicht erreichbar.") from None
+        self._raise_safe(response)
+        if not any(model.get("model_id") == self.model_id and model.get("can_do_text_to_speech")
+                   for model in response.json()):
+            raise ProviderConfigurationError("Das gewählte Sprachmodell ist über diesen Zugang nicht verfügbar.")
         return True
 
     def estimate_usage(self, script):

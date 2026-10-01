@@ -226,10 +226,13 @@ def ensure_audio_drama_demo(user, *, bundle=None, restore=False):
     if enrollment.project_id or (not enrolled and not restore):
         return enrollment.project
     project = Project.objects.create(owner=locked_user, demo_key=DEMO_KEY, title=DEMO_TITLE, language="de", level="B1")
+    from tts.providers import get_tts_configuration
+    configuration = get_tts_configuration()
+    speech_model = configuration.model if configuration else settings.ELEVENLABS_MODEL_ID
     speakers = []
     for name, color, voice in (("Alex", "forest", "DbwWo4rVEd5NrejHYUnm"), ("Mira", "berry", "JiW03c2Gt43XNUQAumRP")):
         speakers.append(Speaker.objects.create(project=project, name=name, color=color, provider="elevenlabs",
-                                               model="eleven_v3", voice_id=voice, position=len(speakers) + 1))
+                                               model=speech_model, voice_id=voice, position=len(speakers) + 1))
     ScriptSegment.objects.bulk_create([
         ScriptSegment(project=project, speaker=speakers[speaker], text=text, direction=direction,
                       position=i, pause_after_ms=550)

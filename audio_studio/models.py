@@ -20,7 +20,7 @@ class StudioConfiguration(models.Model):
     name = models.CharField("Name", max_length=80, default="Musik und Geräusche")
     music_enabled = models.BooleanField("Musikerzeugung freigeben", default=False)
     effects_enabled = models.BooleanField("Geräuscherzeugung freigeben", default=False)
-    music_model = models.CharField("Musikmodell", max_length=80, default="music_v1",
+    music_model = models.CharField("Musikmodell", max_length=80, default="music_v2_5",
                                   choices=[(x, x) for x in ("music_v1", "music_v2", "music_v2_5")])
     music_eur_per_minute = models.DecimalField("Musik: geschätzte EUR pro Minute", max_digits=10,
                                              decimal_places=4, default=0, validators=[MinValueValidator(0)])

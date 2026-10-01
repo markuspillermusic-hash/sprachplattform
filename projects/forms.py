@@ -82,7 +82,7 @@ class SpeakerForm(forms.ModelForm):
             "accent": "Akzentsteuerung",
         }
         help_texts = {
-            "accent": "Optional: Eleven v3 verstärkt diesen Akzent zusätzlich zur gewählten Grundstimme.",
+            "accent": "Optional: Verstärkt diesen Akzent zusätzlich zur gewählten Grundstimme.",
         }
 
     def __init__(

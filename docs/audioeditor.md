@@ -50,6 +50,7 @@ Die Audiodateien lassen sich nach Audioart filtern; die Übersicht zeigt die Zah
 
 ## Einrichtung
 
+- Modellstand vom 1. Oktober 2026: Neue Musik verwendet **Music v2.5** (`music_v2_5`). Bestehende Konfigurationen mit v1 oder v2 werden auf v2.5 umgestellt; Freigaben, Tarifschätzungen, Credits und Kontingente bleiben erhalten. Die API wählt mit `output_format=auto` die zum Modell passende Ausgabe (v2.5: MP3 mit 48 kHz/192 kbit/s); der Editor normalisiert sie für den Mix. Geräusche verwenden weiterhin das aktuelle `eleven_text_to_sound_v2`, einschließlich Schleifen. Historische Aufträge behalten ihr gespeichertes Modell.
 - Neue Migrationen mit `python manage.py migrate` anwenden und Webanwendung sowie Celery-Worker mit dem neuen Code starten. FFmpeg und ffprobe müssen erreichbar sein; beide sind im bestehenden Docker-Image vorhanden.
 - Unter **Verwaltung → Audioeditor → Musik- und Geräuschanbindung** eine Konfiguration anlegen. Musik und Geräusche getrennt freigeben, Musikmodell wählen und **positive geschätzte Tarifwerte in EUR je Minute** gemäß dem eigenen Tarif eintragen. Es werden bewusst keine unbestätigten Preisannahmen voreingestellt.
 - Ohne eigenen API-Schlüssel wird die bestehende ElevenLabs-Sprachanbindung verwendet (alternativ die Serverumgebungsvariable). Ein eigener Schlüssel kann optional verschlüsselt hinterlegt werden. Der API-Schlüssel benötigt Zugriff auf die jeweiligen Modelle/Funktionen; die Plattformfreigabe garantiert keine tarifseitige Freischaltung.

@@ -77,8 +77,8 @@ class AssistantConfigurationTests(TestCase):
             {
                 "name": "OpenAI / ChatGPT",
                 "active": "on",
-                "model": "gpt-6-sol",
-                "reasoning_effort": "low",
+                "model": "gpt-6.1-sol",
+                "reasoning_effort": "none",
                 "base_url": "https://api.openai.com/v1",
                 "max_output_tokens": 8000,
                 "pricing_currency": "USD",
@@ -90,7 +90,8 @@ class AssistantConfigurationTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         configuration.refresh_from_db()
-        self.assertEqual(configuration.model, "gpt-6-sol")
+        self.assertEqual(configuration.model, "gpt-6.1-sol")
+        self.assertEqual(configuration.reasoning_effort, "low")
         self.assertEqual(configuration.get_api_key(), "sk-existing-secret-4321")
         self.assertEqual(str(configuration.input_price_per_million), "2.0000")
         self.assertEqual(str(configuration.output_price_per_million), "10.0000")
@@ -163,3 +164,16 @@ class OpenAIProviderTests(TestCase):
         )
         self.assertTrue(provider.test_connection())
         self.assertEqual(captured, {"method": "GET", "path": "/v1/models/gpt-6-luna"})
+
+    def test_quality_model_normalizes_unsupported_none_reasoning(self):
+        captured = {}
+        def handler(request):
+            captured.update(json.loads(request.content))
+            return httpx.Response(200, json={"output": [{"content": [{"type": "output_text", "text": json.dumps(valid_payload())}]}]})
+        self.configuration.model = "gpt-6.1-sol"
+        self.configuration.reasoning_effort = "none"
+        provider = OpenAIScriptAssistantProvider(self.configuration, transport=httpx.MockTransport(handler))
+        provider.generate_proposal({"task": "create"})
+        self.assertEqual(captured["model"], "gpt-6.1-sol")
+        self.assertEqual(captured["reasoning"]["effort"], "low")
+        self.assertTrue(captured["text"]["format"]["strict"])

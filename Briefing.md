@@ -729,6 +729,8 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 
 ## 22. Aktueller Stand
 
+**Modellstand 1. Oktober 2026:** Eleven v4 und Music v2.5 sind für die bestehenden Schnittstellen geprüft und implementiert. GPT-6 Luna bleibt die sparsame Standardwahl; GPT-6.1 Sol ersetzt die höhere Qualitätsstufe. Geräuschmodell v2 ist aktuell. Echte Modellaufrufe mit den produktiven Schlüsseln sowie 167 lokale Tests sind erfolgreich; Stimmen/Favoriten und historische Modellzuordnungen werden berücksichtigt. Details: `docs/api-modellstand.md`. Diese Ergänzung ist aktueller als die folgenden Pilotangaben.
+
 - Phase 0 ist abgeschlossen: Django 5.2 LTS, Python 3.12, PostgreSQL, Redis, Celery, Gunicorn, FFmpeg und Docker Compose sind als reproduzierbares Grundgerüst vorhanden.
 - Phase 1 ist lokal abgeschlossen: Login, POST-Logout, Sperrung, Rate-Limit, einmalig sichtbare temporäre Passwörter, erzwungener Erstwechsel und Adminverwaltung sind implementiert und getestet.
 - Phase 2 ist lokal abgeschlossen: eigentümergeschützte Projekte, Sprecher, Beiträge, Regieanweisungen, Pausen, Reihenfolge, Duplikation und Autosave sind implementiert.
@@ -748,6 +750,8 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 
 ## 23. Nächste konkrete Aufgabe
 
+**Aktuelle nächste Aufgabe (1. Oktober 2026):** Nach der Serverabnahme Hörvergleiche mit Eleven v4 in den Kernsprachen durchführen und Regieanweisungen/Stimmkonstanz pädagogisch beurteilen. Die folgenden Integrationspilot-Angaben dokumentieren den früheren Stand.
+
 **ElevenLabs-Integrationspilot durchführen: API-Zugang sicher konfigurieren, Stimmen kuratieren und die reale mehrsprachige Audiokette end-to-end abnehmen.**
 
 Ein neuer Arbeitschat soll:
@@ -761,6 +765,8 @@ Ein neuer Arbeitschat soll:
 7. danach den LLM-Anbieter für Phase 5 auswählen oder den Assistenten weiter deaktiviert lassen.
 
 ## 24. Entscheidungsprotokoll
+
+- **2026-10-01:** Provider-Modelle anhand offizieller Dokumentation und realer Schlüssel prüfen. Eleven v4 und Music v2.5 übernehmen; OpenAI-Kostentrennung beibehalten (Luna als Standard, GPT-6.1 Sol als Qualitätsoption). Budget und Nutzerkontingente unverändert lassen. Alte Aufträge behalten ihre gespeicherten Modelle; Stimmen und Favoriten werden übernommen.
 
 | Datum | Entscheidung | Begründung |
 |---|---|---|
@@ -790,6 +796,8 @@ Ein neuer Arbeitschat soll:
 | 2026-07-26 | Nginx lauscht für die Sprachplattform nur auf `127.0.0.1:8085` | Cloudflared erreicht den Dienst lokal; der zusätzliche Proxyport wird nicht im LAN geöffnet. |
 
 ## 25. Änderungsprotokoll
+
+- **2026-10-01:** Aktuelle Modelle, kompatible Reasoning-Einstellungen, automatische Musikausgabequalität und modellgebundene Sprach-Retries umgesetzt. Datenmigrationen und 167 Tests erfolgreich lokal geprüft; je ein realer v4-Dialog, v2.5-Jingle und GPT-6.1-Sol-Entwurf erfolgreich validiert. Betriebsdokumentation unter `docs/api-modellstand.md`.
 
 ### 2026-07-22 – Initiale Fassung
 
