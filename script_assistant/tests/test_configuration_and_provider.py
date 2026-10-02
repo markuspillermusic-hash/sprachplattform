@@ -165,6 +165,23 @@ class OpenAIProviderTests(TestCase):
         self.assertTrue(provider.test_connection())
         self.assertEqual(captured, {"method": "GET", "path": "/v1/models/gpt-6-luna"})
 
+    def test_sound_plan_prompt_separates_draft_from_audio_approval(self):
+        from production.planning import PLAN_SCHEMA
+        captured = {}
+        plan = {"summary": "Jingle", "speech_start": 0, "music_duck_db": 4, "compression": 25, "items": []}
+
+        def handler(request):
+            captured.update(json.loads(request.content))
+            return httpx.Response(200, json={"output": [{"content": [{"type": "output_text", "text": json.dumps(plan)}]}]})
+
+        provider = OpenAIScriptAssistantProvider(self.configuration, transport=httpx.MockTransport(handler))
+        context = {"speech_approved": True, "operation": "draft_sound_plan", "plan_approval_required_for": "generate_audio_and_mix"}
+        provider.generate_proposal({"task": "sound_plan", "workflow_context": context})
+        self.assertEqual(captured["text"]["format"]["schema"], PLAN_SCHEMA)
+        self.assertEqual(json.loads(captured["input"])["workflow_context"], context)
+        self.assertIn("Eine Freigabe des Klangplans erfolgt erst NACH diesem Entwurf", captured["instructions"])
+        self.assertIn("Die Plattform prüft und verwaltet alle Freigaben", captured["instructions"])
+
     def test_quality_model_normalizes_unsupported_none_reasoning(self):
         captured = {}
         def handler(request):

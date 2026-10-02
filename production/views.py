@@ -20,7 +20,7 @@ from generation.models import AudioAsset
 from generation.services import GenerationValidationError
 from tts.models import ProviderVoice
 
-from .forms import PlanItems, PlanSettingsForm, ProductionBriefForm, ScriptLines, SpeakerVoices, WishesForm
+from .forms import PlanItems, PlanRefinementForm, PlanSettingsForm, ProductionBriefForm, ScriptLines, SpeakerVoices, WishesForm
 from .models import Production
 from .planning import ProductionError
 from .planning import validate_plan
@@ -54,7 +54,7 @@ def voice_forms(production, user, data=None):
     return SpeakerVoices(data, prefix="voices", initial=initial, form_kwargs={"project": production.project, "user": user})
 
 
-def render_detail(request, production, *, lines=None, voices=None, settings_form=None, items=None, wishes=None, code=200):
+def render_detail(request, production, *, lines=None, voices=None, settings_form=None, items=None, wishes=None, refinement=None, code=200):
     project = production.project
     recover_stale_runs(project)
     run = busy(production)
@@ -80,6 +80,7 @@ def render_detail(request, production, *, lines=None, voices=None, settings_form
         "voices": voices if voices is not None else voice_forms(production, request.user),
         "plan_settings": settings_form if settings_form is not None else default_settings,
         "items": items if items is not None else default_items,
+        "plan_refinement": refinement if refinement is not None else PlanRefinementForm(),
         "wishes": wishes or WishesForm(initial=production.brief),
         "speech": speech, "mix_asset": mix, "final_asset": final,
         "dirty_script": dirty_script, "dirty_mix": dirty_mix,
@@ -127,7 +128,7 @@ def action(request, project_id):
     authorize(project, request.user)
     production = get_object_or_404(Production, project=project)
     kind = request.POST.get("action", "")
-    settings_form = items = None
+    settings_form = items = refinement = wishes = None
     try:
         revision = int(request.POST.get("revision", ""))
         if kind in ("save_script", "apply_script", "edit_script", "speech"):
@@ -163,12 +164,17 @@ def action(request, project_id):
             if not wishes.is_valid():
                 return render_detail(request, production, wishes=wishes, code=400)
             start_run(project, request.user, kind, revision, wishes.cleaned_data)
-        elif kind in ("save_plan", "mix"):
+        elif kind in ("save_plan", "mix", "refine_plan"):
             settings_form, items = plan_forms(production, request.POST)
+            refinement = PlanRefinementForm(request.POST)
+            valid_refinement = refinement.is_valid()
+            if kind == "refine_plan" and valid_refinement and not refinement.cleaned_data["instruction"]:
+                refinement.add_error("instruction", "Beschreiben Sie bitte, was am Klangplan geändert werden soll.")
+                valid_refinement = False
             valid_settings, valid_items = settings_form.is_valid(), items.is_valid()
-            if not valid_settings or not valid_items:
+            if not valid_settings or not valid_items or not valid_refinement:
                 messages.error(request, "Prüfen Sie bitte die markierten Elemente des Klangplans.")
-                return render_detail(request, production, settings_form=settings_form, items=items, code=400)
+                return render_detail(request, production, settings_form=settings_form, items=items, refinement=refinement, code=400)
             plan = {**settings_form.cleaned_data, "items": [{k: v for k, v in form.cleaned_data.items() if k != "DELETE"}
                     for form in items if form.cleaned_data and not form.cleaned_data.get("DELETE")]}
             from .services import approved_audio, speech_asset
@@ -176,7 +182,9 @@ def action(request, project_id):
             plan = validate_plan(project, plan, float(audio.duration_seconds or speech_asset(production).duration))
             changed = plan != production.plan
             production = save_plan(project, request.user, revision, plan)
-            if kind == "mix" and not changed:
+            if kind == "refine_plan":
+                start_run(project, request.user, "plan", production.revision, refinement.cleaned_data)
+            elif kind == "mix" and not changed:
                 start_run(project, request.user, "mix", production.revision)
             else:
                 messages.success(request, "Der Klangplan wurde gespeichert. Prüfen Sie den aktualisierten Verbrauch und geben Sie anschließend die Mischung frei.")
@@ -191,7 +199,9 @@ def action(request, project_id):
     except (ProductionError, StudioError, GenerationValidationError, ProposalValidationError, ValueError) as exc:
         messages.error(request, str(exc) if isinstance(exc, (ProductionError, StudioError, GenerationValidationError, ProposalValidationError)) else "Der Produktionsstand ist ungültig. Bitte laden Sie die Seite neu.")
         if settings_form is not None and items is not None:
-            return render_detail(request, production, settings_form=settings_form, items=items, code=400)
+            return render_detail(request, production, settings_form=settings_form, items=items, refinement=refinement, code=400)
+        if wishes is not None:
+            return render_detail(request, production, wishes=wishes, code=400)
     return redirect("production:detail", project_id=project.pk)
 
 

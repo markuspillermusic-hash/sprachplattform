@@ -238,6 +238,98 @@ class ProductionTests(TestCase):
         self.assertFalse(GenerationJob.objects.exists())
         self.assertFalse(UsageEvent.objects.exists())
 
+    def test_plan_request_confirms_speech_approval_but_only_requests_a_draft(self):
+        self.speech()
+        before = GenerationJob.objects.count()
+        with patch("production.services._provider_request", return_value=SimpleNamespace(payload=self.plan)) as provider:
+            self.run_phase("plan", {"music_wishes": "Klavier", "effects_wishes": "Vogel"})
+        request = provider.call_args.args[0]
+        self.assertTrue(request["workflow_context"]["speech_approved"])
+        self.assertEqual(request["workflow_context"]["operation"], "draft_sound_plan")
+        self.assertEqual(request["workflow_context"]["plan_approval_required_for"], "generate_audio_and_mix")
+        self.assertEqual(request["brief"]["music_wishes"], "Klavier")
+        self.assertEqual(self.production.stage, "plan")
+        self.assertEqual(GenerationJob.objects.count(), before)
+        self.assertFalse(self.project.studio_jobs.exclude(kind="export").exists())
+
+    def test_refine_plan_saves_manual_changes_and_does_not_generate_audio(self):
+        self.approve_audio()
+        self.production.brief.update(music_wishes="Klavier", effects_wishes="Vogel")
+        self.production.save()
+        data = self.plan_post()
+        data.update(action="refine_plan", instruction="Ersetze den Vogel durch Regen", **{"items-0-gain_db": -24})
+        before = GenerationJob.objects.count()
+        response = self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        self.assertEqual(response.status_code, 302)
+        run = self.project.production_runs.first()
+        self.assertEqual(run.kind, "plan")
+        self.assertEqual(run.input_data["previous_plan"]["items"][0]["gain_db"], -24)
+        self.assertEqual(run.input_data["instruction"], data["instruction"])
+        revised = deepcopy(self.plan)
+        revised["items"][0]["gain_db"] = -24
+        revised["items"][1]["title"] = "Regen"
+        with patch("production.services._provider_request", return_value=SimpleNamespace(payload=revised)) as provider:
+            run_production(run.pk)
+        self.production.refresh_from_db()
+        self.assertEqual(self.production.plan, revised)
+        self.assertEqual(provider.call_args.args[0]["brief"]["music_wishes"], "Klavier")
+        self.assertEqual(GenerationJob.objects.count(), before)
+        self.assertFalse(self.project.production_runs.filter(kind="mix").exists())
+
+    def test_invalid_refinement_preserves_plan_edits_and_instruction(self):
+        self.approve_audio()
+        data = self.plan_post()
+        data.update(action="refine_plan", instruction="Bitte leisere Musik", **{"items-0-title": "Meine Musik", "items-0-fade_in": 3, "items-0-fade_out": 3})
+        response = self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        self.assertContains(response, "Bitte leisere Musik", status_code=400)
+        self.assertEqual(response.context["items"].forms[0]["title"].value(), "Meine Musik")
+        self.assertEqual(self.project.production_runs.filter(kind="plan").count(), 1)
+        data.update(instruction="", **{"items-0-fade_in": 0, "items-0-fade_out": 0})
+        response = self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("instruction", response.context["plan_refinement"].errors)
+        self.assertEqual(self.project.production_runs.filter(kind="plan").count(), 1)
+
+    def test_empty_plan_can_be_edited_or_revised_without_plan_approval(self):
+        self.approve_audio()
+        self.production.plan = {**self.plan, "summary": "Keine Freigabe angegeben", "items": []}
+        self.production.save()
+        response = self.client.get(reverse("production:detail", args=[self.project.pk]))
+        self.assertContains(response, "Klangplan nach Änderungswunsch überarbeiten")
+        self.assertContains(response, "Der Vorschlag enthält noch keine")
+        data = self.plan_post()
+        data.update(action="refine_plan", instruction="Bitte Jingle und Vogel planen")
+        response = self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        self.assertEqual(response.status_code, 302)
+        run = self.project.production_runs.first()
+        with patch("production.services._provider_request", return_value=SimpleNamespace(payload=self.plan)):
+            run_production(run.pk)
+        self.production.refresh_from_db()
+        self.assertEqual(len(self.production.plan["items"]), 2)
+        self.assertFalse(self.project.production_runs.filter(kind="mix").exists())
+
+    def test_failed_plan_refinement_retains_manual_edits(self):
+        self.approve_audio()
+        data = self.plan_post()
+        data.update(action="refine_plan", instruction="Weniger Spannung", **{"items-0-gain_db": -24})
+        self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        from script_assistant.providers import AssistantProviderError
+        run = self.project.production_runs.first()
+        with patch("production.services._provider_request", side_effect=AssistantProviderError("KI nicht erreichbar")):
+            run_production(run.pk)
+        run.refresh_from_db(); self.production.refresh_from_db()
+        self.assertEqual(run.status, "failed")
+        self.assertEqual(self.production.plan["items"][0]["gain_db"], -24)
+
+    def test_ai_plan_change_invalidates_previous_mix_approval(self):
+        self.approve_audio()
+        self.production.mixed_revision = 7
+        self.production.save()
+        revised = deepcopy(self.plan); revised["music_duck_db"] = 2
+        with patch("production.services._provider_request", return_value=SimpleNamespace(payload=revised)):
+            self.run_phase("plan", {"instruction": "Weniger Absenkung"})
+        self.assertIsNone(self.production.mixed_revision)
+
     def test_new_script_is_only_a_draft_until_approved(self):
         self.segment.delete(); self.speaker.delete()
         payload = {"title": "Waldgeschichte", "language": "de", "level": "A2", "speakers": [{"name": "Anna"}], "segments": [{"speaker": "Anna", "text": "Hallo!", "direction": "", "pause_after_ms": 0, "speed": 1}]}

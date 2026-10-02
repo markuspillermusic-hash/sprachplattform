@@ -15,6 +15,10 @@ class ProductionError(ValueError):
 GUIDE = (Path(__file__).with_name("AGENT_GUIDE.md")).read_text(encoding="utf-8")
 PLAN_PROMPT = GUIDE + """
 Du entwirfst einen konkreten Klangplan im vorgegebenen JSON-Schema.
+Dieser Auftrag erstellt ausschließlich einen Vorschlag, keine Audios. Die Plattform hat die Sprachfreigabe
+bereits geprüft; workflow_context bestätigt sie. Eine Freigabe des Klangplans erfolgt erst NACH diesem Entwurf.
+Erstelle die gewünschten Elemente jetzt, auch wenn previous_plan leer ist oder irrtümlich eine fehlende
+Freigabe erwähnt. Gib keine Freigabeaufforderung statt eines Entwurfs zurück.
 Alle Zeiten sind Sekunden seit Beginn der gesamten Mischung. speech_start verschiebt die vollständige Sprache,
 zum Beispiel für einen Jingle. items enthalten nur Musik und Geräusche. Maximal 12 Elemente.
 Für vorhandene Audios setze asset_id aus der gelieferten Bibliothek, prompt leer und duration höchstens auf deren Dauer.

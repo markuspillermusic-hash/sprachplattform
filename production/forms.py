@@ -94,6 +94,11 @@ class PlanSettingsForm(forms.Form):
     compression = forms.FloatField(label="Sprachkompression (0–100)", min_value=0, max_value=100)
 
 
+class PlanRefinementForm(forms.Form):
+    instruction = forms.CharField(label="Änderungswunsch an den Assistenten", max_length=2000, required=False,
+                                  widget=forms.Textarea(attrs={"id": "plan-change", "rows": 2, "placeholder": "Zum Beispiel: kürzerer Jingle, leisere Hintergrundmusik und Regen ab der zweiten Szene."}))
+
+
 class PlanItemForm(forms.Form):
     title = forms.CharField(label="Name", max_length=120)
     kind = forms.ChoiceField(label="Audioart", choices=[("music", "Musik"), ("effects", "Geräusch")])

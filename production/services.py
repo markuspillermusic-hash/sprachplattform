@@ -327,10 +327,14 @@ def run_production(run_id):
             library = [{"asset_id": str(a.pk), "title": a.title, "kind": a.kind, "duration": a.duration}
                        for a in live_assets(run.project).filter(kind__in=("music", "effects"))[:100]]
             result = _provider_request({"task": "sound_plan", "brief": production.brief,
+                "workflow_context": {"speech_approved": True, "operation": "draft_sound_plan",
+                                     "plan_approval_required_for": "generate_audio_and_mix"},
                 "speech_duration": speech.duration, "script": project_payload(run.project), "library": library,
                 "previous_plan": run.input_data["previous_plan"], "change_request": run.input_data.get("instruction", "")}, user)
             plan = validate_plan(run.project, result.payload, speech.duration)
             updates = {"plan": plan, "stage": Production.Stage.PLAN}
+            if plan != production.plan:
+                updates["mixed_revision"] = None
             _progress(run, "Der Klangplan ist bereit zur Prüfung.", plan=plan)
         elif run.kind == "mix":
             production.plan = run.input_data["plan"]
