@@ -729,6 +729,8 @@ Zugangsdaten werden bei Bedarf ausschließlich über sichere Serverkonfiguration
 
 ## 22. Aktueller Stand
 
+**Assistenten-Korrekturen 2. Oktober 2026:** Startseite und Projektübersicht bieten Hörtext und Hörspiel gleichwertig mit Erklärungen an. Der Editorwechsel lädt den aktuellen Entwurf einschließlich Textänderungen und gewählter Stimmen. Stimmen sind vorab und pro Rolle optional wählbar; GER-Niveau ist optional und bleibt ohne Vorgabe leer. Leere zusätzliche Audiofelder werden ignoriert; bei Fehlern bleiben Musikbeschreibungen und Schnittwerte erhalten. 213 Tests und öffentliche Formularabnahme erfolgreich.
+
 **Hörspiel-Assistent 1. Oktober 2026:** Der integrierte, optionale Produktionsablauf ist öffentlich aktiv. Einstieg: Meine Hörtexte → Hörspiel mit Assistent erstellen, direkt `/produktion/neu/`. Gespeicherte Phasen: Skriptentwurf und Korrekturen, explizite Skriptfreigabe, Sprachfassung, Freigabe für Klangplanung, editierbarer Klangplan, Musik-/Geräuscherzeugung und Studiomischung, Prüfung und MP3-/WAV-Export. Bestehende Projekte können den Ablauf ebenfalls verwenden. 201 Tests im Produktionsimage und öffentlicher Ablauf mit echten OpenAI-/ElevenLabs-Audios erfolgreich; vollständig wiederverwendete Sprachabschnitte benötigen keine Anbieterbuchung. Zentrale Anleitung: `production/AGENT_GUIDE.md`; Details: `docs/hoerspiel-assistent.md`. Arbeitsblätter bleiben ein möglicher späterer Ausbau.
 
 **Projektkorrekturen 1. Oktober 2026:** Vollständige Audiokopien mit eigenständigen Dateien, gespeicherten Schnittständen und verfügbaren Sprachversionen sind öffentlich aktiv. Löschen entfernt Inhalte und eigene Dateien, erhält aber Sprach-, Musik- und Geräuschverbrauch. Laufende Aufträge verhindern Kopieren und Löschen. 179 Tests bestehen im Produktionsimage; der öffentliche Ablauf mit elf Demoaudios, Löschen des Originals und anschließendem Celery-WAV-Export der Kopie ist erfolgreich. Details: `docs/projekte-kopieren-und-loeschen.md`.
@@ -774,6 +776,8 @@ Ein neuer Arbeitschat soll:
 
 ## 24. Entscheidungsprotokoll
 
+- **2026-10-02:** Stimmenwahl darf bereits vor dem Skriptentwurf erfolgen und nachträglich pro Rolle geändert werden. Manuelle Stimmenänderungen im Editor bleiben für folgende Entwürfe maßgeblich. Ohne GER-Vorgabe wird kein Niveau eingesetzt. Der Wechsel zum Editor übernimmt den sichtbaren Entwurf, erzeugt aber keine Sprache. Ein unbenutzter Zusatz-Audioblock löst weder Validierung noch Erzeugung aus.
+
 - **2026-10-01:** Integrierten Hörspiel-Assistenten nach ausdrücklichem Auftrag umgesetzt. Serverseitig gesteuerte Freigaben verbinden die bestehenden Anbieter- und Studiofunktionen; zentral gepflegte Anleitung statt Installation auf Lehrergeräten. KI erstellt strukturierte Vorschläge, während Freigaben, Projektzugriff, Budgets und Versionen durch die Plattform kontrolliert werden. Alte Audiofassungen und Studioschnitte bleiben verfügbar; unveränderte Audios werden bevorzugt wiederverwendet.
 
 - **2026-10-01:** Duplizieren übernimmt verfügbare Audios ohne Anbieteraufruf, mit unabhängigen Dateien und unveränderten Ablaufdaten. Löschen erhält Verbrauchsnachweise und die für Musik-/Geräuschkontingente benötigte Dauer, entfernt aber Skriptteile und gespeicherte Anfragen. Ein externer Agent für Unterrichtsmaterial und Browserbedienung ist als möglicher Ausbau diskutiert, noch nicht beauftragt oder umgesetzt.
@@ -808,6 +812,8 @@ Ein neuer Arbeitschat soll:
 | 2026-07-26 | Nginx lauscht für die Sprachplattform nur auf `127.0.0.1:8085` | Cloudflared erreicht den Dienst lokal; der zusätzliche Proxyport wird nicht im LAN geöffnet. |
 
 ## 25. Änderungsprotokoll
+
+- **2026-10-02:** Gleichwertige Startoptionen mit Formaterklärungen, Übernahme des Entwurfs beim Editorwechsel, optionale Stimmenwahl und optionales Sprachniveau veröffentlicht. Browser-Vorbelegung im leeren Audio-Zusatzblock berücksichtigt, Vorgabewerte ergänzt und verlustfreie Fehlerkorrektur im Klangplan umgesetzt. 213 PostgreSQL-Tests, Desktop-/Mobilprüfung sowie öffentlicher Ablauf mit echtem Skriptentwurf und ohne neue ElevenLabs-Buchung erfolgreich. Testprojekt entfernt.
 
 - **2026-10-01:** Optionalen Hörspiel-Assistenten mit Unterrichtsbriefing, Skriptkorrekturen, separaten Freigaben, Klangplanung, Hintergrundverarbeitung, automatischer Clipanordnung, Studioübergang und MP3-/WAV-Export veröffentlicht. Wiederverwendung unveränderter Sprachabschnitte einschließlich unabhängig kopierter Dateien und kostenfreier Pausen-/Tempoanpassung ergänzt. 201 PostgreSQL-Tests erfolgreich, Desktop-/Mobiloberfläche geprüft, öffentlicher echter Drei-Spur-Export und kostenfreie Sprachwiederverwendung bei aktivem Credit-Budget bestätigt. Testprojekte entfernt; Nutzungsnachweise bleiben erhalten.
 

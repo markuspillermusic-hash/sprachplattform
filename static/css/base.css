@@ -63,7 +63,7 @@ main { flex: 1; }
 .project-entry-option h2 {margin: 0; font-size: 2rem;}
 .project-entry-option p {color: var(--muted); line-height: 1.6; margin: .75rem 0 1.5rem;}
 .project-entry-option .button {margin-top: auto;}
-.home-hero {display: block; padding-block: 2.5rem 1rem;}
+.hero.home-hero {display: block; padding-block: 2.5rem 1rem;}
 .home-hero h1 {max-width: 28ch; font-size: clamp(2.2rem, 4vw, 3.4rem);}
 @media (max-width: 650px) {.project-entry-grid {grid-template-columns: 1fr;}}
 
