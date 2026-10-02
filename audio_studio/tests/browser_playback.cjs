@@ -43,7 +43,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:8097';
   const effects = original.clips.find(c => c.track === 'effects');
   original.clips.push({...effects, id: require('node:crypto').randomUUID(), track: 'speech', start: 2});
   const before = await (await page.request.get(`${studio}state/`)).json();
-  const reset = await page.request.post(`${studio}save/`, {headers: {'X-CSRFToken': await page.locator('#audio-studio [name=csrfmiddlewaretoken]').inputValue()}, data: {revision: before.revision, state: original}});
+  const reset = await page.request.post(`${studio}save/`, {headers: {Origin: base, Referer: studio, 'X-CSRFToken': await page.locator('#audio-studio [name=csrfmiddlewaretoken]').inputValue()}, data: {revision: before.revision, state: original}});
   assert(reset.ok(), await reset.text()); await page.reload(); await page.waitForFunction(() => !document.getElementById('studio-play').disabled);
   const clip = id => page.locator(`.studio-clip[data-id="${id}"]`);
   const position = () => page.locator('#studio-position').inputValue().then(Number);
@@ -62,8 +62,12 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:8097';
    for (const [key, value] of Object.entries(values)) await page.locator(`#studio-clip-form [name=${key}]`).fill(String(value));
    await page.getByRole('button', {name: 'Werte übernehmen'}).click();
   }
+  async function start() {
+   await page.locator('#studio-play').click();
+   await page.waitForFunction(() => document.getElementById('studio-play').textContent.includes('Pause'));
+  }
   await cursor(5); await clip(music.id).click({position: {x: 25, y: 25}});
-  await page.locator('#studio-play').click(); await remainsPlaying(5);
+  await start(); await remainsPlaying(5);
   const initialSources = await page.evaluate(() => window.audioQA.sources.length);
   const firstMusic = await page.evaluate(() => window.audioQA.sources.find(s => s.duration > 100).args);
   assert.equal(initialSources, 3);
@@ -127,7 +131,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:8097';
   await page.locator('h1').click(); await page.keyboard.press('Space');
   assert((await page.locator('#studio-play').innerText()).includes('Abspielen'));
   const paused = await position(); await page.waitForTimeout(250); assert.equal(await position(), paused);
-  await page.locator('#studio-undo').click(); await page.locator('#studio-play').click(); await remainsPlaying(0);
+  await page.locator('#studio-undo').click(); await start(); await remainsPlaying(0);
   await page.locator('#studio-stop').click(); assert.equal(await position(), 0);
   await page.waitForTimeout(300);
   assert.equal(await page.evaluate(() => window.audioQA.sources.filter(s => !s.stopped).length), 0, 'Stop must dispose all graphs');
@@ -137,7 +141,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:8097';
   await page.route(new URL(fixture.generated.url, base).href, async route => {
    pending = true; await gate; await route.continue();
   });
-  await page.locator('#studio-play').click(); await remainsPlaying(0);
+  await start(); await remainsPlaying(0);
   await page.locator('.studio-library-item').filter({has: page.locator('strong', {hasText: fixture.generated.title})}).getByRole('button', {name: 'Einfügen'}).click();
   for (let i = 0; i < 30 && !pending; i++) await page.waitForTimeout(50);
   assert(pending, 'New audio should load while the old graph continues');
