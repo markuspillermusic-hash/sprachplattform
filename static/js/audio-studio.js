@@ -11,6 +11,19 @@
   let assets = new Map(), history = [], jobs = [], generation = {}, creditBudget = null, undo = [], redo = [];
   let context, playing = false, nodes = [], started = 0, playFrom = 0, playUntil = 0, frame;
   let saving, polling, ready = false, loadingAudio = false, playbackToken = 0;
+  let clipClipboard = null, activeTrack = "speech", generationPlacement = null, dragging = false, generationSubmitting = false, menuScrollLeft = 0;
+  let generationKind = "music";
+  const generationDrafts = new Map();
+  const pendingKey = `studio-generation:${root.dataset.stateUrl}`;
+  let pendingInsertions = new Map();
+  try { pendingInsertions = new Map(JSON.parse(sessionStorage.getItem(pendingKey) || "[]")); } catch {}
+  const rememberInsertions = () => { try { sessionStorage.setItem(pendingKey, JSON.stringify([...pendingInsertions])); } catch {} };
+  const menu = elMenu();
+  function elMenu() {
+    const node = document.createElement("div"); node.id = "studio-context-menu";
+    node.className = "studio-context-menu"; node.hidden = true; node.setAttribute("role", "menu");
+    node.setAttribute("aria-label", "Clip bearbeiten"); root.append(node); return node;
+  }
   const buffers = new Map();
   const length = (clip) => clip.trim_end - clip.trim_start;
   const mixSettings = () => ({music_duck_db: state.ducking ? 4 : 0,
@@ -218,11 +231,14 @@
   }
   function select(id) {
     selected = id;
+    const clip = state.clips.find(c => c.id === id);
+    if (clip) activeTrack = clip.track;
     root.querySelectorAll(".studio-clip").forEach(b => b.classList.toggle("is-selected", b.dataset.id === id));
     inspector();
   }
   function render() {
     if (!state) return;
+    closeMenu();
     $("timeline").replaceChildren();
     const width = Math.max(650, (duration() + 10) * zoom);
     const labelWidth = window.innerWidth <= 780 ? 130 : 156;
@@ -242,13 +258,26 @@
         input.addEventListener("change", () => change(() => { state.tracks[name][key] = input.checked; })); l.append(input, document.createTextNode(text)); controls.append(l);
       }
       label.append(controls);
+      if (name !== "speech") label.append(action(`＋ ${names[name]}`, () => openGeneration(name, position), "button button-quiet studio-track-add"));
       const volume = el("label", "Pegel (dB)"); const input = el("input");
       input.type = "number"; input.min = -60; input.max = 12; input.value = state.tracks[name].gain_db;
       input.addEventListener("change", safe(() => {
         if (!input.checkValidity() || input.value === "") { render(); throw new Error("Der Spurpegel muss zwischen −60 und +12 dB liegen."); }
         change(() => { state.tracks[name].gain_db = Number(input.value); });
       })); volume.append(input); label.append(volume);
-      const lane = el("div", null, "studio-lane"); lane.style.setProperty("--tick-width", `${zoom * step}px`);
+      const lane = el("div", null, "studio-lane"); lane.dataset.track = name; lane.style.setProperty("--tick-width", `${zoom * step}px`);
+      lane.addEventListener("click", e => {
+        if (e.target.closest(".studio-clip") || dragging) return;
+        closeMenu(); stop(); activeTrack = name;
+        updatePosition((e.clientX - lane.getBoundingClientRect().left) / zoom);
+        if (name !== "speech") openGeneration(name, position);
+      });
+      lane.addEventListener("contextmenu", e => {
+        if (e.target.closest(".studio-clip")) return;
+        e.preventDefault(); stop(); activeTrack = name;
+        updatePosition((e.clientX - lane.getBoundingClientRect().left) / zoom);
+        showLaneMenu(e.clientX, e.clientY, name, position);
+      });
       const placed = [];
       const clips = state.clips.filter(c => c.track === name).sort((a,b) => a.start - b.start);
       for (const c of clips) {
@@ -278,14 +307,27 @@
         updateFadeVisuals(button, c);
         button.addEventListener("click", () => select(c.id));
         button.addEventListener("pointerdown", e => drag(e, c, button));
+        button.addEventListener("contextmenu", e => { e.preventDefault(); e.stopPropagation(); select(c.id); showClipMenu(e.clientX, e.clientY); });
         lane.append(button); row.append(label, lane); $("timeline").append(row); drawWave(canvas, c, w);
       }
-      if (!clips.length) lane.append(el("span", "Audiodatei hinzufügen, um diese Spur zu belegen.", "studio-empty-lane"));
+      if (!clips.length) lane.append(el("span", name === "speech" ? "Sprachfassung übernehmen oder Audio hochladen." : `Hier klicken, um ${names[name]} zu erzeugen.`, "studio-empty-lane"));
       lane.style.height = `${Math.max(150, placed.length * 76 + 20)}px`;
       lane.append(el("div", null, "studio-playhead")); row.append(label, lane); $("timeline").append(row);
     }
     renderMixSettings();
-    inspector(); updatePosition(position); mark();
+    inspector(); updatePosition(position); updateGainLabels(); mark();
+  }
+  function updateGainLabels() {
+    const viewport = $("timeline").getBoundingClientRect();
+    const labelWidth = window.innerWidth <= 780 ? 130 : 156;
+    root.querySelectorAll(".studio-clip").forEach(button => {
+      const label = button.querySelector(".studio-gain-value");
+      const rect = button.getBoundingClientRect(), inset = button.classList.contains("studio-clip-compact") ? 2 : 8;
+      const left = Math.max(inset, viewport.left + labelWidth + 5 - rect.left);
+      const right = Math.min(rect.width - inset, viewport.right - 5 - rect.left);
+      label.style.right = "auto";
+      label.style.left = `${Math.max(0, Math.min(left + 2, right - label.offsetWidth) - inset)}px`;
+    });
   }
   function fitFades(c) {
     const sum = c.fade_in + c.fade_out, total = length(c);
@@ -301,7 +343,7 @@
     }
     button.classList.toggle("studio-clip-compact", width < 40);
     const gainHandle = button.querySelector(".studio-gain-handle");
-    gainHandle.style.top = `${c.gain_db >= 0 ? 38 - c.gain_db * 1.1 : 38 - c.gain_db * .3}px`;
+    gainHandle.style.top = `${clamp(c.gain_db >= 0 ? 38 - c.gain_db * 1.1 : 38 - c.gain_db * .3, 25, 52)}px`;
     gainHandle.title = `Cliplautstärke: ${c.gain_db.toFixed(1)} dB · hoch/runter ziehen · Umschalt für feine Schritte · Doppelklick: 0 dB`;
     gainHandle.firstChild.textContent = `${c.gain_db > 0 ? "+" : ""}${c.gain_db.toFixed(1)} dB`;
     for (const side of ["in", "out"]) {
@@ -321,33 +363,42 @@
   }
   function drag(event, c, button) {
     if (event.button !== 0) return;
-    select(c.id); stop();
+    closeMenu(); select(c.id); stop();
     const old = clone(state), initial = clone(c), x = event.clientX, y = event.clientY,
       side = event.target.dataset.trim, fade = event.target.dataset.fade,
       gainDrag = Boolean(event.target.closest(".studio-gain-handle"));
+    const copyGesture = (event.ctrlKey || event.metaKey) && !side && !fade && !gainDrag;
+    if (copyGesture && state.clips.length >= 60) { message("Es sind höchstens 60 Clips möglich."); return; }
+    let dragged = c, movingButton = button;
     let lastY = y, gainValue = initial.gain_db;
     const captureElement = gainDrag ? event.target.closest(".studio-gain-handle") : button;
     let moved = false, cancelled = false; captureElement.setPointerCapture(event.pointerId);
     const move = e => {
       const delta = Math.round((e.clientX - x) / zoom * 100) / 100;
       if (Math.abs((gainDrag ? e.clientY - y : e.clientX - x)) < 3 && !moved) return;
+      if (!moved && copyGesture) {
+        dragged = clone(initial); dragged.id = crypto.randomUUID(); state.clips.push(dragged);
+        movingButton = button.cloneNode(true); movingButton.dataset.id = dragged.id;
+        movingButton.classList.add("is-copying"); button.parentElement.append(movingButton); drawWave(movingButton.querySelector("canvas"), dragged); select(dragged.id);
+      }
       moved = true;
-      Object.assign(c, initial);
+      dragging = true;
+      const id = dragged.id; Object.assign(dragged, initial, {id});
       if (gainDrag) {
         gainValue = clamp(gainValue + (lastY - e.clientY) * (e.shiftKey ? .05 : .4), -60, 12);
-        lastY = e.clientY; c.gain_db = Math.round(gainValue * 10) / 10;
+        lastY = e.clientY; dragged.gain_db = Math.round(gainValue * 10) / 10;
       } else if (fade) {
         const other = fade === "in" ? "fade_out" : "fade_in";
-        c[`fade_${fade}`] = clamp(initial[`fade_${fade}`] + (fade === "in" ? delta : -delta), 0, length(initial) - initial[other]);
+        dragged[`fade_${fade}`] = clamp(initial[`fade_${fade}`] + (fade === "in" ? delta : -delta), 0, length(initial) - initial[other]);
       } else if (side === "left") {
         const d = clamp(delta, -Math.min(initial.trim_start, initial.start), length(initial) - .01);
-        c.start += d; c.trim_start += d;
-      } else if (side === "right") c.trim_end = clamp(initial.trim_end + delta, initial.trim_start + .01, Math.min(assets.get(c.asset_id)?.duration || initial.trim_end, initial.trim_start + 1800 - c.start));
-      else c.start = clamp(initial.start + delta, 0, 1800 - length(c));
-      fitFades(c);
-      button.style.left = `${c.start * zoom}px`; button.style.width = `${Math.max(14, length(c) * zoom)}px`;
-      button.querySelector("canvas").style.left = `${-c.trim_start * zoom}px`;
-      updateFadeVisuals(button, c);
+        dragged.start += d; dragged.trim_start += d;
+      } else if (side === "right") dragged.trim_end = clamp(initial.trim_end + delta, initial.trim_start + .01, Math.min(assets.get(c.asset_id)?.duration || initial.trim_end, initial.trim_start + 1800 - c.start));
+      else dragged.start = clamp(initial.start + delta, 0, 1800 - length(dragged));
+      fitFades(dragged);
+      movingButton.style.left = `${dragged.start * zoom}px`; movingButton.style.width = `${Math.max(14, length(dragged) * zoom)}px`;
+      movingButton.querySelector("canvas").style.left = `${-dragged.trim_start * zoom}px`;
+      updateFadeVisuals(movingButton, dragged); updateGainLabels();
       inspector();
     };
     const end = e => {
@@ -356,22 +407,24 @@
       if (moved) { undo.push(old); if (undo.length > 60) undo.shift(); redo = []; }
       if (moved || cancelled) render();
       else { inspector(); mark(); }
+      // Suppress the click generated by releasing a drag over a free lane.
+      setTimeout(() => { dragging = false; }, 0);
     };
-    const cancel = e => { state = old; moved = false; cancelled = true; end(e); };
+    const cancel = e => { state = old; selected = c.id; moved = false; cancelled = true; end(e); };
     button.addEventListener("pointermove", move); button.addEventListener("pointerup", end); button.addEventListener("pointercancel", cancel);
   }
-  function addAsset(asset) {
+  function addAsset(asset, placement = null) {
     if (state.clips.length >= 60) throw new Error("Es sind höchstens 60 Clips möglich.");
     assets.set(asset.id, asset);
     const choice = $("add-track").value;
-    const track = choice === "auto" ? (names[asset.kind] ? asset.kind : "effects") : choice;
-    const start = position;
+    const track = placement?.track || (choice === "auto" ? (names[asset.kind] ? asset.kind : "effects") : choice);
+    const start = placement?.start ?? position;
     const remaining = Math.min(asset.duration, 1800 - start);
     if (remaining < .01) throw new Error("Setzen Sie die Abspielposition vor das Ende der 30 Minuten.");
     change(() => {
       const c = {id: crypto.randomUUID(), asset_id: asset.id, track, start, trim_start: 0, trim_end: remaining,
         gain_db: track === "music" ? -16 : track === "effects" ? -10 : 0, fade_in: 0, fade_out: 0};
-      state.clips.push(c); selected = c.id;
+      state.clips.push(c); selected = c.id; activeTrack = track;
     });
     renderLibrary();
   }
@@ -390,9 +443,87 @@
       audio.setAttribute("aria-label", a.title); audio.addEventListener("play", () => stop()); item.append(audio); $("library").append(item);
     }
   }
+  function closeMenu(focusClip = false) {
+    menu.hidden = true;
+    if (focusClip && selected) root.querySelector(`.studio-clip[data-id="${selected}"]`)?.focus({preventScroll: true});
+  }
+  function showMenu(x, y, entries) {
+    menu.replaceChildren();
+    for (const [label, shortcut, fn, enabled = true] of entries) {
+      const item = action(null, () => { closeMenu(); fn(); }, "");
+      item.append(el("span", label), el("small", shortcut)); item.disabled = !enabled;
+      item.setAttribute("role", "menuitem"); menu.append(item);
+    }
+    menu.hidden = false;
+    menuScrollLeft = $("timeline").scrollLeft;
+    menu.style.left = `${clamp(x, 4, window.innerWidth - menu.offsetWidth - 4)}px`;
+    menu.style.top = `${clamp(y, 4, window.innerHeight - menu.offsetHeight - 4)}px`;
+    menu.querySelector("button:not(:disabled)")?.focus({preventScroll: true});
+  }
+  function copySelected() {
+    const c = state.clips.find(c => c.id === selected); if (!c) return false;
+    clipClipboard = clone(c); return true;
+  }
+  function removeSelected() {
+    if (!state.clips.some(c => c.id === selected)) return;
+    change(() => { state.clips = state.clips.filter(c => c.id !== selected); selected = null; });
+  }
+  function insertCopy(source, start, track = source.track) {
+    if (!assets.has(source.asset_id)) throw new Error("Diese Audiodatei ist nicht mehr verfügbar.");
+    if (state.clips.length >= 60 || start < 0 || start + length(source) > 1800) throw new Error("Der neue Clip überschreitet die zulässige Clipzahl oder Gesamtdauer.");
+    change(() => {
+      const copy = clone(source); copy.id = crypto.randomUUID(); copy.start = start; copy.track = track;
+      state.clips.push(copy); selected = copy.id; activeTrack = track;
+    });
+  }
+  function pasteClip(track = activeTrack, start = position) {
+    if (!clipClipboard) return;
+    insertCopy(clipClipboard, start, track);
+  }
+  function duplicateSelected() {
+    const c = state.clips.find(c => c.id === selected); if (c) insertCopy(c, c.start + length(c));
+  }
+  function editSelected() {
+    inspector(); $("clip-form").scrollIntoView({block: "center"}); $("clip-form").elements.start.focus({preventScroll: true});
+  }
+  function showClipMenu(x, y) {
+    stop(); const c = state.clips.find(c => c.id === selected); if (!c) return;
+    showMenu(x, y, [
+      ["Clip bearbeiten …", "", editSelected],
+      ["Kopieren", "Strg+C", copySelected],
+      ["Ausschneiden", "Strg+X", () => { if (copySelected()) removeSelected(); }],
+      ["Am Cursor einfügen", "Strg+V", () => pasteClip(), Boolean(clipClipboard)],
+      ["Duplizieren", "Strg+D", duplicateSelected],
+      ["Am Cursor teilen", "T", splitSelected, position > c.start + .01 && position < c.start + length(c) - .01],
+      ["Löschen", "Entf", removeSelected],
+    ]);
+  }
+  function showLaneMenu(x, y, track, start) {
+    const entries = [["Hier einfügen", "Strg+V", () => pasteClip(track, start), Boolean(clipClipboard)]];
+    if (track !== "speech") entries.unshift([`${names[track]} hier erzeugen …`, "", () => openGeneration(track, start)]);
+    showMenu(x, y, entries);
+  }
+  function openGeneration(track, start) {
+    if (!ready || dragging || generationSubmitting) return;
+    closeMenu(); stop(); activeTrack = track; updatePosition(start);
+    generationPlacement = {track, start: position};
+    $("generate-form").elements.kind.value = track;
+    $("generation-error").hidden = true;
+    generationInfo();
+    if (!$("generate-dialog").open) $("generate-dialog").showModal();
+    $("generate-form").elements.prompt.focus();
+  }
   function renderJobs() {
     $("jobs").replaceChildren();
     for (const job of jobs) {
+      if (pendingInsertions.has(job.id) && ["succeeded", "failed"].includes(job.status)) {
+        const placement = pendingInsertions.get(job.id); pendingInsertions.delete(job.id); rememberInsertions();
+        if (job.status === "failed") message(job.error || "Die Audioerzeugung wurde nicht abgeschlossen. Ihr Prompt bleibt im Erzeugungsfenster erhalten.");
+        if (job.asset && job.status === "succeeded" && !state.clips.some(c => c.asset_id === job.asset.id)) {
+          try { addAsset(job.asset, placement); message(`${names[placement.track]} wurde bei ${time(placement.start)} eingefügt. Speichern Sie Ihren Stand.`); }
+          catch (error) { message(`${error.message} Das fertige Audio bleibt in der Bibliothek und kann später eingefügt werden.`); }
+        }
+      }
       const row = el("div", null, "studio-job");
       row.append(el("strong", `${job.kind === "export" ? `Mix · Stand ${job.revision}` : names[job.kind]} · ${job.label}`));
       if (job.error) row.append(el("p", job.error, "job-error"));
@@ -402,7 +533,7 @@
           const audio = el("audio"); audio.controls = true; audio.preload = "none"; audio.src = job.asset.url;
           audio.setAttribute("aria-label", job.asset.title); audio.addEventListener("play", () => stop()); row.append(audio);
           const link = el("a", "Mix herunterladen", "button button-secondary"); link.href = job.asset.download_url; row.append(link);
-        } else row.append(action("In Spur einfügen", () => addAsset(job.asset)));
+        } else row.append(action(job.placement ? `Bei ${time(job.placement.start)} einfügen` : "In Spur einfügen", () => addAsset(job.asset, job.placement)));
       }
       $("jobs").append(row);
     }
@@ -420,14 +551,29 @@
   }
   function generationInfo() {
     const form = $("generate-form"), kind = form.elements.kind.value, config = generation[kind];
+    if (kind !== generationKind) {
+      generationDrafts.set(generationKind, {prompt: form.elements.prompt.value, duration: form.elements.duration.value, loop: form.elements.loop.checked});
+      const draft = generationDrafts.get(kind) || {prompt: "", duration: kind === "music" ? 15 : 3, loop: false};
+      form.elements.prompt.value = draft.prompt; form.elements.duration.value = draft.duration; form.elements.loop.checked = draft.loop;
+      generationKind = kind;
+    }
+    $("dialog-title").textContent = kind === "music" ? "Musik oder Jingle erzeugen" : "Geräusch oder Atmosphäre erzeugen";
+    form.elements.prompt.placeholder = kind === "music" ? "Zum Beispiel: ruhige instrumentale Klaviermusik für eine geheimnisvolle Waldszene, ohne Gesang" : "Zum Beispiel: eine Holztür öffnet sich langsam und knarrt, ohne Sprache und Musik";
     form.elements.duration.min = kind === "music" ? 3 : .5;
-    form.elements.duration.max = kind === "music" ? 600 : 30;
-    form.elements.duration.value = clamp(Number(form.elements.duration.value), Number(form.elements.duration.min), Number(form.elements.duration.max));
+    const maximum = Math.min(kind === "music" ? 600 : 30, 1800 - (generationPlacement?.start || 0));
+    form.elements.duration.max = maximum;
+    if (maximum >= Number(form.elements.duration.min)) form.elements.duration.value = clamp(Number(form.elements.duration.value), Number(form.elements.duration.min), maximum);
     $("loop-label").hidden = kind !== "effects";
-    $("generate").disabled = !config?.enabled;
+    $("generate").disabled = generationSubmitting || !config?.enabled || maximum < Number(form.elements.duration.min);
+    if (generationPlacement) {
+      generationPlacement.track = kind;
+      $("generation-placement").textContent = `Einfügen auf „${names[kind]}“ bei ${time(generationPlacement.start)} (${generationPlacement.start.toFixed(2)} s). Das fertige Audio wird an dieser Stelle als Clip eingefügt.`;
+    }
+    root.querySelectorAll("[data-studio-generate]").forEach(button => { button.disabled = !ready; });
     $("generation-info").textContent = config?.enabled
       ? `Geschätzter Verbrauch: ${Math.ceil(Number(form.elements.duration.value) * config.credits_per_second).toLocaleString("de-DE")} Credits · persönliches Monatskontingent: ${(config.seconds_limit / 60).toLocaleString("de-DE")} min.${creditBudget ? ` Gemeinsamer Rahmen beim Laden: ${Math.floor(creditBudget.remaining).toLocaleString("de-DE")} Credits verfügbar.` : ""} ${kind === "effects" ? "Für längere Atmosphäre den Clip duplizieren." : "Musik wird ohne Gesang erzeugt."}`
       : "Die Administration muss diese Audioart unter Verwaltung → Musik- und Geräuschanbindung freigeben und einen Tarifwert hinterlegen.";
+    if (maximum < Number(form.elements.duration.min)) $("generation-info").textContent = "An dieser Position ist nicht genug Platz. Setzen Sie den Cursor vor das Ende der 30 Minuten.";
   }
   async function save() {
     if (saving) return saving;
@@ -464,8 +610,25 @@
   $("stop").addEventListener("click", () => stop(true));
   $("position").addEventListener("change", safe(() => { if (!$("position").checkValidity()) throw new Error("Die Abspielposition muss zwischen 0 und 1.800 Sekunden liegen."); const value = Number($("position").value); stop(); updatePosition(value); }));
   $("zoom").addEventListener("input", () => { zoom = Number($("zoom").value); render(); });
-  $("undo").addEventListener("click", () => { if (!undo.length) return; stop(); redo.push(clone(state)); state = undo.pop(); render(); });
-  $("redo").addEventListener("click", () => { if (!redo.length) return; stop(); undo.push(clone(state)); state = redo.pop(); render(); });
+  function undoEdit(forward = false) {
+    const source = forward ? redo : undo, target = forward ? undo : redo;
+    if (!source.length) return;
+    stop(); target.push(clone(state)); state = source.pop(); render();
+  }
+  $("undo").addEventListener("click", () => undoEdit());
+  $("redo").addEventListener("click", () => undoEdit(true));
+  $("timeline").addEventListener("scroll", () => {
+    updateGainLabels(); if (!menu.hidden && $("timeline").scrollLeft !== menuScrollLeft) closeMenu();
+  }, {passive: true});
+  document.addEventListener("pointerdown", e => { if (!menu.contains(e.target)) closeMenu(); }, true);
+  menu.addEventListener("keydown", e => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End", "Escape"].includes(e.key)) return;
+    e.preventDefault(); e.stopPropagation();
+    if (e.key === "Escape") { closeMenu(true); return; }
+    const items = [...menu.querySelectorAll("button:not(:disabled)")], index = items.indexOf(document.activeElement);
+    const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : (index + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items[next]?.focus();
+  });
   function renderMixSettings() {
     const mix = mixSettings();
     root.querySelectorAll("[data-mix]").forEach(input => {
@@ -499,12 +662,8 @@
     if (!asset || length(next) < .01 || next.trim_end > asset.duration + .001 || next.start + length(next) > 1800 || next.fade_in + next.fade_out > length(next) + .000001) throw new Error("Schnittgrenzen und Fades müssen innerhalb der Audiodatei liegen. Die Gesamtdauer darf 30 Minuten nicht überschreiten.");
     change(() => Object.assign(c,next));
   }));
-  $("remove").addEventListener("click", () => change(() => { state.clips = state.clips.filter(c => c.id !== selected); selected = null; }));
-  $("duplicate").addEventListener("click", safe(() => {
-    const c = state.clips.find(c => c.id === selected); if (!c) return;
-    if (state.clips.length >= 60 || c.start + length(c) * 2 > 1800) throw new Error("Der duplizierte Clip überschreitet die zulässige Clipzahl oder Gesamtdauer.");
-    change(() => { const copy = clone(c); copy.id = crypto.randomUUID(); copy.start += length(c); state.clips.push(copy); selected = copy.id; });
-  }));
+  $("remove").addEventListener("click", removeSelected);
+  $("duplicate").addEventListener("click", safe(duplicateSelected));
   function splitSelected() {
     stop();
     const c = state.clips.find(c => c.id === selected); if (!c) return;
@@ -519,13 +678,34 @@
   }
   $("split").addEventListener("click", safe(splitSelected));
   window.addEventListener("keydown", e => {
-    if (!ready || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    if (!ready || e.isComposing || $("generate-dialog").open || dragging) return;
     if (e.target.closest("input, textarea, select, audio, [contenteditable]:not([contenteditable=false])")) return;
     const key = e.key.toLowerCase();
-    if (key !== "t" && key !== " ") return;
+    if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+      const button = root.querySelector(`.studio-clip[data-id="${selected}"]`); if (!button) return;
+      e.preventDefault(); const rect = button.getBoundingClientRect(); showClipMenu(rect.left + 20, rect.top + 20); return;
+    }
+    const modifier = e.ctrlKey || e.metaKey;
+    let fn;
+    if (modifier && !e.altKey) {
+      if (key === "z") fn = () => undoEdit(e.shiftKey);
+      else if (key === "y") fn = () => undoEdit(true);
+      else if (key === "v" && clipClipboard) fn = () => pasteClip();
+      else if (selected && state.clips.some(c => c.id === selected)) {
+        if (key === "c") fn = copySelected;
+        else if (key === "x") fn = () => { if (copySelected()) removeSelected(); };
+        else if (key === "d") fn = duplicateSelected;
+      }
+    } else if (!modifier && !e.altKey) {
+      if (key === "t") fn = splitSelected;
+      else if (key === " ") fn = () => play();
+      else if (["delete", "backspace"].includes(key) && selected) fn = removeSelected;
+      else if (key === "escape") fn = () => closeMenu(true);
+    }
+    if (!fn) return;
     e.preventDefault();
     if (e.repeat || (key === " " && loadingAudio)) return;
-    safe(key === "t" ? splitSelected : () => play())();
+    closeMenu(); safe(fn)();
   });
   $("clip-play").addEventListener("click", safe(() => { if (playing) stop(); return play(selected); }));
   async function busyForm(form, operation) {
@@ -550,10 +730,25 @@
   })));
   $("generate-form").elements.kind.addEventListener("change", generationInfo);
   $("generate-form").elements.duration.addEventListener("input", generationInfo);
-  $("generate-form").addEventListener("submit", safe(() => busyForm($("generate-form"), async () => {
-    const form = $("generate-form"); const result = await api("generate", {kind: form.elements.kind.value, prompt: form.elements.prompt.value, duration: Number(form.elements.duration.value), loop: form.elements.loop.checked});
-    jobs.unshift(result.job); renderJobs(); renderLibrary();
-  })));
+  root.querySelectorAll("[data-studio-generate]").forEach(button => button.addEventListener("click", () => openGeneration(button.dataset.studioGenerate, position)));
+  $("dialog-close").addEventListener("click", () => $("generate-dialog").close());
+  $("dialog-cancel").addEventListener("click", () => $("generate-dialog").close());
+  $("generate-form").addEventListener("submit", async e => {
+    e.preventDefault(); if (generationSubmitting) return;
+    const form = $("generate-form"), placement = clone(generationPlacement);
+    generationSubmitting = true; generationInfo(); $("generation-error").hidden = true;
+    try {
+      if (state.clips.length >= 60) throw new Error("Es sind höchstens 60 Clips möglich. Entfernen Sie zuerst einen Clip oder erzeugen Sie das Audio später.");
+      const result = await api("generate", {kind: form.elements.kind.value, prompt: form.elements.prompt.value,
+        duration: Number(form.elements.duration.value), loop: form.elements.kind.value === "effects" && form.elements.loop.checked, placement});
+      pendingInsertions.set(result.job.id, placement); rememberInsertions(); jobs.unshift(result.job);
+      $("generate-dialog").close(); message(`Audio wird für „${names[placement.track]}“ bei ${time(placement.start)} erzeugt und anschließend dort eingefügt.`);
+      renderJobs(); renderLibrary();
+    } catch (error) {
+      $("generation-error").textContent = error.message; $("generation-error").hidden = false;
+      if (!$("generate-dialog").open) message(error.message);
+    } finally { generationSubmitting = false; generationInfo(); }
+  });
   $("export-form").addEventListener("submit", safe(async () => {
     $("export").disabled = true;
     try {

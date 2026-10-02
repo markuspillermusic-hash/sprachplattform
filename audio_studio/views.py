@@ -56,6 +56,7 @@ def job_data(job):
     return {"id": str(job.pk), "kind": job.kind, "status": job.status,
             "label": job.get_status_display(), "error": job.error_message,
             "revision": job.input_data.get("revision"),
+            "placement": job.input_data.get("placement"),
             "asset": asset_data(job.asset) if job.asset and job.asset.deleted_at is None
             and (job.asset.is_demo_sample or job.asset.expires_at > timezone.now()) else None}
 

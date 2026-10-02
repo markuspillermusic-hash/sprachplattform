@@ -185,6 +185,31 @@ class StudioTests(StudioFixture):
         self.config.music_enabled = False; self.config.save()
         self.assertEqual(self.post("generate", {"kind": "music", "prompt": "Musik", "duration": 6}).status_code, 422)
 
+    def test_generation_remembers_clicked_track_and_position(self):
+        placement = {"track": "effects", "start": 12.75}
+        with patch("audio_studio.views.process_audio.delay"):
+            response = self.post("generate", {"kind": "effects", "prompt": "A distant door", "duration": 2, "placement": placement})
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.json()["job"]["placement"], placement)
+        job = StudioJob.objects.get(pk=response.json()["job"]["id"])
+        self.assertEqual(job.input_data["placement"], placement)
+        self.assertEqual(self.client.get(self.url("jobs")).json()["jobs"][0]["placement"], placement)
+        self.assertFalse(StudioSession.objects.exists())
+
+    def test_invalid_insert_positions_do_not_reserve_paid_generation(self):
+        for placement in ({"track": "speech", "start": 0}, {"track": "effects", "start": 0},
+                          {"track": "music", "start": 1798}, {"track": "music", "start": -1},
+                          {"track": "music", "start": True}, {"track": "music", "start": "10"},
+                          {"track": "music"}, []):
+            with self.subTest(placement=placement):
+                response = self.post("generate", {"kind": "music", "prompt": "Short piano jingle", "duration": 3, "placement": placement})
+                self.assertEqual(response.status_code, 422)
+        self.assertFalse(StudioJob.objects.exists())
+        self.assertFalse(UsageEvent.objects.exists())
+        job = create_generation(self.project, self.user, {"kind": "music", "prompt": "Jingle", "duration": 3,
+                                                        "placement": {"track": "music", "start": 1797}})
+        self.assertEqual(job.input_data["placement"]["start"], 1797)
+
     def test_queue_failure_releases_reserved_budget(self):
         with patch("audio_studio.views.process_audio.delay", side_effect=RuntimeError("private details")):
             result = self.post("generate", {"kind": "music", "prompt": "Musik", "duration": 6})

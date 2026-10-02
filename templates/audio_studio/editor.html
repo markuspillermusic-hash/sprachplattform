@@ -36,6 +36,7 @@
  <div class="studio-timeline" id="studio-timeline" aria-label="Drei Audiospuren"><p>Spuren werden geladen …</p></div>
  <p class="studio-hint">Die oberen Clip-Ecken nach innen ziehen: links zum Einblenden, rechts zum Ausblenden. Die Linien zeigen den Lautstärkeverlauf. An den seitlichen Rändern kürzen oder unten genaue Werte eingeben. Bei sehr schmalen Clips zuerst hineinzoomen. Überlappende Clips auf derselben Spur spielen gleichzeitig – zum Beispiel Regen, Schritte und eine Tür. Zeiten werden in Sekunden angegeben.</p>
  <p class="studio-hint">Den Lautstärkebalken im Clip nach oben oder unten ziehen; mit <kbd>Umschalt</kbd> feinjustieren. Doppelklick auf den Balken setzt den Clippegel auf 0 dB. <kbd>T</kbd> teilt den markierten Clip am roten Abspielcursor. <kbd>Leertaste</kbd> startet oder pausiert. Beim Schreiben in Eingabefeldern bleiben die Tasten frei.</p>
+ <p class="studio-hint">In eine freie Stelle der Musik- oder Geräuschspur klicken, um dort Audio zu erzeugen. Rechtsklick auf einen Clip öffnet seine Bearbeitung. <kbd>Strg+C</kbd> / <kbd>Strg+V</kbd> kopiert und fügt am Cursor ein; <kbd>Strg</kbd> beim Ziehen dupliziert. <kbd>Entf</kbd> entfernt den Clip, <kbd>Strg+Z</kbd> macht Änderungen rückgängig.</p>
  <div class="studio-mix-controls">
   <label>Musik während der Sprache absenken <output id="studio-ducking-value" for="studio-ducking"></output><input id="studio-ducking" data-mix="music_duck_db" type="range" min="0" max="18" step="1" value="4"></label>
   <label>Geräusche während der Sprache absenken <output id="studio-effects-ducking-value" for="studio-effects-ducking"></output><input id="studio-effects-ducking" data-mix="effects_duck_db" type="range" min="0" max="18" step="1" value="0"></label>
@@ -95,16 +96,23 @@
   </section>
   <section class="studio-panel" aria-labelledby="generate-title">
    <p class="eyebrow">Musik und Atmosphäre</p><h2 id="generate-title">Audio erzeugen</h2>
+   <p>Klicken Sie in eine freie Stelle der Spur oder erzeugen Sie Audio an der aktuellen Abspielposition.</p>
+   <div class="studio-actions"><button type="button" class="button button-secondary" data-studio-generate="music" disabled>＋ Musik / Jingle</button><button type="button" class="button button-secondary" data-studio-generate="effects" disabled>＋ Geräusch / Atmosphäre</button></div>
+  </section>
+ </div>
+ <dialog id="studio-generate-dialog" class="studio-dialog" aria-labelledby="studio-dialog-title" aria-describedby="studio-generation-placement">
+  <div class="studio-dialog-heading"><div><p class="eyebrow">Musik und Atmosphäre</p><h2 id="studio-dialog-title">Audio an dieser Stelle erzeugen</h2></div><button type="button" class="button button-quiet" id="studio-dialog-close" aria-label="Fenster schließen">✕</button></div>
+  <p id="studio-generation-placement" class="studio-hint"></p>
+  <p id="studio-generation-error" class="studio-message" role="alert" hidden></p>
    <form id="studio-generate-form">
     <label>Audioart <select name="kind"><option value="music">Musik / Jingle (instrumental)</option><option value="effects">Geräusche / Atmosphäre</option></select></label>
     <label>Beschreibung <textarea name="prompt" rows="3" maxlength="4100" required placeholder="Zum Beispiel: ruhige instrumentale Hintergrundmusik für einen französischen Café-Dialog"></textarea></label>
     <div class="studio-inline"><label>Dauer (s) <input name="duration" type="number" min="3" max="600" step="0.5" value="15" required></label>
      <label id="studio-loop-label" hidden><input name="loop" type="checkbox"> Nahtlos wiederholbares Geräusch</label></div>
     <p id="studio-generation-info" class="studio-hint"></p>
-    <button type="submit" class="button button-secondary" id="studio-generate" disabled>Audio erzeugen</button>
+    <div class="studio-actions"><button type="submit" class="button button-primary" id="studio-generate" disabled>Erzeugen und hier einfügen</button><button type="button" class="button button-secondary" id="studio-dialog-cancel">Abbrechen</button></div>
    </form>
-  </section>
- </div>
+ </dialog>
  <section class="studio-panel studio-export" aria-labelledby="export-title">
   <div><p class="eyebrow">Fertiges Ergebnis</p><h2 id="export-title">Alle hörbaren Spuren exportieren</h2><p>Der Export verwendet den gespeicherten Stand inklusive Schnitt, Lautstärke und Fades.</p></div>
   <form id="studio-export-form" class="studio-inline"><label>Format <select name="format"><option value="mp3">MP3 · 192 kbit/s</option><option value="wav">WAV · 44,1 kHz / 16 Bit</option></select></label><button type="submit" class="button button-primary" id="studio-export" disabled>Mix exportieren</button></form>

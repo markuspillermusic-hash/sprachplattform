@@ -41,7 +41,7 @@
 .studio-gain-handle:hover::before { opacity: 1; border-top-width: 3px; }
 .studio-gain-value { position: absolute; right: 0; top: -5px; padding: 1px 3px; background: var(--track-bg); border: 1px solid currentColor; border-radius: 3px; font-size: 9px; font-weight: 700; white-space: nowrap; pointer-events: none; }
 .studio-clip-compact .studio-gain-handle { left: 2px; right: 2px; }
-.studio-clip-compact .studio-gain-value { display: none; }
+.studio-clip-compact .studio-gain-value { font-size: 8px; padding: 1px; }
 .studio-trim-handle { position: absolute; top: 18px; bottom: 0; width: 7px; background: var(--track-color); opacity: .3; cursor: ew-resize; }
 .studio-trim-left { left: 0; }.studio-trim-right { right: 0; }
 .studio-fade { position: absolute; bottom: 0; height: 40px; background: var(--track-color); opacity: .14; pointer-events: none; }
@@ -82,5 +82,17 @@
 .studio-job audio { width: min(100%, 24rem); height: 36px; }.studio-job .job-error { width: 100%; }
 .studio-export { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
 .studio button:disabled { opacity: .5; cursor: default; }
+.studio-lane { cursor: crosshair; }
+.studio-track-add { padding: .25rem .4rem; font-size: .75rem; min-height: 2rem; }
+.studio-dialog { width: min(36rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; box-sizing: border-box; padding: 1.5rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); color: var(--ink); }
+.studio-dialog::backdrop { background: rgb(15 35 28 / .45); }
+.studio-dialog-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+.studio-dialog form > label { margin-bottom: 1rem; }
+.studio-dialog textarea { width: 100%; box-sizing: border-box; }
+.studio-context-menu { position: fixed; z-index: 20; width: min(17rem, calc(100vw - 1rem)); padding: .4rem; border: 1px solid var(--line); border-radius: .65rem; background: var(--surface); box-shadow: 0 .4rem 1.5rem rgb(15 35 28 / .18); }
+.studio-context-menu button { display: flex; justify-content: space-between; gap: 1rem; width: 100%; border: 0; padding: .65rem .7rem; border-radius: .35rem; background: transparent; color: var(--ink); text-align: left; cursor: pointer; font: inherit; font-size: .85rem; }
+.studio-context-menu button:hover, .studio-context-menu button:focus-visible { background: var(--track-bg, #eef4f0); outline: 2px solid var(--brand); outline-offset: -2px; }
+.studio-context-menu small { color: var(--muted); white-space: nowrap; }
+.studio-clip.is-copying { pointer-events: none; opacity: .85; cursor: copy; }
 @media(max-width: 780px) { .studio-heading { align-items: start; flex-direction: column; }.studio-workspace { grid-template-columns: 1fr; }.studio-fields { grid-template-columns: repeat(2, minmax(0,1fr)); }.studio-transport { gap: .5rem; padding: .7rem; }.studio-track-label { padding: .5rem; }.studio-ruler, .studio-track { grid-template-columns: 130px 1fr; } }
 @media(prefers-reduced-motion: reduce) { .studio * { scroll-behavior: auto; } }

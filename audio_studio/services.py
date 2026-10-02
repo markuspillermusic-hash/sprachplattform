@@ -144,6 +144,11 @@ def create_generation(project, user, data):
     loop = data.get("loop", False)
     if type(loop) is not bool:
         raise StudioError("Ungültige Loop-Einstellung.")
+    placement = data.get("placement")
+    if placement is not None:
+        if not isinstance(placement, dict) or set(placement) != {"track", "start"} or placement["track"] != kind:
+            raise StudioError("Die Einfügeposition passt nicht zur gewählten Audioart.")
+        placement = {"track": kind, "start": number(placement["start"], 0, 1800 - duration)}
     locked_user = get_user_model().objects.select_for_update().get(pk=user.pk)
     month = timezone.localdate().replace(day=1)
     used = StudioJob.objects.filter(requested_by=user, kind=kind,
@@ -163,6 +168,9 @@ def create_generation(project, user, data):
     job = StudioJob.objects.create(project=project, requested_by=user, kind=kind, duration=duration, usage_event=event,
                                    input_data={"prompt": prompt.strip(), "duration": duration, "loop": loop,
                                                "model": model, "configuration_id": config.pk})
+    if placement is not None:
+        job.input_data["placement"] = placement
+        job.save(update_fields=["input_data"])
     event.reference = f"studio:{job.pk}"
     event.save(update_fields=("reference",))
     return job
