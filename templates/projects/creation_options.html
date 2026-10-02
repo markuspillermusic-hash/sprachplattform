@@ -1,10 +1,12 @@
 <div class="project-entry-grid" aria-label="Audioformat wählen">
   <article class="project-entry-option">
+    <div class="format-mark">{% include 'components/icon.html' with icon='dialogue' %}</div>
     <h2>Hörtext</h2>
     <p>Ein reiner Sprechtext: Dialoge, Erzählungen oder andere Hörtexte mit einer oder mehreren Stimmen.</p>
     <a class="button button-primary" href="{% url 'projects:create' %}">Hörtext erstellen</a>
   </article>
   {% if request.user.role != 'student' %}<article class="project-entry-option">
+    <div class="format-mark format-mark-studio">{% include 'components/icon.html' with icon='studio' %}</div>
     <h2>Hörspiel</h2>
     <p>Sprechtexte mit Musik und Geräuschen: Der Assistent führt Sie vom Skript bis zur fertigen Mischung.</p>
     <a class="button button-primary" href="{% url 'production:create' %}">Hörspiel erstellen</a>

@@ -4,7 +4,7 @@
 <section class="page-shell assistant-workspace" aria-labelledby="assistant-title">
   <header class="assistant-page-heading">
     <a class="back-link" href="{% url 'projects:editor' conversation.project.id %}">← Zum bisherigen Hörtext</a>
-    <p class="eyebrow">KI-Unterstützung</p>
+    <p class="eyebrow product-section-label">{% include 'components/icon.html' with icon='spark' %}KI-Unterstützung</p>
     <h1 id="assistant-title">Entwurf prüfen und verfeinern.</h1>
     <p class="lead">Noch ist nichts überschrieben. Übernehmen Sie den Entwurf erst, wenn er zu Ihrer Unterrichtsidee passt.</p>
   </header>

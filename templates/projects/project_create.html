@@ -11,13 +11,13 @@
 
   <div class="creation-choice-grid{% if not assistant_allowed %} creation-choice-grid-single{% endif %}" aria-label="Erstellungsart wählen">
     <a class="creation-choice{% if selected_mode == 'manual' %} is-selected{% endif %}" href="?mode=manual">
-      <span class="choice-number" aria-hidden="true">1</span>
+      <span class="choice-number" aria-hidden="true">{% include 'components/icon.html' with icon='script' %}</span>
       <strong>Hörtext selbst erstellen</strong>
       <span>Titel und Sprache festlegen, danach frei im Editor schreiben.</span>
     </a>
     {% if assistant_allowed %}
       <a class="creation-choice{% if selected_mode == 'assistant' %} is-selected{% endif %}" href="?mode=assistant">
-        <span class="choice-number" aria-hidden="true">2</span>
+        <span class="choice-number" aria-hidden="true">{% include 'components/icon.html' with icon='spark' %}</span>
         <strong>Mit KI-Unterstützung erstellen</strong>
         <span>Ein paar Angaben machen und sofort einen bearbeitbaren Entwurf erhalten.</span>
       </a>
@@ -47,7 +47,7 @@
       <div class="assistant-core-fields">
         {% for field in assistant_form %}
           {% if field.name == 'vocabulary' %}<details class="assistant-optional"><summary>Optionale Lernziele und Rollen</summary>{% endif %}
-          <div class="field field-{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small class="form-help">{{ field.help_text }}</small>{% endif %}{% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}</div>
+          <div class="field field-{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small class="form-help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}{% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}</div>
           {% if field.name == 'additional_instructions' %}</details>{% endif %}
         {% endfor %}
       </div>

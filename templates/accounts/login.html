@@ -6,6 +6,7 @@
     <p class="eyebrow">Interner Zugang</p>
     <h1 id="login-title">Willkommen zurück.</h1>
     <p class="lead">Melden Sie sich mit dem Benutzernamen und Passwort an, das Sie von der Administration erhalten haben.</p>
+    {% include 'components/brand_scene.html' %}
   </div>
   <form class="form-card" method="post" novalidate>
     {% csrf_token %}
@@ -26,4 +27,3 @@
   </form>
 </section>
 {% endblock %}
-

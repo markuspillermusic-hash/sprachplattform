@@ -3,7 +3,7 @@
 {% block title %}Hörspiel-Produktion · {{ project.title }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{% static 'css/audio-studio.css' %}">
-<script src="{% static 'js/audio-studio.js' %}" defer></script>
+<script src="{% static 'js/audio-studio.js' %}?v=20261002-3" defer></script>
 {% endblock %}
 {% block content %}
 <section class="studio" id="audio-studio"
@@ -17,7 +17,7 @@
  <header class="studio-heading">
   <div><a class="back-link" href="{% url 'projects:editor' project.id %}">← Zum Skript</a>
    {% if project.production and user.role != 'student' %}<a class="back-link" href="{% url 'production:detail' project.id %}">← Zum Hörspiel-Assistenten</a>{% endif %}
-   <p class="eyebrow">Optional · Hörspiel-Produktion</p><h1>{{ project.title }}</h1>
+   <p class="eyebrow product-section-label">{% include 'components/icon.html' with icon='studio' %}Optional · Hörspiel-Produktion</p><h1>{{ project.title }}</h1>
    <p>Sprache, Musik und Atmosphäre auf einer gemeinsamen Zeitachse. Für reine Hörtexte genügt die Audioausgabe im Skript.</p></div>
   <div class="studio-save"><button type="button" class="button button-primary" id="studio-save" disabled>Stand speichern</button>
    <span id="studio-save-status" role="status">Wird geladen …</span></div>
@@ -38,17 +38,17 @@
  <p class="studio-hint">Den Lautstärkebalken im Clip nach oben oder unten ziehen; mit <kbd>Umschalt</kbd> feinjustieren. Doppelklick auf den Balken setzt den Clippegel auf 0 dB. <kbd>T</kbd> teilt den markierten Clip am roten Abspielcursor. <kbd>Leertaste</kbd> startet oder pausiert. Beim Schreiben in Eingabefeldern bleiben die Tasten frei.</p>
  <p class="studio-hint">In eine freie Stelle der Musik- oder Geräuschspur klicken, um dort Audio zu erzeugen. Rechtsklick auf einen Clip öffnet seine Bearbeitung. <kbd>Strg+C</kbd> / <kbd>Strg+V</kbd> kopiert und fügt am Cursor ein; <kbd>Strg</kbd> beim Ziehen dupliziert. <kbd>Entf</kbd> entfernt den Clip, <kbd>Strg+Z</kbd> macht Änderungen rückgängig.</p>
  <div class="studio-mix-controls">
-  <label>Musik während der Sprache absenken <output id="studio-ducking-value" for="studio-ducking"></output><input id="studio-ducking" data-mix="music_duck_db" type="range" min="0" max="18" step="1" value="4"></label>
-  <label>Geräusche während der Sprache absenken <output id="studio-effects-ducking-value" for="studio-effects-ducking"></output><input id="studio-effects-ducking" data-mix="effects_duck_db" type="range" min="0" max="18" step="1" value="0"></label>
-  <label>Sprachkompressor <output id="studio-speech-compression-value" for="studio-speech-compression"></output><input id="studio-speech-compression" data-mix="compression" type="range" min="0" max="100" step="1" value="0"></label>
+  <label for="studio-ducking">Musik während der Sprache absenken <output id="studio-ducking-value" for="studio-ducking"></output><input id="studio-ducking" data-mix="music_duck_db" type="range" min="0" max="18" step="1" value="4"></label>
+  <label for="studio-effects-ducking">Geräusche während der Sprache absenken <output id="studio-effects-ducking-value" for="studio-effects-ducking"></output><input id="studio-effects-ducking" data-mix="effects_duck_db" type="range" min="0" max="18" step="1" value="0"></label>
+  <label for="studio-speech-compression">Sprachkompressor <output id="studio-speech-compression-value" for="studio-speech-compression"></output><input id="studio-speech-compression" data-mix="compression" type="range" min="0" max="100" step="1" value="0"></label>
  </div>
  <details class="studio-mix-details"><summary>Attack und Release einstellen</summary>
   <p class="studio-hint">Attack bestimmt, wie sanft die Absenkung einsetzt; Release, wie langsam Musik und Atmosphäre zurückkehren. Kurze Sprachpausen lassen die Hintergrundlautstärke ruhig. Die Kompressorzeiten steuern nur die Sprache.</p>
   <div class="studio-mix-controls">
-   <label>Absenkung · Attack <output id="studio-duck-attack-value" for="studio-duck-attack"></output><input id="studio-duck-attack" data-mix="duck_attack_ms" type="range" min="50" max="2000" step="50" value="250"></label>
-   <label>Absenkung · Release <output id="studio-duck-release-value" for="studio-duck-release"></output><input id="studio-duck-release" data-mix="duck_release_ms" type="range" min="100" max="3000" step="50" value="900"></label>
-   <label>Kompressor · Attack <output id="studio-compressor-attack-value" for="studio-compressor-attack"></output><input id="studio-compressor-attack" data-mix="compressor_attack_ms" type="range" min="5" max="100" step="5" value="25"></label>
-   <label>Kompressor · Release <output id="studio-compressor-release-value" for="studio-compressor-release"></output><input id="studio-compressor-release" data-mix="compressor_release_ms" type="range" min="100" max="1500" step="50" value="350"></label>
+   <label for="studio-duck-attack">Absenkung · Attack <output id="studio-duck-attack-value" for="studio-duck-attack"></output><input id="studio-duck-attack" data-mix="duck_attack_ms" type="range" min="50" max="2000" step="50" value="250"></label>
+   <label for="studio-duck-release">Absenkung · Release <output id="studio-duck-release-value" for="studio-duck-release"></output><input id="studio-duck-release" data-mix="duck_release_ms" type="range" min="100" max="3000" step="50" value="900"></label>
+   <label for="studio-compressor-attack">Kompressor · Attack <output id="studio-compressor-attack-value" for="studio-compressor-attack"></output><input id="studio-compressor-attack" data-mix="compressor_attack_ms" type="range" min="5" max="100" step="5" value="25"></label>
+   <label for="studio-compressor-release">Kompressor · Release <output id="studio-compressor-release-value" for="studio-compressor-release"></output><input id="studio-compressor-release" data-mix="compressor_release_ms" type="range" min="100" max="1500" step="50" value="350"></label>
   </div>
  </details>
  <div class="studio-options">

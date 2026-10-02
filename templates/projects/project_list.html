@@ -49,7 +49,7 @@
       {% for project in projects %}
         <li class="project-card">
           <a class="project-card-main" href="{% url 'projects:editor' project.id %}">
-            <span class="project-language">{{ project.get_language_display }}{% if project.level %} · {{ project.level }}{% endif %}</span>
+            <div class="project-card-emblem">{% include "components/icon.html" with icon="script" %}</div><span class="project-language">{{ project.get_language_display }}{% if project.level %} · {{ project.level }}{% endif %}</span>
             <h2>{{ project.title }}{% if project.demo_key %} <span class="demo-badge">Demo</span>{% endif %}</h2>
             <span>{{ project.segments.count }} Beiträge · {{ project.character_count }} Zeichen</span>
             <span>Bearbeitet {{ project.updated_at|date:"d.m.Y, H:i" }}</span>

@@ -99,7 +99,7 @@
           <header class="voice-card-heading">
             <div>
               {% if card.is_favorite %}<span class="favorite-kicker">Persönlicher Favorit</span>{% endif %}
-              <h2>{{ card.voice.display_name }}</h2>
+              <h2>{% include "components/icon.html" with icon="voices" %}{{ card.voice.display_name }}</h2>
               <p>{{ card.source }} · {{ card.voice.model }}</p>
             </div>
             <form method="post" action="{% url 'tts:favorite_toggle' card.voice.pk %}" data-favorite-form data-voice-name="{{ card.voice.display_name }}">

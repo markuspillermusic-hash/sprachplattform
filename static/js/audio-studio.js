@@ -238,6 +238,7 @@
   }
   function render() {
     if (!state) return;
+    const focusedTrackControl = document.activeElement?.dataset.trackControl;
     closeMenu();
     $("timeline").replaceChildren();
     const width = Math.max(650, (duration() + 10) * zoom);
@@ -251,15 +252,18 @@
     ruleLane.append(el("div", null, "studio-playhead")); ruler.append(ruleLane); $("timeline").append(ruler);
     for (const name of Object.keys(names)) {
       const row = el("div", null, `studio-track studio-track-${name}`); row.style.width = `${width + labelWidth}px`;
+      row.setAttribute("role", "group"); row.setAttribute("aria-label", `${names[name]}spur`);
       const label = el("div", null, "studio-track-label"); label.append(el("strong", names[name]));
       const controls = el("div", null, "studio-track-buttons");
       for (const [key, text] of [["mute", "Stumm"], ["solo", "Solo"]]) {
         const l = el("label"); const input = el("input"); input.type = "checkbox"; input.checked = state.tracks[name][key];
+        input.dataset.trackControl = `${name}-${key}`; input.setAttribute("aria-label", `${text} · ${names[name]}`);
         input.addEventListener("change", () => change(() => { state.tracks[name][key] = input.checked; })); l.append(input, document.createTextNode(text)); controls.append(l);
       }
       label.append(controls);
       if (name !== "speech") label.append(action(`＋ ${names[name]}`, () => openGeneration(name, position), "button button-quiet studio-track-add"));
       const volume = el("label", "Pegel (dB)"); const input = el("input");
+      input.dataset.trackControl = `${name}-gain`; input.setAttribute("aria-label", `Pegel (dB) · ${names[name]}`);
       input.type = "number"; input.min = -60; input.max = 12; input.value = state.tracks[name].gain_db;
       input.addEventListener("change", safe(() => {
         if (!input.checkValidity() || input.value === "") { render(); throw new Error("Der Spurpegel muss zwischen −60 und +12 dB liegen."); }
@@ -316,6 +320,10 @@
     }
     renderMixSettings();
     inspector(); updatePosition(position); updateGainLabels(); mark();
+    if (focusedTrackControl) {
+      Array.from($("timeline").querySelectorAll("[data-track-control]"))
+        .find(control => control.dataset.trackControl === focusedTrackControl)?.focus({preventScroll: true});
+    }
   }
   function updateGainLabels() {
     const viewport = $("timeline").getBoundingClientRect();

@@ -8,21 +8,22 @@
   <title>{% block title %}Sprachplattform{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/base.css' %}">
   <link rel="icon" href="{% static 'icons/favicon.svg' %}" type="image/svg+xml">
-  <script src="{% static 'js/app.js' %}" defer></script>
+  <script src="{% static 'js/app.js' %}?v=20261002-2" defer></script>
   {% block head %}{% endblock %}
+  <link rel="stylesheet" href="{% static 'css/product.css' %}">
 </head>
 <body>
   <a class="skip-link" href="#hauptinhalt">Zum Inhalt springen</a>
   <header class="site-header">
     <a class="brand" href="{% url 'core:home' %}" aria-label="Sprachplattform – Startseite">
-      <span class="brand-mark" aria-hidden="true">S</span>
+      <img class="brand-logo" src="{% static 'icons/brand.svg' %}" width="50" height="40" alt="">
       <span>Sprachplattform</span>
     </a>
     <nav class="account-nav" aria-label="Benutzerkonto">
       {% if request.user.is_authenticated %}
-        <a href="{% url 'projects:list' %}">Meine Hörtexte</a>
-        <a href="{% url 'tts:catalog' %}">Stimmen</a>
-        {% if request.user.is_staff or request.user.role == 'admin' or request.user.role == 'teacher' %}<a href="{% url 'accounts:student_access_list' %}">Schülerzugänge</a>{% endif %}
+        <a class="nav-link" href="{% url 'projects:list' %}"{% if request.resolver_match.app_name == 'projects' or request.resolver_match.app_name == 'production' or request.resolver_match.app_name == 'audio_studio' or request.resolver_match.app_name == 'script_assistant' %} aria-current="page"{% endif %}>{% include 'components/icon.html' with icon='script' %}Meine Hörtexte</a>
+        <a class="nav-link" href="{% url 'tts:catalog' %}"{% if request.resolver_match.app_name == 'tts' %} aria-current="page"{% endif %}>{% include 'components/icon.html' with icon='voices' %}Stimmen</a>
+        {% if request.user.is_staff or request.user.role == 'admin' or request.user.role == 'teacher' %}<a class="nav-link" href="{% url 'accounts:student_access_list' %}"{% if request.resolver_match.url_name|slice:':7' == 'student' %} aria-current="page"{% endif %}>{% include 'components/icon.html' with icon='access' %}Schülerzugänge</a>{% endif %}
         <span class="account-name">{{ request.user.username }}</span>
         {% if request.user.is_staff %}<a href="{% url 'admin:index' %}">Verwaltung</a>{% endif %}
         <form method="post" action="{% url 'accounts:logout' %}">

@@ -6,6 +6,7 @@
       const status = form.querySelector('[data-save-status]');
       if (!status) return;
       status.textContent = 'Speichert …';
+      status.dataset.saveState = 'saving';
       clearTimeout(timers.get(form));
       timers.set(form, setTimeout(() => save(form, status), 700));
     };
@@ -28,12 +29,42 @@
       }
       status.textContent = response.ok ? 'Gespeichert' : 'Nicht gespeichert – Eingaben prüfen';
       status.classList.toggle('save-error', !response.ok);
+      status.dataset.saveState = response.ok ? 'saved' : 'error';
+      showSaveErrors(form, payload.errors || {});
       if (response.ok && form.matches('[data-segment-autosave]')) {
         updateSegmentAppearance(form, payload.speaker);
       }
     } catch (_) {
       status.textContent = 'Speichern fehlgeschlagen – Verbindung prüfen';
       status.classList.add('save-error');
+      status.dataset.saveState = 'error';
+    }
+  }
+
+  function showSaveErrors(form, errors) {
+    form.querySelectorAll('[data-autosave-error]').forEach((error) => error.remove());
+    form.querySelectorAll('[data-autosave-invalid]').forEach((control) => {
+      control.removeAttribute('aria-invalid');
+      const description = (control.getAttribute('aria-describedby') || '').split(/\s+/)
+        .filter((id) => id && id !== `${control.id}-save-error`).join(' ');
+      if (description) control.setAttribute('aria-describedby', description);
+      else control.removeAttribute('aria-describedby');
+      delete control.dataset.autosaveInvalid;
+    });
+    for (const [name, messages] of Object.entries(errors)) {
+      const control = Array.from(form.elements).find((element) => element.name === name || element.name?.endsWith(`-${name}`));
+      if (!control?.id || !control.closest('.field')) continue;
+      const error = document.createElement('p');
+      error.id = `${control.id}-save-error`;
+      error.className = 'autosave-field-error';
+      error.dataset.autosaveError = '';
+      error.textContent = messages.map((item) => item.message).join(' ');
+      control.closest('.field').append(error);
+      const disclosure = control.closest('details');
+      if (disclosure) disclosure.open = true;
+      control.setAttribute('aria-invalid', 'true');
+      control.dataset.autosaveInvalid = '';
+      control.setAttribute('aria-describedby', [control.getAttribute('aria-describedby'), error.id].filter(Boolean).join(' '));
     }
   }
 
@@ -190,7 +221,7 @@
     const title = item.querySelector('[data-job-title]');
     const message = item.querySelector('[data-job-message]');
     if (title) title.textContent = 'Die Audioerzeugung ist fehlgeschlagen';
-    if (message) message.textContent = job.error || 'Die Audiodatei konnte nicht erstellt werden.';
+    if (message) message.textContent = 'Bitte prüfen Sie die Fehlermeldung und versuchen Sie es erneut.';
     const progressWrap = item.querySelector('[data-job-progress-wrap]');
     if (progressWrap) progressWrap.hidden = true;
     const recovery = item.querySelector('[data-job-error]');

@@ -3,10 +3,12 @@
 {% block content %}
 {{ voice_preview_data|json_script:"voice-preview-data" }}
 <section class="editor-shell" aria-labelledby="editor-title">
+  <h1 class="visually-hidden" id="editor-title">{{ project.title }}</h1>
   <header class="editor-heading">
     <div class="editor-navigation">
       <a class="back-link" href="{% url 'projects:list' %}">← Meine Hörtexte</a>
       <a class="button button-secondary" href="{% url 'audio_studio:editor' project.id %}">Hörspiel-Studio öffnen →</a>
+      <nav class="editor-jumps" aria-label="Editorbereiche"><a href="#script-title">Skript</a><a href="#settings-title">Stimmen</a><a href="#audio-output">Audio</a></nav>
     </div>
     <form class="project-meta" method="post" action="{% url 'projects:autosave' project.id %}" data-autosave>
       {% csrf_token %}
@@ -17,11 +19,59 @@
     </form>
   </header>
 
+
+  <details class="audio-history">
+    <summary>Optional: Hörspiel-Produktion</summary>
+    {% if request.user.role != 'student' %}<a class="button button-primary" href="{% url 'production:detail' project.id %}">Mit Hörspiel-Assistent produzieren →</a>{% endif %}
+    <p>Ergänzen Sie Ihren Hörtext mit Jingles, Musik und mehreren gleichzeitigen Geräuschen. Im Hörspiel-Studio können Sie Clips schneiden, mischen und gemeinsam exportieren.</p>
+    <a class="button button-secondary" href="{% url 'audio_studio:editor' project.id %}">Hörspiel-Studio öffnen →</a>
+  </details>
+
+  <div class="editor-grid">
+    <section class="script-column" aria-labelledby="script-title">
+      <div class="column-heading"><div><p class="eyebrow">Skript</p><h2 id="script-title">{% include "components/icon.html" with icon="script" %}Sprechbeiträge</h2></div><span class="character-count">{{ project.character_count }} Zeichen</span></div>
+
+      {% if segments_with_forms %}
+        <ol class="segment-list">
+          {% for segment, form in segments_with_forms %}
+            <li>
+              <article id="segment-{{ segment.pk }}" class="segment-card segment-{{ segment.speaker.color }}" data-segment-card>
+                <header class="segment-heading"><span>Beitrag {{ forloop.counter }}</span><strong>{{ segment.speaker.name }}</strong></header>
+                <form method="post" action="{% url 'projects:segment_autosave' project.id segment.id %}" data-autosave data-segment-autosave>
+                  {% csrf_token %}
+                  <div class="field"><label for="{{ form.speaker.id_for_label }}">Sprecher</label>{{ form.speaker }}</div>
+                  <div class="field"><label for="{{ form.text.id_for_label }}">Sprechtext</label>{{ form.text }}</div>
+                  <details class="segment-performance"><summary>Regie, Pause und Tempo</summary>
+                  <div class="segment-settings">
+                    <div class="field"><label for="{{ form.direction.id_for_label }}">Regie</label>{{ form.direction }}</div>
+                    <div class="field"><label for="{{ form.pause_after_ms.id_for_label }}">Pause danach (ms)</label>{{ form.pause_after_ms }}</div>
+                    <div class="field"><label for="{{ form.speed.id_for_label }}">Tempo</label>{{ form.speed }}</div>
+                  </div>
+                  </details>
+                  <span class="save-status" data-save-status role="status">Gespeichert</span>
+                </form>
+                <div class="segment-actions">
+                  <form method="post" action="{% url 'projects:segment_move' project.id segment.id 'up' %}">{% csrf_token %}<button class="icon-button" type="submit" aria-label="Beitrag nach oben verschieben">↑</button></form>
+                  <form method="post" action="{% url 'projects:segment_move' project.id segment.id 'down' %}">{% csrf_token %}<button class="icon-button" type="submit" aria-label="Beitrag nach unten verschieben">↓</button></form>
+                  <form method="post" action="{% url 'projects:segment_duplicate' project.id segment.id %}">{% csrf_token %}<button class="button button-quiet" type="submit">Duplizieren</button></form>
+                  <form method="post" action="{% url 'projects:segment_delete' project.id segment.id %}" data-confirm="Diesen Beitrag löschen?">{% csrf_token %}<button class="button button-danger" type="submit">Löschen</button></form>
+                </div>
+              </article>
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <div class="empty-state compact"><h2>Noch keine Sprechbeiträge</h2><p>Legen Sie zuerst rechts einen Sprecher an und fügen Sie danach den ersten Beitrag hinzu.</p></div>
+      {% endif %}
+      <form method="post" action="{% url 'projects:segment_add' project.id %}">{% csrf_token %}<button class="button button-secondary button-wide" type="submit">＋ Sprechbeitrag hinzufügen</button></form>
+    </section>
+
+    <aside class="settings-column" aria-labelledby="settings-title">
   <section id="audio-output" class="audio-output" aria-labelledby="audio-output-title">
     <header class="audio-output-heading">
       <div>
         <p class="eyebrow">Audioausgabe</p>
-        <h2 id="audio-output-title">Erzeugen, anhören und herunterladen</h2>
+        <h2 id="audio-output-title">{% include "components/icon.html" with icon="studio" %}Erzeugen, anhören und herunterladen</h2>
       </div>
       {% if latest_job %}<span class="status-badge status-{{ latest_job.status }}" data-job-status>{{ latest_job.get_status_display }}</span>{% endif %}
     </header>
@@ -48,7 +98,7 @@
             {% if latest_job.status == 'queued' %}Der Auftrag wartet auf die Verarbeitung.
             {% elif latest_job.status == 'running' %}Sie können auf dieser Seite bleiben; der Status wird automatisch aktualisiert.
             {% elif latest_job.status == 'succeeded' %}Hören Sie das Ergebnis direkt an oder laden Sie die MP3 herunter.
-            {% else %}{{ latest_job.error_message }}{% endif %}
+            {% else %}Bitte prüfen Sie die Fehlermeldung und versuchen Sie es erneut.{% endif %}
           </p>
 
           <div class="generation-progress" data-job-progress-wrap {% if latest_job.status != 'queued' and latest_job.status != 'running' %}hidden{% endif %}>
@@ -115,53 +165,8 @@
     {% endif %}
   </section>
 
-  <details class="audio-history">
-    <summary>Optional: Hörspiel-Produktion</summary>
-    {% if request.user.role != 'student' %}<a class="button button-primary" href="{% url 'production:detail' project.id %}">Mit Hörspiel-Assistent produzieren →</a>{% endif %}
-    <p>Ergänzen Sie Ihren Hörtext mit Jingles, Musik und mehreren gleichzeitigen Geräuschen. Im Hörspiel-Studio können Sie Clips schneiden, mischen und gemeinsam exportieren.</p>
-    <a class="button button-secondary" href="{% url 'audio_studio:editor' project.id %}">Hörspiel-Studio öffnen →</a>
-  </details>
-
-  <div class="editor-grid">
-    <section class="script-column" aria-labelledby="script-title">
-      <div class="column-heading"><div><p class="eyebrow">Skript</p><h1 id="script-title">Sprechbeiträge</h1></div><span class="character-count">{{ project.character_count }} Zeichen</span></div>
-
-      {% if segments_with_forms %}
-        <ol class="segment-list">
-          {% for segment, form in segments_with_forms %}
-            <li>
-              <article id="segment-{{ segment.pk }}" class="segment-card segment-{{ segment.speaker.color }}" data-segment-card>
-                <header class="segment-heading"><span>Beitrag {{ forloop.counter }}</span><strong>{{ segment.speaker.name }}</strong></header>
-                <form method="post" action="{% url 'projects:segment_autosave' project.id segment.id %}" data-autosave data-segment-autosave>
-                  {% csrf_token %}
-                  <div class="field"><label for="{{ form.speaker.id_for_label }}">Sprecher</label>{{ form.speaker }}</div>
-                  <div class="field"><label for="{{ form.text.id_for_label }}">Sprechtext</label>{{ form.text }}</div>
-                  <div class="segment-settings">
-                    <div class="field"><label for="{{ form.direction.id_for_label }}">Regie</label>{{ form.direction }}</div>
-                    <div class="field"><label for="{{ form.pause_after_ms.id_for_label }}">Pause danach</label>{{ form.pause_after_ms }}</div>
-                    <div class="field"><label for="{{ form.speed.id_for_label }}">Tempo</label>{{ form.speed }}</div>
-                  </div>
-                  <span class="save-status" data-save-status role="status">Gespeichert</span>
-                </form>
-                <div class="segment-actions">
-                  <form method="post" action="{% url 'projects:segment_move' project.id segment.id 'up' %}">{% csrf_token %}<button class="icon-button" type="submit" aria-label="Beitrag nach oben verschieben">↑</button></form>
-                  <form method="post" action="{% url 'projects:segment_move' project.id segment.id 'down' %}">{% csrf_token %}<button class="icon-button" type="submit" aria-label="Beitrag nach unten verschieben">↓</button></form>
-                  <form method="post" action="{% url 'projects:segment_duplicate' project.id segment.id %}">{% csrf_token %}<button class="button button-quiet" type="submit">Duplizieren</button></form>
-                  <form method="post" action="{% url 'projects:segment_delete' project.id segment.id %}" data-confirm="Diesen Beitrag löschen?">{% csrf_token %}<button class="button button-danger" type="submit">Löschen</button></form>
-                </div>
-              </article>
-            </li>
-          {% endfor %}
-        </ol>
-      {% else %}
-        <div class="empty-state compact"><h2>Noch keine Sprechbeiträge</h2><p>Legen Sie zuerst rechts einen Sprecher an und fügen Sie danach den ersten Beitrag hinzu.</p></div>
-      {% endif %}
-      <form method="post" action="{% url 'projects:segment_add' project.id %}">{% csrf_token %}<button class="button button-secondary button-wide" type="submit">＋ Sprechbeitrag hinzufügen</button></form>
-    </section>
-
-    <aside class="settings-column" aria-labelledby="settings-title">
       <div class="sidebar-card">
-        <p class="eyebrow">Audioeinstellungen</p><h2 id="settings-title">Sprecher &amp; Stimmen</h2>
+        <p class="eyebrow">Audioeinstellungen</p><h2 id="settings-title">{% include "components/icon.html" with icon="voices" %}Sprecher &amp; Stimmen</h2>
         <p class="voice-catalog-link"><a href="{% url 'tts:catalog' %}?language={{ project.language }}">Stimmen anhören und Favoriten wählen →</a></p>
         {% for speaker, form, catalog_voice in speakers_with_forms %}
           <div class="speaker-row speaker-{{ speaker.color }}">
@@ -170,7 +175,7 @@
               <div class="field"><label for="{{ form.name.id_for_label }}">Name</label>{{ form.name }}</div>
               <div class="field"><label for="{{ form.color.id_for_label }}">Farbe</label>{{ form.color }}</div>
               <div class="field"><label for="{{ form.voice.id_for_label }}">Stimme</label>{{ form.voice }}{% if form.voice.errors %}<div class="field-errors">{{ form.voice.errors }}</div>{% endif %}</div>
-              {% if form.accent %}<div class="field"><label for="{{ form.accent.id_for_label }}">Akzent</label>{{ form.accent }}<small class="field-help">{{ form.accent.help_text }}</small></div>{% endif %}
+              {% if form.accent %}<div class="field"><label for="{{ form.accent.id_for_label }}">Akzent</label>{{ form.accent }}<small class="field-help" id="{{ form.accent.auto_id }}_helptext">{{ form.accent.help_text }}</small></div>{% endif %}
               <div class="voice-preview-panel" data-voice-preview-panel hidden>
                 <span class="voice-preview-label" data-voice-preview-label>Stimmenprobe</span>
                 <audio class="voice-preview" controls preload="none" data-voice-preview></audio>
@@ -188,7 +193,7 @@
             <div class="field"><label for="{{ speaker_form.name.id_for_label }}">Name</label>{{ speaker_form.name }}</div>
             <div class="field"><label for="{{ speaker_form.color.id_for_label }}">Farbe</label>{{ speaker_form.color }}</div>
             <div class="field"><label for="{{ speaker_form.voice.id_for_label }}">Stimme (optional)</label>{{ speaker_form.voice }}</div>
-            {% if speaker_form.accent %}<div class="field"><label for="{{ speaker_form.accent.id_for_label }}">Akzent</label>{{ speaker_form.accent }}<small class="field-help">{{ speaker_form.accent.help_text }}</small></div>{% endif %}
+            {% if speaker_form.accent %}<div class="field"><label for="{{ speaker_form.accent.id_for_label }}">Akzent</label>{{ speaker_form.accent }}<small class="field-help" id="{{ speaker_form.accent.auto_id }}_helptext">{{ speaker_form.accent.help_text }}</small></div>{% endif %}
             <div class="voice-preview-panel" data-voice-preview-panel hidden>
               <span class="voice-preview-label" data-voice-preview-label>Stimmenprobe</span>
               <audio class="voice-preview" controls preload="none" data-voice-preview></audio>
@@ -202,7 +207,7 @@
         <p class="eyebrow">KI-Assistent</p><h2>Text gemeinsam weiterentwickeln</h2>
         {% if assistant_configured %}
           <p>Ein neuer Vorschlag bleibt getrennt von diesem Hörtext, bis Sie ihn ausdrücklich übernehmen.</p>
-          <a class="button button-secondary button-wide" href="{% url 'script_assistant:project_revision' project.id %}">Mit KI überarbeiten</a>
+          <a class="button button-secondary button-wide" href="{% url 'script_assistant:project_revision' project.id %}">{% include "components/icon.html" with icon="spark" %}Mit KI überarbeiten</a>
           {% if last_applied_proposal %}
             <form method="post" action="{% url 'script_assistant:undo' last_applied_proposal.id %}">{% csrf_token %}<button class="button button-quiet button-wide" type="submit">Letzte KI-Übernahme rückgängig</button></form>
           {% endif %}
