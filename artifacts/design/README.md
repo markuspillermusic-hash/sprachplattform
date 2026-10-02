@@ -17,3 +17,9 @@ Stand: 2. Oktober 2026. Lokale Browseraufnahmen mit isolierten Design-Demos; kei
 Der generierte Entwurf wurde mit dem eingebauten Imagegen-Werkzeug aus dem Startseiten-Screenshot erstellt. Promptinhalt: professionelle deutsche Sprachplattform; bestehende Struktur beibehalten; eigenes Logo aus Sprechblasen und Klangwelle; konsistente zweifarbige Icons für Hörtext, Hörspiel, Stimmen, Skript, Zugang und Assistent; ruhiges Waldgrün mit Amber; hoher Kontrast; vergrößerte Logo-/Icon-Musterleiste. Dieses Bild dient der visuellen Beurteilung. Die echten Assets sind die lokalen SVGs unter `static/icons`.
 
 Die Screenshots dokumentieren Zustände und Bedienoberflächen. Für ein veröffentlichtes Werbevideo müssen die ausdrücklich gekennzeichneten Demos gegen freigegebene repräsentative Unterrichtsinhalte ausgetauscht werden.
+
+## Öffentliche Abnahme nach Veröffentlichung
+
+- [Live-Startseite](startseite-veroeffentlicht.png)
+- [Live-Anmeldung](login-veroeffentlicht.png)
+- [Live-Startseite auf schmalem Bildschirm](startseite-veroeffentlicht-mobil.png)

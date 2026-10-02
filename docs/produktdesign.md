@@ -32,11 +32,11 @@ Die Vorschau läuft separat unter `http://127.0.0.1:8098/` mit `var/design-previ
 
 ## Abgleich vor Veröffentlichung
 
-Die öffentliche Startseite wurde am 2. Oktober 2026 lesend geprüft: Sie verwendet weiterhin das bisherige S-Zeichen und die bisherigen Leitlinien. Die neue Markenidentität ist dort noch nicht veröffentlicht. Es fand kein Login und keine Änderung am Server statt.
+Vor der Veröffentlichung wurde die öffentliche Startseite lesend geprüft: Sie verwendete noch das bisherige S-Zeichen und die bisherigen Leitlinien. Nach ausdrücklicher Nutzerfreigabe wurde die Designfassung `64c0280` auf der Plattform veröffentlicht; die anschließende öffentliche Prüfung zeigt die neue Markenidentität. Ein Login mit produktiven Nutzerkonten war nicht Teil dieser Prüfung.
 
 `docs/operations.md` und `docs/pilot-checklist.md` enthalten zusätzliche Betriebs- und Pilotfreigaben. Einige historische Checkboxen passen nicht zum später in `Briefing.md` dokumentierten Serverbetrieb; ein grüner lokaler Design-Test belegt keinen aktuellen Restore-, MFA- oder pädagogischen Freigabestatus.
 
-Offen bleiben eine vollständige Prüfung mit Screenreader und Browser-Zoom im Kernablauf sowie die Abnahme und Veröffentlichung auf dem Zielserver. Reale Sprachqualität und Kosten-/Betriebsfreigabe sind durch Testtöne und lokale UI-Prüfungen nicht nachgewiesen. Die Designänderung ist lokal reviewbar; das Gesamtziel bleibt bis zur noch ausstehenden Abnahme aktiv.
+Die Veröffentlichung und öffentliche visuelle Abnahme sind abgeschlossen. Eine native Screenreader-Prüfung und ein vollständiger Browser-Zoomtest wurden vor der Freigabe ausdrücklich als ausstehend benannt und bleiben empfohlene zusätzliche Zugänglichkeitsprüfungen. Reale Sprachqualität und Kosten-/Betriebsfreigabe werden durch dieses Designrelease nicht neu bewertet. Die gewünschte eigene Markenidentität, professionell gestalteten Arbeitsansichten und verbesserten Bedienzustände sind umgesetzt und veröffentlicht; vollständige WCAG-Konformität wird nicht behauptet.
 
 ## Zusätzliche Zugänglichkeitsprüfung
 
@@ -46,3 +46,5 @@ Offen bleiben eine vollständige Prüfung mit Screenreader und Browser-Zoom im K
 - Clipauswahl mit Enter, Mischregler per Pfeiltaste und Rückgängig geprüft. Escape schließt den Erzeugungsdialog und führt den Fokus zum Auslöser zurück.
 - Nach diesen Templateänderungen 98 Tests für accounts/projects/production sowie 45 Studio-Tests bestanden. Die zusätzliche Fokuskorrektur wurde anschließend im Browser geprüft.
 - Am 2. Oktober 2026 hat der Nutzer die Veröffentlichung auf der bestehenden Plattform ausdrücklich freigegeben. Veröffentlichung und öffentlicher Smoke-Test folgen; eine native NVDA-/VoiceOver-Prüfung wurde nicht durchgeführt.
+
+Veröffentlichungsnachweise und Rücknahmeweg: `docs/design-release.md`. Zugänglichkeitsbefunde und Grenzen: `docs/accessibility-design-review.md`.
