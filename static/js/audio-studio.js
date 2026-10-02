@@ -9,7 +9,9 @@
   const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
   let state, revision = 0, saved = "", selected = null, position = 0, zoom = 12;
   let assets = new Map(), history = [], jobs = [], generation = {}, creditBudget = null, undo = [], redo = [];
-  let context, playing = false, nodes = [], started = 0, playFrom = 0, playUntil = 0, frame;
+  let context, playing = false, graph = null, started = 0, playFrom = 0, frame, playOnlyId = null;
+  let syncTimer, syncRequest = 0, seekRevision = 0, appliedPlaybackState = "";
+  const retiringGraphs = new Set(), bufferLoads = new Map();
   let saving, polling, ready = false, loadingAudio = false, playbackToken = 0;
   let clipClipboard = null, activeTrack = "speech", generationPlacement = null, dragging = false, generationSubmitting = false, menuScrollLeft = 0;
   let generationKind = "music";
@@ -69,12 +71,11 @@
     $("save").disabled = !ready || Boolean(saving) || !dirty;
     $("undo").disabled = !undo.length;
     $("redo").disabled = !redo.length;
-    $("play").disabled = !ready || !state.clips.length || loadingAudio;
+    $("play").disabled = !ready || (!playing && (!state.clips.length || loadingAudio));
     $("stop").disabled = !ready;
     $("export").disabled = !ready || !state.clips.length || jobs.some(j => j.kind === "export" && ["queued", "running"].includes(j.status));
   }
   function checkpoint() {
-    stop();
     undo.push(clone(state));
     if (undo.length > 60) undo.shift();
     redo = [];
@@ -82,20 +83,33 @@
   function change(fn) { checkpoint(); fn(); render(); }
   function updatePosition(value) {
     position = clamp(value, 0, 1800);
-    $("position").value = position.toFixed(2);
+    if (document.activeElement !== $("position")) $("position").value = position.toFixed(2);
     $("time").textContent = `${time(position)} / ${time(duration())}`;
     root.querySelectorAll(".studio-playhead").forEach(p => { p.style.left = `${position * zoom}px`; });
   }
+  const playbackPosition = (at = context?.currentTime || 0) => clamp(playFrom + Math.max(0, at - started), 0, 1800);
+  function disposeGraph(value) {
+    if (!value) return;
+    clearTimeout(value.cleanup);
+    value.nodes.forEach(node => { try { node.stop(); } catch {} try { node.disconnect(); } catch {} });
+    retiringGraphs.delete(value);
+  }
   function stop(reset = false) {
     playbackToken++;
-    if (playing) position = clamp(playFrom + Math.max(0, context.currentTime - started), 0, playUntil);
+    syncRequest++; clearTimeout(syncTimer); syncTimer = null;
+    if (playing) position = playbackPosition();
     playing = false;
-    nodes.forEach(n => { try { n.stop(); } catch {} try { n.disconnect(); } catch {} });
-    nodes = [];
+    disposeGraph(graph); graph = null;
+    [...retiringGraphs].forEach(disposeGraph);
     cancelAnimationFrame(frame);
     if (reset) position = 0;
     $("play").textContent = "▶ Abspielen";
     if (state) updatePosition(position);
+    if (state) mark();
+  }
+  function seek(value) {
+    updatePosition(value);
+    if (playing) { playFrom = clamp(value, 0, 1800); started = context.currentTime; seekRevision++; schedulePlaybackSync(); }
   }
   function audible() {
     const solo = Object.values(state.tracks).some(t => t.solo);
@@ -112,90 +126,158 @@
   }
   async function getBuffer(assetId) {
     if (buffers.has(assetId)) return buffers.get(assetId);
+    if (bufferLoads.has(assetId)) return bufferLoads.get(assetId);
     const asset = assets.get(assetId);
     if (!asset) throw new Error("Eine Audiodatei ist abgelaufen. Entfernen Sie den Clip oder fügen Sie die Datei erneut hinzu.");
-    const response = await fetch(asset.url, {credentials: "same-origin", cache: "no-store"});
-    if (!response.ok) throw new Error("Die Audiodatei ist nicht mehr verfügbar.");
-    let buffer;
-    try { buffer = await context.decodeAudioData(await response.arrayBuffer()); }
-    catch { throw new Error("Der Browser konnte diese Audiodatei nicht öffnen."); }
-    buffers.set(assetId, buffer);
-    return buffer;
+    const loading = (async () => {
+      const response = await fetch(asset.url, {credentials: "same-origin", cache: "no-store"});
+      if (!response.ok) throw new Error("Die Audiodatei ist nicht mehr verfügbar.");
+      let buffer;
+      try { buffer = await context.decodeAudioData(await response.arrayBuffer()); }
+      catch { throw new Error("Der Browser konnte diese Audiodatei nicht öffnen."); }
+      buffers.set(assetId, buffer); return buffer;
+    })();
+    bufferLoads.set(assetId, loading);
+    try { return await loading; } finally { bufferLoads.delete(assetId); }
+  }
+  const playbackClips = () => state.clips.filter(c => !playOnlyId || c.id === playOnlyId);
+  const geometry = clips => JSON.stringify([seekRevision, clips.map(c => [c.id, c.asset_id, c.track, c.start, c.trim_start, c.trim_end])]);
+  function hold(param, at) {
+    // Removing the entire old curve also avoids Web Audio curve-overlap errors.
+    // Retain the current level until the new automation starts.
+    const value = param.value;
+    param.cancelScheduledValues(0);
+    param.setValueAtTime(value, context.currentTime);
+    param.setValueAtTime(value, at);
+  }
+  function updatePlaybackParameters(value, clips, from, at, smooth = true) {
+    const mix = mixSettings(), allowed = audible(), end = Math.max(from + .02, ...clips.map(c => c.start + length(c)));
+    const speech = intervals();
+    for (const name of Object.keys(names)) {
+      const track = value.tracks[name], gain = track.gain.gain;
+      const base = playOnlyId || allowed.has(name) ? db(state.tracks[name].gain_db) : 0;
+      const duckDb = !playOnlyId && allowed.has("speech") ? (name === "music" ? mix.music_duck_db : name === "effects" ? mix.effects_duck_db : 0) : 0;
+      const previous = gain.value; hold(gain, at);
+      if (duckDb > 0 && base > 0) {
+        const span = end - from, attack = mix.duck_attack_ms / 1000, release = mix.duck_release_ms / 1000;
+        const count = Math.max(2, Math.ceil(span / .02) + 1), values = new Float32Array(count);
+        for (let i = 0; i < count; i++) {
+          const elapsed = i / (count - 1) * span, t = from + elapsed;
+          const envelope = Math.max(0, ...speech.map(([s,e]) => Math.min(1, Math.max(0,(t - s + attack)/attack), Math.max(0,(e + release - t)/release))));
+          const level = base * db(-duckDb * envelope * envelope * (3 - 2 * envelope));
+          values[i] = smooth ? previous + (level - previous) * Math.min(1, elapsed / .02) : level;
+        }
+        gain.setValueCurveAtTime(values, at, span);
+      } else {
+        gain.setValueAtTime(smooth ? previous : base, at); gain.linearRampToValueAtTime(base, at + .02);
+      }
+      if (track.compressor) {
+        const amount = mix.compression / 100;
+        track.compressor.ratio.setTargetAtTime(1 + 2 * amount, at, .015);
+        track.compressor.attack.setTargetAtTime(mix.compressor_attack_ms / 1000, at, .015);
+        track.compressor.release.setTargetAtTime(mix.compressor_release_ms / 1000, at, .015);
+        track.makeup.gain.setTargetAtTime(db(2 * amount), at, .015);
+      }
+    }
+    for (const c of clips) {
+      const gain = value.clips.get(c.id)?.gain.gain; if (!gain) continue;
+      const total = length(c), passed = Math.max(0, from - c.start), remaining = total - passed;
+      if (remaining <= .001) continue;
+      const when = at + Math.max(0, c.start - from), ramp = smooth && passed > 0 ? Math.min(.012, remaining) : 0;
+      const factor = t => Math.max(0, Math.min(1, c.fade_in ? t / c.fade_in : 1, c.fade_out ? (total - t) / c.fade_out : 1));
+      hold(gain, at);
+      if (ramp) gain.linearRampToValueAtTime(db(c.gain_db) * factor(passed + ramp), when + ramp);
+      else gain.setValueAtTime(db(c.gain_db) * factor(passed), when);
+      if (c.fade_in > passed + ramp) gain.linearRampToValueAtTime(db(c.gain_db), when + c.fade_in - passed);
+      if (c.fade_out) {
+        if (total - c.fade_out > passed + ramp) gain.setValueAtTime(db(c.gain_db), when + total - c.fade_out - passed);
+        gain.linearRampToValueAtTime(0, when + remaining);
+      }
+    }
+  }
+  function createPlaybackGraph(clips, from, at, fade = false) {
+    const value = {nodes: [], tracks: {}, clips: new Map(), signature: geometry(clips)};
+    try {
+      const master = context.createGain(), limiter = context.createDynamicsCompressor(); value.master = master;
+      master.gain.setValueAtTime(fade ? 0 : .8, at); if (fade) master.gain.linearRampToValueAtTime(.8, at + .015);
+      limiter.threshold.value = -1; limiter.knee.value = 0; limiter.ratio.value = 20;
+      limiter.attack.value = .005; limiter.release.value = .25;
+      master.connect(limiter); limiter.connect(context.destination); value.nodes.push(master, limiter);
+      for (const name of Object.keys(names)) {
+        const gain = context.createGain(), track = {gain}; value.tracks[name] = track; value.nodes.push(gain);
+        if (name === "speech") {
+          const compressor = context.createDynamicsCompressor(), makeup = context.createGain();
+          compressor.threshold.value = -18; compressor.knee.value = 6;
+          const mix = mixSettings();
+          compressor.ratio.value = 1 + 2 * mix.compression / 100;
+          compressor.attack.value = mix.compressor_attack_ms / 1000;
+          compressor.release.value = mix.compressor_release_ms / 1000;
+          makeup.gain.value = db(2 * mix.compression / 100);
+          gain.connect(compressor); compressor.connect(makeup); makeup.connect(master);
+          Object.assign(track, {compressor, makeup}); value.nodes.push(compressor, makeup);
+        } else gain.connect(master);
+      }
+      for (const c of clips) {
+        const passed = Math.max(0, from - c.start), remaining = length(c) - passed;
+        if (remaining <= .001) continue;
+        const source = context.createBufferSource(), gain = context.createGain(); source.buffer = buffers.get(c.asset_id);
+        source.connect(gain); gain.connect(value.tracks[c.track].gain);
+        value.clips.set(c.id, {source, gain}); value.nodes.push(source, gain);
+        source.start(at + Math.max(0, c.start - from), c.trim_start + passed, remaining);
+      }
+      updatePlaybackParameters(value, clips, from, at, false);
+      return value;
+    } catch (error) { disposeGraph(value); throw error; }
+  }
+  function schedulePlaybackSync() {
+    if (!playing) return;
+    syncRequest++;
+    if (syncTimer) return;
+    syncTimer = setTimeout(async () => {
+      syncTimer = null; const request = syncRequest, token = playbackToken;
+      try {
+        const snapshot = JSON.stringify(state); if (snapshot === appliedPlaybackState && graph?.signature === geometry(playbackClips())) return;
+        await Promise.all(playbackClips().map(c => getBuffer(c.asset_id)));
+        if (!playing || token !== playbackToken || request !== syncRequest) return;
+        const clips = playbackClips(), at = context.currentTime + .012, from = playbackPosition(at);
+        if (graph?.signature === geometry(clips)) updatePlaybackParameters(graph, clips, from, at);
+        else {
+          const old = graph; graph = createPlaybackGraph(clips, from, at, true);
+          if (old) {
+            hold(old.master.gain, at); old.master.gain.linearRampToValueAtTime(0, at + .015);
+            retiringGraphs.add(old); old.cleanup = setTimeout(() => disposeGraph(old), 80);
+          }
+        }
+        appliedPlaybackState = JSON.stringify(state);
+      } catch (error) { if (playing && token === playbackToken) message(error.message); }
+    }, 60);
   }
   async function play(onlyId) {
     if (playing) { stop(); return; }
+    if (loadingAudio) return;
     root.querySelectorAll("audio").forEach(audio => audio.pause());
     if (!context) context = new (window.AudioContext || window.webkitAudioContext)();
-    await context.resume();
-    const allowed = audible();
-    const clips = state.clips.filter(c => onlyId ? c.id === onlyId : allowed.has(c.track));
-    if (!clips.length) throw new Error("Es sind keine hörbaren Clips ausgewählt.");
+    playOnlyId = onlyId || null;
+    const clips = playbackClips(), allowed = audible();
+    if (!clips.some(c => playOnlyId || allowed.has(c.track))) throw new Error("Es sind keine hörbaren Clips ausgewählt.");
     if (onlyId) updatePosition(clips[0].start);
-    const end = Math.max(...clips.map(c => c.start + length(c)));
-    if (position >= end) updatePosition(onlyId ? clips[0].start : 0);
+    if (position >= Math.max(...clips.map(c => c.start + length(c)))) updatePosition(onlyId ? clips[0].start : 0);
     const token = ++playbackToken;
     loadingAudio = true; mark();
     try {
-      await Promise.all(clips.map(c => getBuffer(c.asset_id)));
-      if (token !== playbackToken) return;
-      playFrom = position; playUntil = end; started = context.currentTime + .06;
-      const master = context.createGain(); master.gain.value = .8;
-      const mix = mixSettings();
-      const limiter = context.createDynamicsCompressor();
-      limiter.threshold.value = -1; limiter.knee.value = 0; limiter.ratio.value = 20;
-      limiter.attack.value = .005; limiter.release.value = .25;
-      master.connect(limiter); limiter.connect(context.destination);
-      nodes.push(master, limiter);
-      const trackNodes = {};
-      for (const name of Object.keys(names)) {
-        const gain = context.createGain();
-        gain.gain.value = db(state.tracks[name].gain_db);
-        if (name === "speech" && mix.compression > 0) {
-          const compressor = context.createDynamicsCompressor(), makeup = context.createGain();
-          const amount = mix.compression / 100;
-          compressor.threshold.value = -18; compressor.ratio.value = 1 + 2 * amount; compressor.knee.value = 6;
-          compressor.attack.value = mix.compressor_attack_ms / 1000;
-          compressor.release.value = mix.compressor_release_ms / 1000; makeup.gain.value = db(2 * amount);
-          gain.connect(compressor); compressor.connect(makeup); makeup.connect(master);
-          nodes.push(compressor, makeup);
-        } else gain.connect(master);
-        trackNodes[name] = gain; nodes.push(gain);
-        const duckDb = name === "music" ? mix.music_duck_db : name === "effects" ? mix.effects_duck_db : 0;
-        if (!onlyId && duckDb > 0 && allowed.has("speech")) {
-          const speech = intervals();
-          const attack = mix.duck_attack_ms / 1000, release = mix.duck_release_ms / 1000;
-          const count = Math.max(2, Math.ceil((end - position) / .02) + 1);
-          const values = new Float32Array(count);
-          for (let i = 0; i < count; i++) {
-            const t = position + i / (count - 1) * (end - position);
-            const envelope = Math.max(0, ...speech.map(([s,e]) => Math.min(1, Math.max(0,(t - s + attack)/attack), Math.max(0,(e + release - t)/release))));
-            const smooth = envelope * envelope * (3 - 2 * envelope);
-            values[i] = db(state.tracks[name].gain_db - duckDb * smooth);
-          }
-          gain.gain.setValueCurveAtTime(values, started, end - position);
-        }
-      }
-      for (const c of clips) {
-        const passed = Math.max(0, position - c.start), remaining = length(c) - passed;
-        if (remaining <= .001) continue;
-        const source = context.createBufferSource(), gain = context.createGain();
-        source.buffer = buffers.get(c.asset_id);
-        source.connect(gain); gain.connect(trackNodes[c.track]);
-        const when = started + Math.max(0, c.start - position), total = length(c);
-        const factor = (t) => Math.min(1, c.fade_in ? t / c.fade_in : 1, c.fade_out ? (total - t) / c.fade_out : 1);
-        gain.gain.setValueAtTime(db(c.gain_db) * factor(passed), when);
-        if (c.fade_in > passed) gain.gain.linearRampToValueAtTime(db(c.gain_db), when + c.fade_in - passed);
-        if (c.fade_out) {
-          if (total - c.fade_out > passed) gain.gain.setValueAtTime(db(c.gain_db), when + total - c.fade_out - passed);
-          gain.gain.linearRampToValueAtTime(0, when + remaining);
-        }
-        source.start(when, c.trim_start + passed, remaining); nodes.push(source, gain);
-      }
+      await context.resume();
+      // Edits made while loading may introduce another asset. Decode the latest selection.
+      do {
+        await Promise.all(playbackClips().map(c => getBuffer(c.asset_id)));
+        if (token !== playbackToken) return;
+      } while (playbackClips().some(c => !buffers.has(c.asset_id)));
+      playFrom = position; started = context.currentTime + .06;
+      graph = createPlaybackGraph(playbackClips(), playFrom, started);
+      appliedPlaybackState = JSON.stringify(state);
       playing = true; $("play").textContent = "Ⅱ Pause";
       const tick = () => {
         if (!playing) return;
-        updatePosition(playFrom + Math.max(0, context.currentTime - started));
-        if (position >= playUntil) { stop(); updatePosition(playUntil); return; }
+        updatePosition(playbackPosition());
         frame = requestAnimationFrame(tick);
       };
       tick();
@@ -248,7 +330,7 @@
     ruler.append(el("div", "Zeit (min:s)", "studio-ruler-label"));
     const ruleLane = el("div", null, "studio-ruler-lane");
     for (let t = 0; t < width / zoom; t += step) { const tick = el("span", time(t), "studio-tick"); tick.style.left = `${t * zoom}px`; ruleLane.append(tick); }
-    ruleLane.addEventListener("click", e => { stop(); updatePosition((e.clientX - ruleLane.getBoundingClientRect().left)/zoom); });
+    ruleLane.addEventListener("click", e => seek((e.clientX - ruleLane.getBoundingClientRect().left)/zoom));
     ruleLane.append(el("div", null, "studio-playhead")); ruler.append(ruleLane); $("timeline").append(ruler);
     for (const name of Object.keys(names)) {
       const row = el("div", null, `studio-track studio-track-${name}`); row.style.width = `${width + labelWidth}px`;
@@ -272,15 +354,17 @@
       const lane = el("div", null, "studio-lane"); lane.dataset.track = name; lane.style.setProperty("--tick-width", `${zoom * step}px`);
       lane.addEventListener("click", e => {
         if (e.target.closest(".studio-clip") || dragging) return;
-        closeMenu(); stop(); activeTrack = name;
-        updatePosition((e.clientX - lane.getBoundingClientRect().left) / zoom);
-        if (name !== "speech") openGeneration(name, position);
+        closeMenu(); activeTrack = name;
+        const target = clamp((e.clientX - lane.getBoundingClientRect().left) / zoom, 0, 1800);
+        if (name !== "speech") openGeneration(name, target);
+        else seek(target);
       });
       lane.addEventListener("contextmenu", e => {
         if (e.target.closest(".studio-clip")) return;
-        e.preventDefault(); stop(); activeTrack = name;
-        updatePosition((e.clientX - lane.getBoundingClientRect().left) / zoom);
-        showLaneMenu(e.clientX, e.clientY, name, position);
+        e.preventDefault(); activeTrack = name;
+        const target = clamp((e.clientX - lane.getBoundingClientRect().left) / zoom, 0, 1800);
+        if (!playing) updatePosition(target);
+        showLaneMenu(e.clientX, e.clientY, name, target);
       });
       const placed = [];
       const clips = state.clips.filter(c => c.track === name).sort((a,b) => a.start - b.start);
@@ -319,7 +403,7 @@
       lane.append(el("div", null, "studio-playhead")); row.append(label, lane); $("timeline").append(row);
     }
     renderMixSettings();
-    inspector(); updatePosition(position); updateGainLabels(); mark();
+    inspector(); updatePosition(position); updateGainLabels(); mark(); schedulePlaybackSync();
     if (focusedTrackControl) {
       Array.from($("timeline").querySelectorAll("[data-track-control]"))
         .find(control => control.dataset.trackControl === focusedTrackControl)?.focus({preventScroll: true});
@@ -371,7 +455,7 @@
   }
   function drag(event, c, button) {
     if (event.button !== 0) return;
-    closeMenu(); select(c.id); stop();
+    closeMenu(); select(c.id);
     const old = clone(state), initial = clone(c), x = event.clientX, y = event.clientY,
       side = event.target.dataset.trim, fade = event.target.dataset.fade,
       gainDrag = Boolean(event.target.closest(".studio-gain-handle"));
@@ -407,7 +491,7 @@
       movingButton.style.left = `${dragged.start * zoom}px`; movingButton.style.width = `${Math.max(14, length(dragged) * zoom)}px`;
       movingButton.querySelector("canvas").style.left = `${-dragged.trim_start * zoom}px`;
       updateFadeVisuals(movingButton, dragged); updateGainLabels();
-      inspector();
+      inspector(); schedulePlaybackSync();
     };
     const end = e => {
       button.removeEventListener("pointermove", move); button.removeEventListener("pointerup", end); button.removeEventListener("pointercancel", cancel);
@@ -495,7 +579,7 @@
     inspector(); $("clip-form").scrollIntoView({block: "center"}); $("clip-form").elements.start.focus({preventScroll: true});
   }
   function showClipMenu(x, y) {
-    stop(); const c = state.clips.find(c => c.id === selected); if (!c) return;
+    const c = state.clips.find(c => c.id === selected); if (!c) return;
     showMenu(x, y, [
       ["Clip bearbeiten …", "", editSelected],
       ["Kopieren", "Strg+C", copySelected],
@@ -513,8 +597,10 @@
   }
   function openGeneration(track, start) {
     if (!ready || dragging || generationSubmitting) return;
-    closeMenu(); stop(); activeTrack = track; updatePosition(start);
-    generationPlacement = {track, start: position};
+    closeMenu(); activeTrack = track;
+    const target = clamp(start, 0, 1800);
+    if (!playing) updatePosition(target);
+    generationPlacement = {track, start: target};
     $("generate-form").elements.kind.value = track;
     $("generation-error").hidden = true;
     generationInfo();
@@ -601,10 +687,9 @@
   }
   async function load() {
     if (saving) throw new Error("Warten Sie, bis der Stand gespeichert ist.");
-    stop();
     const data = await api("state");
     state = data.state; revision = data.revision; saved = JSON.stringify(state); selected = null;
-    assets = new Map(data.assets.map(a => [a.id,a])); buffers.clear(); undo = []; redo = [];
+    assets = new Map(data.assets.map(a => [a.id,a])); if (!playing && !loadingAudio) buffers.clear(); undo = []; redo = [];
     history = data.history; jobs = data.jobs; generation = data.generation; creditBudget = data.credit_budget;
     zoom = clamp(($("timeline").clientWidth - (window.innerWidth <= 780 ? 130 : 156)) / Math.max(20, duration() + 8), 2, 60);
     $("zoom").value = zoom;
@@ -616,12 +701,12 @@
   $("save").addEventListener("click", safe(save));
   $("play").addEventListener("click", safe(() => play()));
   $("stop").addEventListener("click", () => stop(true));
-  $("position").addEventListener("change", safe(() => { if (!$("position").checkValidity()) throw new Error("Die Abspielposition muss zwischen 0 und 1.800 Sekunden liegen."); const value = Number($("position").value); stop(); updatePosition(value); }));
+  $("position").addEventListener("change", safe(() => { if (!$("position").checkValidity()) throw new Error("Die Abspielposition muss zwischen 0 und 1.800 Sekunden liegen."); const value = Number($("position").value); seek(value); }));
   $("zoom").addEventListener("input", () => { zoom = Number($("zoom").value); render(); });
   function undoEdit(forward = false) {
     const source = forward ? redo : undo, target = forward ? undo : redo;
     if (!source.length) return;
-    stop(); target.push(clone(state)); state = source.pop(); render();
+    target.push(clone(state)); state = source.pop(); render();
   }
   $("undo").addEventListener("click", () => undoEdit());
   $("redo").addEventListener("click", () => undoEdit(true));
@@ -653,7 +738,7 @@
       state.mix = {...mixSettings(), [input.dataset.mix]: Number(input.value)};
       state.ducking = state.mix.music_duck_db > 0; state.effects_ducking = state.mix.effects_duck_db > 0;
       state.speech_compression = state.mix.compression > 0;
-      renderMixSettings(); mark();
+      renderMixSettings(); mark(); schedulePlaybackSync();
     });
     input.addEventListener("change", () => { delete input.dataset.editing; });
     input.addEventListener("blur", () => { delete input.dataset.editing; });
@@ -673,7 +758,7 @@
   $("remove").addEventListener("click", removeSelected);
   $("duplicate").addEventListener("click", safe(duplicateSelected));
   function splitSelected() {
-    stop();
+    if (playing) updatePosition(playbackPosition());
     const c = state.clips.find(c => c.id === selected); if (!c) return;
     const cut = position - c.start;
     if (state.clips.length >= 60 || cut < .01 || cut > length(c) - .01) throw new Error("Setzen Sie die Abspielposition innerhalb des Clips; maximal 60 Clips sind möglich.");
@@ -728,11 +813,11 @@
     const files = [...$("upload-form").elements.audio.files];
     if (!files.length || files.some(file => file.size > 50 * 1024 * 1024)) throw new Error("Wählen Sie Audiodateien mit jeweils höchstens 50 MB.");
     if (state.clips.length + files.length > 60) throw new Error("Die Auswahl überschreitet die Grenze von 60 Clips. Wählen Sie weniger Dateien.");
-    const uploadPosition = position;
+    const uploadPosition = position, choice = $("add-track").value;
     for (const file of files) {
       const data = new FormData(); data.append("audio", file);
       const result = await api("upload", data, true);
-      updatePosition(uploadPosition); addAsset(result.asset);
+      addAsset(result.asset, {start: uploadPosition, track: choice === "auto" ? (names[result.asset.kind] ? result.asset.kind : "effects") : choice});
     }
     $("upload-form").reset();
   })));
