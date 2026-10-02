@@ -22,6 +22,7 @@ from script_assistant.services import apply_proposal, create_proposal, editable_
 from script_assistant.workflows import _provider_request, project_payload
 from usage_control.services import QuotaExceeded
 from tts.providers.base import ProviderError
+from tts.models import ProviderVoice
 
 from .models import Production, ProductionRun
 from .planning import ProductionError, available_material, build_state, material_key, validate_plan
@@ -109,7 +110,14 @@ def _apply_draft(production, user):
     # Retain a teacher's chosen voices when a role keeps its name and language.
     for speaker in production.project.speakers.all():
         previous = old.get(speaker.name)
-        if previous and previous.voice_id and production.draft["language"] == old_language:
+        selected = production.brief.get("voice_choices", {}).get(speaker.name)
+        if selected:
+            voice = ProviderVoice.objects.filter(pk=selected, active=True).first()
+            if not voice or voice.languages and production.project.language not in voice.languages:
+                raise ProductionError("Eine ausgewählte Stimme ist nicht mehr für diese Sprache verfügbar. Bitte wählen Sie die Stimme erneut.")
+            speaker.provider, speaker.model, speaker.voice_id = voice.provider, voice.model, voice.voice_id
+            speaker.save(update_fields=["provider", "model", "voice_id"])
+        elif speaker.name not in production.brief.get("voice_choices", {}) and previous and previous.voice_id and production.draft["language"] == old_language:
             speaker.provider, speaker.model, speaker.voice_id = previous.provider, previous.model, previous.voice_id
             speaker.save(update_fields=["provider", "model", "voice_id"])
     proposal.applied_snapshot = editable_project_snapshot(production.project)
@@ -118,12 +126,21 @@ def _apply_draft(production, user):
 
 
 @transaction.atomic
-def save_draft(project, user, revision, payload, *, apply=False):
+def save_draft(project, user, revision, payload, *, apply=False, voice_choices=None):
     project = Project.objects.select_for_update().get(pk=project.pk)
     authorize(project, user)
     production = Production.objects.select_for_update().get(project=project)
     check_revision(production, revision)
     production.draft = validate_script_proposal(payload)
+    if voice_choices is not None:
+        if set(voice_choices) != {speaker["name"] for speaker in production.draft["speakers"]}:
+            raise ProductionError("Die Stimmenauswahl passt nicht zu den Rollen des Entwurfs.")
+        for voice_id in voice_choices.values():
+            if voice_id:
+                voice = ProviderVoice.objects.filter(pk=voice_id, active=True).first()
+                if not voice or voice.languages and production.draft["language"] not in voice.languages:
+                    raise ProductionError("Eine ausgewählte Stimme ist für die Zielsprache nicht freigegeben.")
+        production.brief["voice_choices"] = voice_choices
     if apply:
         _apply_draft(production, user)
     production.stage = Production.Stage.SCRIPT
@@ -184,6 +201,12 @@ def start_run(project, user, kind, revision, data=None):
             raise ProductionError("Für vorhandene Skripte verwenden Sie bitte den Änderungswunsch.")
         if kind == "refine" and not str(data.get("instruction", "")).strip():
             raise ProductionError("Beschreiben Sie bitte die gewünschte Skriptänderung.")
+        if kind == "refine" and not production.draft:
+            production.brief["voice_choices"] = {}
+            for speaker in project.speakers.all():
+                voice = ProviderVoice.objects.filter(provider=speaker.provider, model=speaker.model, voice_id=speaker.voice_id, active=True).first()
+                if voice:
+                    production.brief["voice_choices"][speaker.name] = str(voice.pk)
         data["current_script"] = production.draft or project_payload(project) if kind == "refine" else {}
         production.stage = Production.Stage.SCRIPT
     elif kind == "speech":
@@ -276,14 +299,19 @@ def run_production(run_id):
         updates = {}
         if run.kind in ("script", "refine"):
             _progress(run, "Das Skript wird vorbereitet.")
-            request = {"task": "create" if run.kind == "script" else "revise", "brief": production.brief,
+            brief = {key: value for key, value in production.brief.items() if key not in ("voice_choices", "initial_voice_choices")}
+            request = {"task": "create" if run.kind == "script" else "revise", "brief": brief,
                        "production": True, "current_script": run.input_data.get("current_script", {}),
                        "change_request": run.input_data.get("instruction", "")}
             result = _provider_request(request, user)
             draft = validate_script_proposal(result.payload)
             if draft["language"] != run.project.language:
                 raise ProductionError("Der Entwurf hat die vereinbarte Sprache nicht eingehalten. Bitte starten Sie die Skriptphase erneut.")
-            updates = {"draft": draft, "stage": Production.Stage.SCRIPT}
+            draft["level"] = production.brief.get("level", run.project.level)
+            if run.kind == "script" and production.brief.get("initial_voice_choices"):
+                production.brief["voice_choices"] = {speaker["name"]: production.brief["initial_voice_choices"][str(index)]
+                    for index, speaker in enumerate(draft["speakers"], 1) if str(index) in production.brief["initial_voice_choices"]}
+            updates = {"draft": draft, "brief": production.brief, "stage": Production.Stage.SCRIPT}
             _progress(run, "Der Skriptentwurf ist bereit zur Prüfung.", draft=draft)
         elif run.kind == "speech":
             _progress(run, "Die freigegebene Sprachfassung wird erzeugt.")

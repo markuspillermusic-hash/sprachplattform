@@ -1,4 +1,26 @@
 (() => {
+  const brief = document.querySelector('[data-production-brief]');
+  if (brief) {
+    const language = brief.querySelector('[name=language]');
+    const count = brief.querySelector('[name=speaker_count]');
+    const format = brief.querySelector('[name=format]');
+    const updateVoices = () => {
+      const roles = format.value === 'monologue' ? 1 : Number(count.value);
+      for (let index = 1; index <= 4; index++) {
+        const select = brief.querySelector(`[name=voice_${index}]`);
+        select.closest('.field').hidden = index > roles;
+        select.disabled = index > roles;
+        for (const option of select.options) {
+          const languages = JSON.parse(option.dataset.languages || '[]');
+          option.disabled = languages.length > 0 && !languages.includes(language.value);
+          option.hidden = option.disabled;
+        }
+        if (select.selectedOptions[0]?.disabled) select.value = '';
+      }
+    };
+    [language, count, format].forEach(field => field.addEventListener('change', updateVoices));
+    updateVoices();
+  }
   const root = document.querySelector('[data-production]');
   if (!root) return;
   let dirty = false;

@@ -30,6 +30,9 @@ from accounts.models import TemporaryStudentAccess
 from .models import Production, ProductionRun
 from .planning import ProductionError, material_key, validate_plan
 from .services import recover_stale_runs, run_production, save_draft, save_plan, select_speech, start_run
+from .views import plan_forms, script_forms, voice_forms
+from .forms import ProductionBriefForm
+from tts.models import ProviderVoice
 
 
 def mp3_bytes(seconds):
@@ -67,6 +70,151 @@ class ProductionTests(TestCase):
         run.refresh_from_db(); self.production.refresh_from_db()
         self.assertEqual(run.status, "succeeded", run.error_message)
         return run
+
+    @staticmethod
+    def form_data(form):
+        return {field.html_name: ("on" if field.value() is True else "" if field.value() is None or field.value() is False else str(field.value())) for field in form}
+
+    def plan_post(self):
+        settings, items = plan_forms(self.production)
+        data = {"action": "save_plan", "revision": self.production.revision, **self.form_data(settings), **self.form_data(items.management_form)}
+        for form in items:
+            data.update(self.form_data(form))
+        return data
+
+    def voice(self, **kwargs):
+        return ProviderVoice.objects.create(provider="elevenlabs", model="eleven_v4", voice_id=kwargs.pop("voice_id", "selected-voice"), display_name="Gewählte Stimme", active=True, languages=kwargs.pop("languages", ["de"]), **kwargs)
+
+    def test_home_and_project_list_offer_equal_audio_formats(self):
+        for path in ("/", reverse("projects:list")):
+            response = self.client.get(path)
+            self.assertContains(response, "Hörtext erstellen")
+            self.assertContains(response, "Hörspiel erstellen")
+            self.assertContains(response, "Ein reiner Sprechtext")
+            self.assertContains(response, "Sprechtexte mit Musik und Geräuschen")
+
+    def test_optional_level_and_initial_voice_are_saved_without_audio_generation(self):
+        voice = self.voice()
+        response = self.client.post(reverse("production:create"), {"language": "de", "format": "monologue", "duration_seconds": 30,
+            "speaker_count": 1, "target_group": "Klasse 7", "topic": "Wald", "level": "", "voice_1": voice.pk})
+        self.assertEqual(response.status_code, 302)
+        project = Project.objects.exclude(pk=self.project.pk).get()
+        self.assertEqual(project.level, "")
+        self.assertEqual(project.production.brief["initial_voice_choices"], {"1": str(voice.pk)})
+        run = project.production_runs.get()
+        draft = project_payload(self.project)
+        with patch("production.services._provider_request", return_value=SimpleNamespace(payload=draft)) as provider:
+            run_production(run.pk)
+        project.production.refresh_from_db()
+        self.assertEqual(project.production.draft["level"], "")
+        self.assertEqual(project.production.brief["voice_choices"], {"Erzähler": str(voice.pk)})
+        self.assertNotIn("initial_voice_choices", provider.call_args.args[0]["brief"])
+        self.assertFalse(project.segments.exists())
+        self.assertFalse(GenerationJob.objects.filter(version__project=project).exists())
+
+    def test_initial_voice_rejects_incompatible_language_and_inactive_catalog_entry(self):
+        voice = self.voice(languages=["en"])
+        data = {"language": "de", "format": "monologue", "duration_seconds": 30, "speaker_count": 1,
+                "target_group": "Klasse 7", "topic": "Wald", "voice_1": voice.pk}
+        form = ProductionBriefForm(data, user=self.user)
+        self.assertFalse(form.is_valid())
+        self.assertIn("voice_1", form.errors)
+        voice.active = False; voice.save()
+        self.assertFalse(ProductionBriefForm(data, user=self.user).is_valid())
+
+    def test_editor_handoff_loads_draft_unsaved_text_and_selected_voice_without_audio(self):
+        voice = self.voice()
+        payload = project_payload(self.project)
+        self.project.segments.all().delete(); self.project.speakers.all().delete()
+        self.production.draft = payload; self.production.save()
+        lines = script_forms(self.production)[1]; voices = voice_forms(self.production, self.user)
+        data = {"action": "edit_script", "revision": self.production.revision, **self.form_data(lines.management_form), **self.form_data(voices.management_form)}
+        for form in [*lines.forms, *voices.forms]: data.update(self.form_data(form))
+        data["script-0-text"] = "Dieser geänderte Entwurf kommt im Editor an."
+        data["voices-0-voice"] = voice.pk
+        response = self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        self.assertRedirects(response, reverse("projects:editor", args=[self.project.pk]))
+        self.assertEqual(self.project.segments.get().text, data["script-0-text"])
+        self.assertEqual(self.project.speakers.get().voice_id, voice.voice_id)
+        self.production.refresh_from_db()
+        self.assertFalse(self.production.draft)
+        self.assertFalse(GenerationJob.objects.exists())
+
+    def test_explicit_voice_is_kept_when_applying_a_draft(self):
+        voice = self.voice()
+        prod = save_draft(self.project, self.user, 0, project_payload(self.project), voice_choices={"Erzähler": str(voice.pk)})
+        self.assertEqual(self.project.speakers.get().voice_id, "voice-a")
+        self.run_phase("speech")
+        self.assertEqual(self.production.speech_job.parts.get().input_data[0]["voice_id"], voice.voice_id)
+
+    def test_automatic_voice_choice_can_replace_a_previous_manual_voice(self):
+        voice = self.voice()
+        save_draft(self.project, self.user, 0, project_payload(self.project), apply=True, voice_choices={"Erzähler": ""})
+        self.assertEqual(self.project.speakers.get().voice_id, voice.voice_id)
+
+    def test_editor_voice_changes_are_authoritative_for_followup_drafts(self):
+        first = self.voice(voice_id="first-choice")
+        second = self.voice(voice_id="editor-choice")
+        save_draft(self.project, self.user, 0, project_payload(self.project), apply=True, voice_choices={"Erzähler": str(first.pk)})
+        speaker = self.project.speakers.get(); speaker.voice_id = second.voice_id; speaker.save()
+        self.production.refresh_from_db()
+        self.assertEqual(voice_forms(self.production, self.user).forms[0]["voice"].value(), second.pk)
+        with patch("production.services._provider_request", return_value=SimpleNamespace(payload=project_payload(self.project))):
+            self.run_phase("refine", {"instruction": "Text verbessern"})
+        self.assertEqual(self.production.brief["voice_choices"]["Erzähler"], str(second.pk))
+        save_draft(self.project, self.user, self.production.revision, self.production.draft, apply=True)
+        self.assertEqual(self.project.speakers.get().voice_id, second.voice_id)
+
+    def test_untouched_optional_audio_with_browser_defaults_is_ignored(self):
+        self.approve_audio()
+        data = self.plan_post()
+        self.assertEqual(data["items-2-kind"], "music")
+        response = self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        self.assertEqual(response.status_code, 302)
+        self.production.refresh_from_db()
+        self.assertEqual(len(self.production.plan["items"]), 2)
+
+    def test_new_optional_music_is_saved_with_default_timing_and_gain(self):
+        self.approve_audio()
+        data = self.plan_post()
+        data.update({"items-2-title": "Abspann", "items-2-prompt": "Gentle instrumental outro"})
+        response = self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        self.assertEqual(response.status_code, 302)
+        self.production.refresh_from_db()
+        self.assertEqual(self.production.plan["items"][2]["prompt"], "Gentle instrumental outro")
+        self.assertEqual(self.production.plan["items"][2]["duration"], 15)
+        self.assertEqual(self.production.plan["items"][2]["start"], 0)
+        self.assertFalse(self.project.production_runs.filter(kind="mix").exists())
+
+    def test_semantic_plan_errors_preserve_every_entered_audio(self):
+        self.approve_audio()
+        data = self.plan_post()
+        data.update({"items-2-title": "Zusätzliche Musik bleibt erhalten", "items-2-prompt": "My entered music request",
+                     "items-2-duration": 5, "items-2-fade_in": 4, "items-2-fade_out": 4})
+        response = self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "My entered music request", status_code=400)
+        self.assertContains(response, "Zusätzliche Musik bleibt erhalten", status_code=400)
+        self.assertEqual(response.context["items"].forms[2]["fade_out"].value(), "4")
+        self.production.refresh_from_db()
+        self.assertEqual(len(self.production.plan["items"]), 2)
+        data["items-2-fade_out"] = 1
+        response = self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        self.assertEqual(response.status_code, 302)
+        self.production.refresh_from_db()
+        self.assertEqual(len(self.production.plan["items"]), 3)
+
+    def test_partial_optional_audio_keeps_text_and_shows_specific_field_errors(self):
+        self.approve_audio()
+        data = self.plan_post(); data["items-2-prompt"] = "This entered description must stay"
+        response = self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, data["items-2-prompt"], status_code=400)
+        self.assertIn("title", response.context["items"].forms[2].errors)
+
+    def test_project_payload_does_not_invent_a_level(self):
+        self.project.level = ""; self.project.save()
+        self.assertEqual(project_payload(self.project)["level"], "")
 
     def speech(self):
         self.run_phase("speech")

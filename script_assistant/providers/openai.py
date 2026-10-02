@@ -14,7 +14,7 @@ SCRIPT_SCHEMA = {
     "properties": {
         "title": {"type": "string", "minLength": 1, "maxLength": 160},
         "language": {"type": "string", "enum": list(Project.Language.values)},
-        "level": {"type": "string", "enum": list(Project.Level.values)},
+        "level": {"type": "string", "enum": ["", *Project.Level.values]},
         "speakers": {
             "type": "array",
             "minItems": 1,
@@ -67,6 +67,7 @@ SCRIPT_SCHEMA = {
 
 SYSTEM_PROMPT = """Du erstellst didaktisch geeignete Hörtexte für den Sprachunterricht.
 Halte Zielsprache, GER-Niveau, Situation, Rollen, gewünschte Länge und Lernziele genau ein.
+Wenn kein GER-Niveau vorgegeben ist, setze level auf den leeren String und orientiere die Sprache an Zielgruppe und Lernziel.
 Schreibe natürlich, altersneutral und ohne Erklärtext außerhalb des verlangten Schemas.
 Jeder Sprechername muss eindeutig sein und jeder Beitrag muss einen vorhandenen Sprecher verwenden.
 Beschreibe für jeden Sprecher zusätzlich Rolle, den passenden kanonischen role_type, Geschlecht, Altersgruppe, Akzent und gewünschten Stimmstil.

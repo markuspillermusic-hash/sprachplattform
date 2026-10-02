@@ -114,7 +114,7 @@ def project_create(request):
     assistant_form = (
         AssistantBriefForm(request.POST or None)
         if selected_mode == "assistant"
-        else AssistantBriefForm(initial={"level": Project.Level.A2})
+        else AssistantBriefForm()
     )
     if request.method == "POST" and selected_mode == "manual" and form.is_valid():
         project = form.save(commit=False)

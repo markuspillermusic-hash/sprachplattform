@@ -93,10 +93,10 @@ def _brief_message(brief):
         announcement="Durchsage",
         story="Erzählung",
     ).get(brief["format"], brief["format"])
-    summary = (
-        f"{format_label} auf {language}, Niveau {brief['level']}, "
-        f"etwa {brief['duration_seconds']} Sekunden: {brief['topic']}"
-    )
+    summary = f"{format_label} auf {language}, "
+    if brief.get("level"):
+        summary += f"Niveau {brief['level']}, "
+    summary += f"etwa {brief['duration_seconds']} Sekunden: {brief['topic']}"
     accent = brief.get("english_accent")
     if brief.get("language") == Project.Language.EN and accent not in (None, "", "unspecified"):
         accent_label = {
@@ -138,7 +138,7 @@ def project_payload(project):
     return {
         "title": snapshot["title"],
         "language": snapshot["language"],
-        "level": snapshot["level"] or Project.Level.A2,
+        "level": snapshot["level"],
         "speakers": speaker_profiles,
         "segments": [
             {
@@ -156,6 +156,7 @@ def project_payload(project):
 def begin_assisted_project(user, brief):
     result = _provider_request({"task": "create", "brief": brief}, user)
     payload = validate_script_proposal(result.payload)
+    payload["level"] = brief.get("level", "")
     with transaction.atomic():
         project = Project.objects.create(
             owner=user,

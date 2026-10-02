@@ -34,7 +34,7 @@ class AssistantBriefForm(forms.Form):
         required=False,
         help_text="Bei Englisch kann die Aussprache gezielt festgelegt werden.",
     )
-    level = forms.ChoiceField(choices=Project.Level.choices, label="GER-Niveau", initial=Project.Level.A2)
+    level = forms.ChoiceField(choices=[("", "Kein Sprachniveau vorgeben"), *Project.Level.choices], label="GER-Niveau (optional)", required=False)
     format = forms.ChoiceField(choices=FORMAT_CHOICES, label="Art des Hörtexts", initial="dialogue")
     topic = forms.CharField(
         label="Thema oder Situation",

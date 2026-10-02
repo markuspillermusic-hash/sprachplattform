@@ -58,6 +58,14 @@ main { flex: 1; }
 .button-quiet { min-height: 2.4rem; padding: 0.5rem 0.75rem; color: var(--brand-dark); background: transparent; }
 .button-wide { width: 100%; }
 .production-entry-actions {display: flex; flex-wrap: wrap; gap: .65rem;}
+.project-entry-grid {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin: 1.5rem 0 2.5rem;}
+.project-entry-option {display: flex; flex-direction: column; align-items: flex-start; padding: 1.75rem; border: 1px solid var(--line); border-top: 4px solid var(--brand); border-radius: 1rem; background: var(--surface);}
+.project-entry-option h2 {margin: 0; font-size: 2rem;}
+.project-entry-option p {color: var(--muted); line-height: 1.6; margin: .75rem 0 1.5rem;}
+.project-entry-option .button {margin-top: auto;}
+.home-hero {display: block; padding-block: 2.5rem 1rem;}
+.home-hero h1 {max-width: 28ch; font-size: clamp(2.2rem, 4vw, 3.4rem);}
+@media (max-width: 650px) {.project-entry-grid {grid-template-columns: 1fr;}}
 
 .message-stack { width: min(100% - 2rem, 72rem); margin: 1rem auto 0; }
 .message { margin: 0 0 0.5rem; padding: 0.85rem 1rem; border: 1px solid var(--line); border-radius: 0.7rem; background: var(--surface); }

@@ -18,8 +18,9 @@ from script_assistant.schema import ProposalValidationError
 from tts.providers import get_tts_provider, tts_provider_is_configured
 from generation.models import AudioAsset
 from generation.services import GenerationValidationError
+from tts.models import ProviderVoice
 
-from .forms import PlanItems, PlanSettingsForm, ProductionBriefForm, ScriptLines, WishesForm
+from .forms import PlanItems, PlanSettingsForm, ProductionBriefForm, ScriptLines, SpeakerVoices, WishesForm
 from .models import Production
 from .planning import ProductionError
 from .planning import validate_plan
@@ -38,7 +39,22 @@ def plan_forms(production, data=None):
     return PlanSettingsForm(data, prefix="plan", initial=plan), PlanItems(data, prefix="items", initial=plan["items"], form_kwargs={"assets": assets})
 
 
-def render_detail(request, production, *, lines=None, settings_form=None, items=None, wishes=None, code=200):
+def voice_forms(production, user, data=None):
+    payload = production.draft or project_payload(production.project)
+    choices = production.brief.get("voice_choices", {})
+    old = {speaker.name: speaker for speaker in production.project.speakers.all()}
+    initial = []
+    for role in payload["speakers"]:
+        name = role["name"]
+        selected = choices.get(name) if production.draft else None
+        if (not production.draft or name not in choices) and name in old:
+            speaker = old[name]
+            selected = ProviderVoice.objects.filter(provider=speaker.provider, model=speaker.model, voice_id=speaker.voice_id, active=True).values_list("pk", flat=True).first()
+        initial.append({"name": name, "voice": selected})
+    return SpeakerVoices(data, prefix="voices", initial=initial, form_kwargs={"project": production.project, "user": user})
+
+
+def render_detail(request, production, *, lines=None, voices=None, settings_form=None, items=None, wishes=None, code=200):
     project = production.project
     recover_stale_runs(project)
     run = busy(production)
@@ -61,6 +77,7 @@ def render_detail(request, production, *, lines=None, settings_form=None, items=
     return render(request, "production/detail.html", {
         "production": production, "project": project, "run": run, "last_run": project.production_runs.first(),
         "script_payload": payload, "lines": lines if lines is not None else default_lines,
+        "voices": voices if voices is not None else voice_forms(production, request.user),
         "plan_settings": settings_form if settings_form is not None else default_settings,
         "items": items if items is not None else default_items,
         "wishes": wishes or WishesForm(initial=production.brief),
@@ -78,16 +95,19 @@ def render_detail(request, production, *, lines=None, settings_form=None, items=
 def create(request):
     if request.user.role == request.user.Role.STUDENT:
         raise PermissionDenied
-    form = ProductionBriefForm(request.POST or None)
+    form = ProductionBriefForm(request.POST or None, user=request.user)
     if request.method == "POST" and form.is_valid():
         from django.db import transaction
         with transaction.atomic():
             brief = dict(form.cleaned_data)
+            brief["initial_voice_choices"] = {str(index): str(brief[f"voice_{index}"].pk) for index in range(1, 5) if brief.get(f"voice_{index}")}
+            for index in range(1, 5):
+                brief.pop(f"voice_{index}", None)
             project = Project.objects.create(owner=request.user, title="Hörspiel-Entwurf", language=brief["language"], level=brief["level"])
             production = Production.objects.create(project=project, brief=brief)
             start_run(project, request.user, "script", production.revision)
         return redirect("production:detail", project_id=project.pk)
-    return render(request, "production/create.html", {"form": form})
+    return render(request, "production/create.html", {"form": form, "voice_errors": any(form[f"voice_{index}"].errors for index in range(1, 5))})
 
 
 @login_required
@@ -95,7 +115,7 @@ def detail(request, project_id):
     project = owned_project(request, project_id)
     authorize(project, request.user)
     production, _ = Production.objects.get_or_create(project=project, defaults={"brief": {
-        "language": project.language, "level": project.level or "A2", "topic": project.title,
+        "language": project.language, "level": project.level, "topic": project.title,
         "format": "dialogue", "duration_seconds": 120, "speaker_count": project.speakers.count() or 2}})
     return render_detail(request, production)
 
@@ -107,16 +127,28 @@ def action(request, project_id):
     authorize(project, request.user)
     production = get_object_or_404(Production, project=project)
     kind = request.POST.get("action", "")
+    settings_form = items = None
     try:
         revision = int(request.POST.get("revision", ""))
-        if kind in ("save_script", "apply_script", "speech"):
+        if kind in ("save_script", "apply_script", "edit_script", "speech"):
             payload, lines = script_forms(production, request.POST)
-            if not lines.is_valid() or not lines.forms:
+            voices = voice_forms(production, request.user, request.POST) if "voices-TOTAL_FORMS" in request.POST else None
+            valid_lines = lines.is_valid() and bool(lines.forms)
+            valid_voices = voices.is_valid() if voices is not None else True
+            if not valid_lines or not valid_voices:
                 messages.error(request, "Prüfen Sie bitte die markierten Sprechbeiträge.")
-                return render_detail(request, production, lines=lines, code=400)
+                return render_detail(request, production, lines=lines, voices=voices, code=400)
+            voice_choices = None
+            if voices is not None:
+                names = [form.cleaned_data["name"] for form in voices]
+                if names != [speaker["name"] for speaker in payload["speakers"]]:
+                    raise ProductionError("Die Stimmenauswahl passt nicht zu den Rollen des Entwurfs.")
+                voice_choices = {form.cleaned_data["name"]: str(form.cleaned_data["voice"].pk) if form.cleaned_data["voice"] else "" for form in voices}
             payload = deepcopy(payload)
             payload["segments"] = [{**form.cleaned_data, "speed": float(form.cleaned_data["speed"])} for form in lines]
-            production = save_draft(project, request.user, revision, payload, apply=kind != "save_script")
+            production = save_draft(project, request.user, revision, payload, apply=kind != "save_script", voice_choices=voice_choices)
+            if kind == "edit_script":
+                return redirect("projects:editor", project_id=project.pk)
             if kind == "speech":
                 start_run(project, request.user, "speech", production.revision)
             else:
@@ -133,7 +165,8 @@ def action(request, project_id):
             start_run(project, request.user, kind, revision, wishes.cleaned_data)
         elif kind in ("save_plan", "mix"):
             settings_form, items = plan_forms(production, request.POST)
-            if not settings_form.is_valid() or not items.is_valid():
+            valid_settings, valid_items = settings_form.is_valid(), items.is_valid()
+            if not valid_settings or not valid_items:
                 messages.error(request, "Prüfen Sie bitte die markierten Elemente des Klangplans.")
                 return render_detail(request, production, settings_form=settings_form, items=items, code=400)
             plan = {**settings_form.cleaned_data, "items": [{k: v for k, v in form.cleaned_data.items() if k != "DELETE"}
@@ -157,6 +190,8 @@ def action(request, project_id):
             raise ProductionError("Diese Aktion ist nicht verfügbar.")
     except (ProductionError, StudioError, GenerationValidationError, ProposalValidationError, ValueError) as exc:
         messages.error(request, str(exc) if isinstance(exc, (ProductionError, StudioError, GenerationValidationError, ProposalValidationError)) else "Der Produktionsstand ist ungültig. Bitte laden Sie die Seite neu.")
+        if settings_form is not None and items is not None:
+            return render_detail(request, production, settings_form=settings_form, items=items, code=400)
     return redirect("production:detail", project_id=project.pk)
 
 

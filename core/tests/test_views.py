@@ -8,7 +8,7 @@ class HomeViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<html lang="de">')
-        self.assertContains(response, "Hörtexte für den Sprachunterricht")
+        self.assertContains(response, "Hörtexte und Hörspiele für den Unterricht")
 
     def test_security_headers_allow_only_required_capabilities(self):
         response = self.client.get(reverse("core:home"))

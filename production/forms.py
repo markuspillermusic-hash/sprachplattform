@@ -1,8 +1,20 @@
+import json
+
 from django import forms
 from django.forms import formset_factory
 
 from projects.models import ScriptSegment
+from projects.forms import VoiceChoiceField, compatible_voice_queryset, user_favorite_voice_ids
 from script_assistant.forms import AssistantBriefForm
+from tts.models import ProviderVoice
+
+
+class VoiceLanguageSelect(forms.Select):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        if getattr(value, "instance", None) is not None:
+            option["attrs"]["data-languages"] = json.dumps(value.instance.languages)
+        return option
 
 
 class ProductionBriefForm(AssistantBriefForm):
@@ -17,6 +29,41 @@ class ProductionBriefForm(AssistantBriefForm):
                                   widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Zum Beispiel: kurzer Jingle, danach ruhige Klaviermusik"}))
     effects_wishes = forms.CharField(label="Geräusche und Atmosphäre", max_length=2000, required=False,
                                     widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Zum Beispiel: Bahnhofsatmosphäre und eine Tür am Anfang"}))
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        favorites = user_favorite_voice_ids(user)
+        voices = compatible_voice_queryset(None, favorite_ids=favorites)
+        for index in range(1, 5):
+            field = VoiceChoiceField(queryset=voices, required=False, label=f"Stimme für Rolle {index}", empty_label="Automatisch passend auswählen", widget=VoiceLanguageSelect)
+            field.favorite_ids = favorites
+            self.fields[f"voice_{index}"] = field
+
+    def clean(self):
+        cleaned = super().clean()
+        for index in range(1, 5):
+            field = f"voice_{index}"
+            voice = cleaned.get(field)
+            if index > cleaned.get("speaker_count", 0):
+                cleaned[field] = None
+            elif voice and voice.languages and cleaned.get("language") not in voice.languages:
+                self.add_error(field, "Diese Stimme ist für die gewählte Zielsprache nicht freigegeben.")
+        return cleaned
+
+
+class SpeakerVoiceForm(forms.Form):
+    name = forms.CharField(widget=forms.HiddenInput)
+    voice = VoiceChoiceField(queryset=ProviderVoice.objects.none(),
+                             required=False, label="Stimme", empty_label="Automatisch passend auswählen")
+
+    def __init__(self, *args, project, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        favorites = user_favorite_voice_ids(user)
+        self.fields["voice"].queryset = compatible_voice_queryset(project, favorite_ids=favorites)
+        self.fields["voice"].favorite_ids = favorites
+
+
+SpeakerVoices = formset_factory(SpeakerVoiceForm, extra=0, max_num=10, validate_max=True, absolute_max=10)
 
 
 class ScriptLineForm(forms.Form):
@@ -62,6 +109,16 @@ class PlanItemForm(forms.Form):
     def __init__(self, *args, assets, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["asset_id"].choices = [("", "Neues Audio erzeugen")] + [(str(a.pk), a.title) for a in assets]
+        if self.empty_permitted:
+            self.initial = {"kind": "music", "duration": 15, "start": 0, "gain_db": -18, "fade_in": 0, "fade_out": 0, **self.initial}
+
+    def has_changed(self):
+        # The browser submits default choices even inside a closed optional row.
+        # Only a name, generation description or selected audio starts a new row.
+        if self.empty_permitted and self.is_bound and not any(
+                str(self.data.get(self.add_prefix(key), "")).strip() for key in ("title", "prompt", "asset_id")):
+            return False
+        return super().has_changed()
 
 
 PlanItems = formset_factory(PlanItemForm, extra=1, can_delete=True, max_num=12, validate_max=True, absolute_max=13)
