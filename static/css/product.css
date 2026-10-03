@@ -96,6 +96,10 @@ details[open] > summary { color: var(--brand-dark); }
 .auth-intro h1 { max-width: none; font-size: clamp(2.4rem, 5vw, 3.5rem); }
 .auth-intro .brand-scene { margin-top: 1.75rem; min-height: 20rem; max-width: 30rem; }
 .auth-layout { align-items: center; padding-block: 3rem; }
+.auth-demo { margin: 1.75rem 0 0; }
+.auth-demo video { display: block; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 1rem; background: #102d25; }
+.auth-demo figcaption { margin-top: .65rem; font-size: .875rem; color: var(--muted); }
+.auth-contact { margin-top: 1rem; font-size: .95rem; overflow-wrap: anywhere; }
 .form-card { box-shadow: var(--shadow); }
 .page-shell, .editor-shell { padding-block: 2.5rem; }
 .project-grid { margin-top: 1.5rem; }

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Anmelden · Sprachplattform{% endblock %}
 {% block content %}
 <section class="auth-layout" aria-labelledby="login-title">
@@ -6,7 +7,15 @@
     <p class="eyebrow">Interner Zugang</p>
     <h1 id="login-title">Willkommen zurück.</h1>
     <p class="lead">Melden Sie sich mit dem Benutzernamen und Passwort an, das Sie von der Administration erhalten haben.</p>
-    {% include 'components/brand_scene.html' %}
+    <figure class="auth-demo">
+      <video controls playsinline preload="none" poster="{% static 'video/sprachplattform-demo.jpg' %}" aria-label="Demo der Sprachplattform">
+        <source src="{% static 'video/sprachplattform-demo.mp4' %}" type="video/mp4">
+        <track kind="captions" src="{% static 'video/sprachplattform-demo.de.vtt' %}" srclang="de" label="Deutsch" default>
+        Ihr Browser unterstützt die Videowiedergabe nicht. <a href="{% static 'video/sprachplattform-demo.mp4' %}">Demo-Video öffnen</a>.
+      </video>
+      <figcaption>Die Sprachplattform kennenlernen · 1:44 Minuten</figcaption>
+    </figure>
+    <p class="auth-contact">Kontakt: <a href="mailto:markus.piller@jmf-gymnasium.de">markus.piller@jmf-gymnasium.de</a></p>
   </div>
   <form class="form-card" method="post" novalidate>
     {% csrf_token %}
