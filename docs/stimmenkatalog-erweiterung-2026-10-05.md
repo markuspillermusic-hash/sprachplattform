@@ -26,4 +26,8 @@ Vor Deployment wird das bestehende Datenbank-Backup ausgeführt. Zusätzlich wer
 
 Rollback bei Fehlern im Stimmen-Speichern oder beim Seitenaufruf: vorherige Images wieder einsetzen; die gespeicherten Aktivierungswerte nach Voice-ID und Modell wiederherstellen. Die Sprachmigration erweitert ausschließlich die Auswahlwerte und verändert keine bestehenden Projekte. Bereits neu angelegte Projekte in zusätzlichen Sprachen vor einer Rückkehr zum alten Code berücksichtigen.
 
-Der bestätigte produktive Stand wird nach Deployment unten ergänzt.
+Produktiv bestätigt am 5. Oktober 2026 um 21:21 Uhr (Europe/Berlin), Implementierung `ba9c3e6`: 179 zusätzliche Freigaben, insgesamt 260 aktive Stimmen. Web und Worker laufen; Datenbank und Web sind gesund. Migration `projects.0006_expand_project_languages` ist angewendet. Öffentliche Bereitschaftsprüfung und neues JavaScript liefern HTTP 200.
+
+Alle 233 Tests bestehen auch im produktiven Docker-Image mit isolierter SQLite-Datenbank und isoliertem Audioordner. Der erste Server-Testlauf hatte wegen der eingebundenen Produktions-Demo vier abweichende Demo-Zählungen; mit vollständiger Testisolation bestanden sämtliche Tests. Drei in den Fehlerausgaben eindeutig identifizierte Test-Audioordner wurden nach Prüfung, dass kein produktives Projekt zu ihnen gehört, rückholbar in `test-run-quarantine-20261005` im Audio-Volume verschoben.
+
+Produktive GET-Prüfungen: Katalogseite 1 mit 24 Karten, Seite 11 mit 20 Karten, Filter „Jung“ mit 73 Treffern. Die Stimmenauswahl bietet in jeder der 32 Projektsprachen alle 260 Stimmen. Im eingeloggten Live-Browser sind 260 Stimmen und unverändert 11 persönliche Favoriten sichtbar; im Hörspiel-Formular stehen pro Rolle 260 Stimmen zur Wahl. Eine englische Stimme blieb beim Sprachwechsel auf Portugiesisch und bei der Suche nach anderen Stimmen erhalten. Screenshot: `output/stimmenkatalog-2026-10-05/live-katalog.jpg` (lokal).
