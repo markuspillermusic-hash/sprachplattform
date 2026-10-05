@@ -15,7 +15,7 @@ ElevenLabs bietet zusätzliche jugendlich klingende Stimmen. Der Anbieter unters
 
 Neu in **Verwaltung → ElevenLabs-Anbindung**: **Junge ElevenLabs-Stimmen für alle Unterrichtssprachen importieren**. Die Aktion sucht alle acht Unterrichtssprachen sowie die vorhandenen englischen Akzentvarianten gezielt nach jungen Stimmen. Sie übernimmt Hörproben und Metadaten. Neue Stimmen bleiben zur Prüfung deaktiviert; bestehende Freigaben und allgemeine Kuratierungsränge bleiben erhalten. Danach unter **Anbieter-Stimmen → Alter: Jung** geeignete Stimmen anhören und freigeben. Im öffentlichen Stimmenkatalog ebenfalls nach Sprache und Alter filtern.
 
-Es wurden in dieser Umsetzung keine neuen Stimmen beim produktiven Anbieter importiert oder freigeschaltet. Die lokale Entwicklungsdatenbank enthält keinen repräsentativen Produktionskatalog. Daher wird keine aktuelle Anzahl verfügbarer junger Produktionsstimmen behauptet.
+Es wurden in dieser Umsetzung keine neuen Stimmen beim produktiven Anbieter importiert oder freigeschaltet. Die separate [Liste mit 30 zusätzlichen Empfehlungen](stimmenempfehlungen-2026-10-05.md) wurde anschließend anhand der angemeldeten Studio-Quality-Bibliothek recherchiert und mit den 81 freigegebenen Produktionsstimmen abgeglichen. Die produktive API-Anbindung beantwortete die lesende Voice-Library-Abfrage mit HTTP 401; der Bibliotheksimport bleibt daher von einer funktionierenden Anbieterberechtigung abhängig.
 
 ## Ist Eleven v4 die sinnvollste Wahl?
 
@@ -53,4 +53,12 @@ $env:FEEDBACK_TEST_CHANNEL = 'msedge'
 node projects/tests/browser_feedback.cjs
 ```
 
-Bei einer externen Playwright-Installation kann deren `node_modules`-Ordner über `NODE_PATH` angegeben werden. Die Fixture ist ausdrücklich auf `var/feedback-preview.sqlite3` beschränkt und setzt nur ihre eigenen Testbeiträge zurück. Der Browserserver kann nach der Prüfung beendet werden. Produktives Deployment ist nicht Bestandteil dieser Umsetzung.
+Bei einer externen Playwright-Installation kann deren `node_modules`-Ordner über `NODE_PATH` angegeben werden. Die Fixture ist ausdrücklich auf `var/feedback-preview.sqlite3` beschränkt und setzt nur ihre eigenen Testbeiträge zurück. Der Browserserver kann nach der Prüfung beendet werden.
+
+## Live-Stand
+
+Am 5. Oktober 2026 um 20:11 Uhr (Europe/Berlin) wurde Commit `5c87c8f` auf dem Produktionsserver unter `/opt/sprachplattform` ausgerollt. Vorher wurde der bestehende Backup-Dienst erfolgreich ausgeführt; die bisherigen Web- und Worker-Images wurden unter `before-feedback-20261005` für ein Rollback gesichert.
+
+Im neu gebauten Produktionsimage bestanden alle 229 Django-Tests mit isolierter Testdatenbank und deaktivierten Anbieter-Keys. Die Prüfung auf fehlende Migrationen war erfolgreich. Web und Worker wurden anschließend gestartet; `projects.0005_normal_direction_label` wurde angewendet und die Container meldeten gesund. Der Deployment-Systemcheck meldet nur die bestehende Warnung zur fehlenden HSTS-Preload-Anmeldung.
+
+Öffentliche Prüfung: Startseite, Anmeldung, `/health/live/` und `/health/ready/` antworten mit HTTP 200; Readiness meldet `ready`. Zusätzlich wurden beide Assistentenformulare im laufenden Produktionscontainer mit einer lesenden GET-Anfrage gerendert: HTTP 200, gemeinsamer Stimmenbrief und Schieberegler mit 30–600 Sekunden und Schrittweite 15 bestätigt. Die Startprotokolle zeigen keine Fehler.
