@@ -102,6 +102,7 @@ class WorksheetTests(TestCase):
             generate_worksheet(self.sheet.pk)
         provider.assert_called_once()
         self.assertEqual(provider.call_args.kwargs["feature"], UsageEvent.Feature.WORKSHEET)
+        self.assertEqual(provider.call_args.args[0]["script"]["segments"][0]["number"], 1)
         self.sheet.refresh_from_db()
         self.assertEqual(self.sheet.status, "ready")
 

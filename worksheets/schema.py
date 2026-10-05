@@ -38,6 +38,7 @@ Grammatik oder bietet einen klaren Schreib- oder Sprechauftrag. Keine belanglose
 Für jede while-Aufgabe sind source_segments mit den passenden Beitragsnummern und evidence als wörtliches Zitat aus diesen
 Beiträgen erforderlich. Für before und persönliche Transferaufgaben dürfen Quellen leer sein: Die Lösung nennt dann
 ausdrücklich Beispielantwort oder individuelle Lösung. Keine erfundenen Zeitstempel.
+Beitragsnummern entsprechen dem number-Feld des jeweiligen Skriptbeitrags, beginnend bei 1.
 choice benötigt 3 oder 4 plausible, unterschiedliche Optionen und genau eine eindeutige richtige Antwort, die einer Option
 wortgleich entspricht. true_false benötigt zwei Optionen in der Sprache der Anweisungen und eine Antwort gleich einer Option.
 open hat keine Optionen. answer enthält nur das Lehrkräfteblatt, nie Informationen, die in die Schülerfrage kopiert werden müssen.

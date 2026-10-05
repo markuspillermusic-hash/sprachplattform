@@ -25,12 +25,15 @@ def document_context(worksheet, audience, *, preview=False):
 
 def export_pdf(worksheet, audience):
     from weasyprint import HTML
+    from weasyprint.urls import URLFetcher, URLFetcherResponse
     context = document_context(worksheet, audience)
-    def local_logo_only(url):
-        if url != context["logo"]:
-            raise ValueError("Externe Ressourcen sind im Arbeitsblatt nicht erlaubt.")
-        return {"string": base64.b64decode(url.split(",", 1)[1]), "mime_type": "image/svg+xml"}
-    return HTML(string=render_to_string("worksheets/document.html", context), url_fetcher=local_logo_only).write_pdf()
+    class LocalLogoOnly(URLFetcher):
+        def fetch(self, url, headers=None):
+            if url != context["logo"]:
+                raise ValueError("Externe Ressourcen sind im Arbeitsblatt nicht erlaubt.")
+            return URLFetcherResponse(url, base64.b64decode(url.split(",", 1)[1]), {"Content-Type": "image/svg+xml"})
+    return HTML(string=render_to_string("worksheets/document.html", context),
+                url_fetcher=LocalLogoOnly(allowed_protocols=["data"], fail_on_errors=True)).write_pdf()
 
 
 def export_docx(worksheet, audience):
