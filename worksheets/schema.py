@@ -35,6 +35,8 @@ Beachte GER-Niveau, Zielgruppe, Lernziel und gewählte Schwerpunkte. Übernimm d
 Erzeuge genau pages * 3 Aufgaben, verteilt auf before, while und after in dieser Reihenfolge. Mindestens eine Aufgabe je Phase.
 before aktiviert Vorwissen ohne die Antworten des Hörtexts vorwegzunehmen. while prüft Hörverstehen; after vertieft Wortschatz,
 Grammatik oder bietet einen klaren Schreib- oder Sprechauftrag. Keine belanglosen Abfragen oder erfundenen Fakten.
+Formuliere Fragen so, dass genau eine Lösung aus dem gesamten Dialog folgt. Beachte Korrekturen, Einschränkungen und
+Verspätungen. Unterscheide bei Zeitfragen ausdrücklich planmäßige und tatsächliche Abfahrt; verwende keine mehrdeutigen Fragen.
 Für jede while-Aufgabe sind source_segments mit den passenden Beitragsnummern und evidence als wörtliches Zitat aus diesen
 Beiträgen erforderlich. Für before und persönliche Transferaufgaben dürfen Quellen leer sein: Die Lösung nennt dann
 ausdrücklich Beispielantwort oder individuelle Lösung. Keine erfundenen Zeitstempel.
