@@ -1,0 +1,40 @@
+{{ brief_form.non_field_errors }}
+<div class="assistant-core-fields">
+  {% for field in brief_form %}
+    {% if field.name == 'language' or field.name == 'english_accent' or field.name == 'level' or field.name == 'format' or field.name == 'topic' or field.name == 'duration_seconds' or field.name == 'speaker_count' or field.name == 'target_group' %}
+      {% include 'components/brief_field.html' with field=field %}
+    {% endif %}
+  {% endfor %}
+  <details class="assistant-optional"{% if brief_form.errors %} open{% endif %}>
+    <summary>Lernziele und weitere Vorgaben (optional)</summary>
+    <div class="assistant-detail-fields">
+      {% for field in brief_form %}
+        {% if field.name == 'vocabulary' or field.name == 'grammar_focus' or field.name == 'learning_goal' or field.name == 'additional_instructions' %}
+          {% include 'components/brief_field.html' with field=field %}
+        {% endif %}
+      {% endfor %}
+    </div>
+  </details>
+  <details class="assistant-optional"{% if brief_form.errors %} open{% endif %}>
+    <summary>Rollen und Stimmen (optional)</summary>
+    <p class="form-help">Geben Sie die Rollen in der gewünschten Reihenfolge an. Beschreiben Sie die Stimmenwünsche für jede Rolle einzeln.</p>
+    {% include 'components/brief_field.html' with field=brief_form.speaker_roles %}
+    {% include 'components/brief_field.html' with field=brief_form.voice_preferences %}
+    {% if production_brief %}
+      <h3>Stimmen vorab auswählen (optional)</h3>
+      <p class="form-help">Rolle 1, Rolle 2 usw. beziehen sich auf Ihre Angaben oben. Ohne Auswahl ordnet der Assistent passende Stimmen zu. Die Zuordnung bleibt danach bearbeitbar.</p>
+      <div class="assistant-detail-fields">
+        {% for field in brief_form %}{% if field.name == 'voice_1' or field.name == 'voice_2' or field.name == 'voice_3' or field.name == 'voice_4' %}{% include 'components/brief_field.html' with field=field %}{% endif %}{% endfor %}
+      </div>
+    {% endif %}
+  </details>
+  {% if production_brief %}
+    <details class="assistant-optional"{% if brief_form.errors %} open{% endif %}>
+      <summary>Musik und Geräusche (optional)</summary>
+      <div class="assistant-detail-fields">
+        {% include 'components/brief_field.html' with field=brief_form.music_wishes %}
+        {% include 'components/brief_field.html' with field=brief_form.effects_wishes %}
+      </div>
+    </details>
+  {% endif %}
+</div>

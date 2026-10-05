@@ -18,9 +18,6 @@ class VoiceLanguageSelect(forms.Select):
 
 
 class ProductionBriefForm(AssistantBriefForm):
-    duration_seconds = forms.TypedChoiceField(choices=[(n, label) for n, label in
-        ((30, "30 Sekunden"), (60, "1 Minute"), (120, "2 Minuten"), (180, "3 Minuten"), (300, "5 Minuten"), (600, "10 Minuten"))],
-        coerce=int, initial=120, label="Gewünschte Länge")
     target_group = forms.CharField(label="Klasse oder Zielgruppe", max_length=300,
                                   widget=forms.TextInput(attrs={"placeholder": "Zum Beispiel: Klasse 7"}))
     learning_goal = forms.CharField(label="Lernziel", max_length=1000, required=False,
@@ -32,6 +29,7 @@ class ProductionBriefForm(AssistantBriefForm):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["duration_seconds"].initial = 120
         favorites = user_favorite_voice_ids(user)
         voices = compatible_voice_queryset(None, favorite_ids=favorites)
         for index in range(1, 5):
@@ -69,13 +67,14 @@ SpeakerVoices = formset_factory(SpeakerVoiceForm, extra=0, max_num=10, validate_
 class ScriptLineForm(forms.Form):
     speaker = forms.ChoiceField(label="Rolle")
     text = forms.CharField(label="Sprechtext", max_length=4000, widget=forms.Textarea(attrs={"rows": 3}))
-    direction = forms.ChoiceField(label="Regie", choices=ScriptSegment.Direction.choices, required=False)
-    pause_after_ms = forms.IntegerField(label="Pause danach (ms)", min_value=0, max_value=5000)
-    speed = forms.DecimalField(label="Tempo", min_value=.5, max_value=1.5, decimal_places=2)
+    direction = forms.ChoiceField(label="Regieanweisung (optional)", choices=ScriptSegment.Direction.choices, required=False, initial="")
+    pause_after_ms = forms.IntegerField(label="Pause danach (ms)", min_value=0, max_value=5000, initial=500)
+    speed = forms.DecimalField(label="Tempo", min_value=.5, max_value=1.5, decimal_places=2, initial=1)
 
-    def __init__(self, *args, speaker_names, **kwargs):
+    def __init__(self, *args, speaker_names, language="de", **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["speaker"].choices = [(name, name) for name in speaker_names]
+        self.fields["text"].widget.attrs.update({"lang": language, "spellcheck": "true", "data-script-text": "true"})
 
 
 ScriptLines = formset_factory(ScriptLineForm, extra=0, max_num=500, validate_max=True, absolute_max=500)

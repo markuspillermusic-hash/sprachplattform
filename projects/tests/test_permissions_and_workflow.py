@@ -92,6 +92,25 @@ class ProjectWorkflowTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("speaker", form.errors)
 
+    def test_insert_segment_at_start_middle_and_end_keeps_existing_text(self):
+        second = ScriptSegment.objects.create(project=self.project, speaker=self.speaker, position=2, text="Merci.")
+        url = reverse("projects:segment_add", args=[self.project.pk])
+        for before, index in ((self.segment, 0), (second, 2), (None, 4)):
+            response = self.client.post(url, {"before": str(before.pk)} if before else {})
+            self.assertEqual(response.status_code, 302)
+            ordered = list(self.project.segments.all())
+            self.assertEqual(ordered[index].text, "")
+            self.assertEqual([s.position for s in ordered], list(range(1, len(ordered) + 1)))
+        self.assertEqual([s.text for s in self.project.segments.all() if s.text], [self.segment.text, second.text])
+
+    def test_insert_segment_rejects_foreign_or_invalid_anchor(self):
+        speaker = Speaker.objects.create(project=self.other_project, name="Fremd")
+        foreign = ScriptSegment.objects.create(project=self.other_project, speaker=speaker, text="Fremd")
+        for anchor in (str(foreign.pk), "invalid-uuid"):
+            response = self.client.post(reverse("projects:segment_add", args=[self.project.pk]), {"before": anchor})
+            self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.project.segments.count(), 1)
+
     def test_speaker_form_only_offers_active_voices_for_project_language(self):
         french_voice = ProviderVoice.objects.create(
             provider="elevenlabs",

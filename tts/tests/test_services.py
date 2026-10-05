@@ -28,6 +28,19 @@ class FakeLibraryProvider:
 
 
 class VoiceLibrarySyncTests(TestCase):
+    def test_young_import_searches_every_language_and_retains_existing_approval(self):
+        provider = FakeLibraryProvider()
+        existing = ProviderVoice.objects.create(provider="elevenlabs", model=provider.model_id, voice_id="shared-voice",
+            display_name="Shared", active=True, labels={"curated_matches": ["de:all"], "curated_ranks": {"de:all": 4}})
+        voices, created = sync_curated_voice_library(provider=provider, age="young")
+        self.assertTrue(all(call["age"] == "young" for call in provider.calls))
+        self.assertEqual(len(provider.calls), len(CURATED_LIBRARY_SEARCHES))
+        self.assertEqual(created, 0)
+        existing.refresh_from_db()
+        self.assertTrue(existing.active)
+        self.assertEqual(existing.labels["curated_ranks"]["de:all"], 4)
+        self.assertIn("de:all:young", existing.labels["curated_matches"])
+
     def test_curated_import_deduplicates_and_keeps_new_voices_inactive(self):
         provider = FakeLibraryProvider()
 

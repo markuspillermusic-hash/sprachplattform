@@ -44,13 +44,7 @@
           <span>{% if request.user.is_staff %}{% if assistant_configuration %}<a href="{% url 'admin:script_assistant_assistantconfiguration_change' assistant_configuration.id %}">OpenAI-API jetzt in der Verwaltung hinterlegen →</a>{% else %}<a href="{% url 'admin:script_assistant_assistantconfiguration_add' %}">OpenAI-API jetzt in der Verwaltung hinterlegen →</a>{% endif %}{% else %}Bitte wenden Sie sich an die Administration.{% endif %}</span>
         </div>
       {% endif %}
-      <div class="assistant-core-fields">
-        {% for field in assistant_form %}
-          {% if field.name == 'vocabulary' %}<details class="assistant-optional"><summary>Optionale Lernziele und Rollen</summary>{% endif %}
-          <div class="field field-{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small class="form-help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}{% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}</div>
-          {% if field.name == 'additional_instructions' %}</details>{% endif %}
-        {% endfor %}
-      </div>
+      {% include 'components/assistant_brief_fields.html' with brief_form=assistant_form production_brief=False %}
       <button class="button button-primary button-wide" type="submit" {% if not assistant_configured %}disabled{% endif %}>Entwurf erstellen</button>
       <p class="form-help">Der Entwurf wird nicht automatisch als fertiger Hörtext übernommen. Sie prüfen ihn zuerst und können Änderungen wünschen.</p>
     </form>

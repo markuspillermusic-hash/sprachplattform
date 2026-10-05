@@ -1,0 +1,14 @@
+<div data-script-row>
+  <button class="button button-quiet production-script-insert" type="button" data-script-add>＋ Sprechbeitrag hier einfügen</button>
+  <article class="production-script-line">
+    <p class="eyebrow" data-script-number>Beitrag {{ number|default:'neu' }}</p>
+    <div class="field"><label for="{{ line.speaker.id_for_label }}">Rolle</label>{{ line.speaker }}{{ line.speaker.errors }}</div>
+    <div class="field"><label for="{{ line.text.id_for_label }}">Sprechtext</label>{{ line.text }}{{ line.text.errors }}</div>
+    <details{% if line.errors %} open{% endif %}>
+      <summary>Regie, Pause und Tempo (optional)</summary>
+      <div class="production-fields">
+        {% for field in line %}{% if field.name != 'speaker' and field.name != 'text' %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endif %}{% endfor %}
+      </div>
+    </details>
+  </article>
+</div>

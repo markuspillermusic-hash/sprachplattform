@@ -94,6 +94,7 @@ class ElevenLabsProvider(TTSProvider):
         *,
         language=None,
         accent=None,
+        age=None,
         page_size=20,
         sort="trending",
     ):
@@ -108,6 +109,8 @@ class ElevenLabsProvider(TTSProvider):
             params["language"] = language
         if accent:
             params["accent"] = accent
+        if age:
+            params["age"] = age
         try:
             response = self.client.get("/v1/shared-voices", params=params, headers=self._headers())
         except httpx.TimeoutException:

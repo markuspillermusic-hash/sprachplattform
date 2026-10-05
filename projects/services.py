@@ -323,6 +323,22 @@ def next_position(queryset):
 
 
 @transaction.atomic
+def insert_segment(project, *, before=None):
+    Project.objects.select_for_update().get(pk=project.pk)
+    ordered = list(project.segments.select_for_update())
+    index = next((i for i, item in enumerate(ordered) if item.pk == before.pk), len(ordered)) if before else len(ordered)
+    speaker = ordered[index].speaker if index < len(ordered) else project.speakers.first()
+    if speaker is None:
+        return None
+    segment = ScriptSegment.objects.create(project=project, speaker=speaker, text="", position=index + 1)
+    ordered.insert(index, segment)
+    for position, item in enumerate(ordered, start=1):
+        item.position = position
+    ScriptSegment.objects.bulk_update(ordered, ["position"])
+    return segment
+
+
+@transaction.atomic
 def move_segment(segment, direction):
     ordered = list(segment.project.segments.select_for_update())
     index = next(i for i, item in enumerate(ordered) if item.pk == segment.pk)

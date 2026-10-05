@@ -30,7 +30,7 @@ from .services import authorize, busy, estimate_mix, recover_stale_runs, save_dr
 def script_forms(production, data=None):
     payload = production.draft or project_payload(production.project)
     return payload, ScriptLines(data, prefix="script", initial=payload["segments"],
-                                form_kwargs={"speaker_names": [speaker["name"] for speaker in payload["speakers"]]})
+                                form_kwargs={"speaker_names": [speaker["name"] for speaker in payload["speakers"]], "language": production.project.language})
 
 
 def plan_forms(production, data=None):

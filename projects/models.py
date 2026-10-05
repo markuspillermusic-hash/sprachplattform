@@ -104,7 +104,7 @@ class Speaker(models.Model):
 
 class ScriptSegment(models.Model):
     class Direction(models.TextChoices):
-        NONE = "", "Keine"
+        NONE = "", "Normal"
         FRIENDLY = "friendly", "freundlich"
         CHEERFUL = "cheerfully", "erfreut"
         SURPRISED = "surprised", "überrascht"

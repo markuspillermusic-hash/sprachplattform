@@ -1,0 +1,12 @@
+<div class="field field-{{ field.name }}">
+  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+  {% if field.name == 'duration_seconds' %}
+    <div class="duration-control">
+      <output for="{{ field.id_for_label }}" data-duration-output>{{ field.value|default:60 }} Sekunden</output>
+      {{ field }}
+      <div class="duration-limits" aria-hidden="true"><span>30 Sek.</span><span>10 Min.</span></div>
+    </div>
+  {% else %}{{ field }}{% endif %}
+  {% if field.help_text %}<small class="form-help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}
+  {% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}
+</div>

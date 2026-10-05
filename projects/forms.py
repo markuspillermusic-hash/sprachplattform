@@ -146,7 +146,7 @@ class SegmentForm(forms.ModelForm):
         labels = {
             "speaker": "Sprecher",
             "text": "Sprechtext",
-            "direction": "Regieanweisung",
+            "direction": "Regieanweisung (optional)",
             "pause_after_ms": "Pause danach (ms)",
             "speed": "Tempo",
         }
@@ -159,3 +159,4 @@ class SegmentForm(forms.ModelForm):
     def __init__(self, *args, project, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["speaker"].queryset = project.speakers.all()
+        self.fields["text"].widget.attrs.update({"lang": project.language, "spellcheck": "true", "data-script-text": "true"})

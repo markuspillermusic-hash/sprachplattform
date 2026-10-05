@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from projects.models import Project
+from script_assistant.forms import AssistantBriefForm
 from script_assistant.models import AssistantConversation, AssistantProposal
 from script_assistant.providers import AssistantProviderResult
 from tts.models import ProviderVoice, VoiceFavorite
@@ -75,6 +76,16 @@ class AssistantWorkflowTests(TestCase):
             "voice_preferences": "junge, natürliche Stimmen",
             "additional_instructions": "",
         }
+
+    def test_duration_interval_accepts_intermediate_steps_and_rejects_invalid_values(self):
+        for seconds in (30, 45, 75, 255, 600):
+            form = AssistantBriefForm({**self.assistant_form_data(), "duration_seconds": seconds})
+            self.assertTrue(form.is_valid(), form.errors)
+            self.assertEqual(form.cleaned_data["duration_seconds"], seconds)
+        for seconds in (0, 29, 31, 601, "invalid", "45.5"):
+            form = AssistantBriefForm({**self.assistant_form_data(), "duration_seconds": seconds})
+            self.assertFalse(form.is_valid())
+            self.assertIn("duration_seconds", form.errors)
 
     @patch("script_assistant.workflows.get_script_assistant_provider", return_value=FakeProvider())
     def test_assisted_creation_is_previewed_then_applied_with_favorite_voice_first(self, provider):

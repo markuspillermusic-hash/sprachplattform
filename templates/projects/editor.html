@@ -35,15 +35,16 @@
         <ol class="segment-list">
           {% for segment, form in segments_with_forms %}
             <li>
+              <form class="segment-insert" method="post" action="{% url 'projects:segment_add' project.id %}" data-segment-insert>{% csrf_token %}<input type="hidden" name="before" value="{{ segment.pk }}"><button class="button button-quiet" type="submit">＋ {% if forloop.first %}Sprechbeitrag am Anfang einfügen{% else %}Sprechbeitrag hier einfügen{% endif %}</button></form>
               <article id="segment-{{ segment.pk }}" class="segment-card segment-{{ segment.speaker.color }}" data-segment-card>
                 <header class="segment-heading"><span>Beitrag {{ forloop.counter }}</span><strong>{{ segment.speaker.name }}</strong></header>
                 <form method="post" action="{% url 'projects:segment_autosave' project.id segment.id %}" data-autosave data-segment-autosave>
                   {% csrf_token %}
                   <div class="field"><label for="{{ form.speaker.id_for_label }}">Sprecher</label>{{ form.speaker }}</div>
                   <div class="field"><label for="{{ form.text.id_for_label }}">Sprechtext</label>{{ form.text }}</div>
-                  <details class="segment-performance"><summary>Regie, Pause und Tempo</summary>
+                  <details class="segment-performance"><summary>Regie, Pause und Tempo (optional)</summary>
                   <div class="segment-settings">
-                    <div class="field"><label for="{{ form.direction.id_for_label }}">Regie</label>{{ form.direction }}</div>
+                    <div class="field"><label for="{{ form.direction.id_for_label }}">{{ form.direction.label }}</label>{{ form.direction }}</div>
                     <div class="field"><label for="{{ form.pause_after_ms.id_for_label }}">Pause danach (ms)</label>{{ form.pause_after_ms }}</div>
                     <div class="field"><label for="{{ form.speed.id_for_label }}">Tempo</label>{{ form.speed }}</div>
                   </div>
@@ -63,7 +64,7 @@
       {% else %}
         <div class="empty-state compact"><h2>Noch keine Sprechbeiträge</h2><p>Legen Sie zuerst rechts einen Sprecher an und fügen Sie danach den ersten Beitrag hinzu.</p></div>
       {% endif %}
-      <form method="post" action="{% url 'projects:segment_add' project.id %}">{% csrf_token %}<button class="button button-secondary button-wide" type="submit">＋ Sprechbeitrag hinzufügen</button></form>
+      <form method="post" action="{% url 'projects:segment_add' project.id %}" data-segment-insert>{% csrf_token %}<button class="button button-secondary button-wide" type="submit">＋ Sprechbeitrag hinzufügen</button></form>
     </section>
 
     <aside class="settings-column" aria-labelledby="settings-title">

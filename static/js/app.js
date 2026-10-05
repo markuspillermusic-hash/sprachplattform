@@ -1,5 +1,27 @@
 (() => {
   const timers = new WeakMap();
+  const pendingSaves = new WeakMap();
+
+  document.querySelectorAll('[data-duration-slider]').forEach((slider) => {
+    const output = slider.closest('.duration-control')?.querySelector('[data-duration-output]');
+    const update = () => {
+      const seconds = Number(slider.value);
+      const minutes = Math.floor(seconds / 60);
+      const remainder = seconds % 60;
+      const label = [minutes ? `${minutes} Min.` : '', remainder ? `${remainder} Sek.` : ''].filter(Boolean).join(' ');
+      if (output) output.textContent = `Etwa ${label}`;
+      slider.setAttribute('aria-valuetext', `Etwa ${label}`);
+    };
+    slider.addEventListener('input', update);
+    update();
+  });
+
+  const scriptLanguage = document.querySelector('.project-meta [name="project-language"]');
+  scriptLanguage?.addEventListener('change', () => {
+    document.querySelectorAll('[data-script-text]').forEach((field) => {
+      field.lang = scriptLanguage.value;
+    });
+  });
 
   document.querySelectorAll('[data-autosave]').forEach((form) => {
     const schedule = () => {
@@ -14,7 +36,32 @@
     form.addEventListener('change', schedule);
   });
 
-  async function save(form, status) {
+  function save(form, status) {
+    const previous = pendingSaves.get(form) || Promise.resolve();
+    const pending = previous.then(() => performSave(form, status));
+    pendingSaves.set(form, pending);
+    return pending;
+  }
+
+  document.querySelectorAll('[data-segment-insert]').forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = form.querySelector('button');
+      if (button.disabled) return;
+      button.disabled = true;
+      let valid = true;
+      for (const autosaveForm of document.querySelectorAll('[data-autosave]')) {
+        const status = autosaveForm.querySelector('[data-save-status]');
+        if (!status || !['saving', 'error'].includes(status.dataset.saveState)) continue;
+        clearTimeout(timers.get(autosaveForm));
+        if (!await save(autosaveForm, status)) valid = false;
+      }
+      if (valid) HTMLFormElement.prototype.submit.call(form);
+      else button.disabled = false;
+    });
+  });
+
+  async function performSave(form, status) {
     try {
       const response = await fetch(form.action, {
         method: 'POST',
@@ -34,10 +81,12 @@
       if (response.ok && form.matches('[data-segment-autosave]')) {
         updateSegmentAppearance(form, payload.speaker);
       }
+      return response.ok;
     } catch (_) {
       status.textContent = 'Speichern fehlgeschlagen – Verbindung prüfen';
       status.classList.add('save-error');
       status.dataset.saveState = 'error';
+      return false;
     }
   }
 

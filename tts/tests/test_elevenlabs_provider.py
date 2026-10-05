@@ -143,12 +143,14 @@ class ElevenLabsProviderTests(SimpleTestCase):
         voices = self.provider_with_handler(handler).search_voice_library(
             language="en",
             accent="british",
+            age="young",
             page_size=20,
         )
 
         self.assertEqual(captured["path"], "/v1/shared-voices")
         self.assertEqual(captured["query"]["language"], "en")
         self.assertEqual(captured["query"]["accent"], "british")
+        self.assertEqual(captured["query"]["age"], "young")
         self.assertEqual(captured["query"]["include_custom_rates"], "false")
         self.assertEqual(voices[0].labels["gender"], "male")
         self.assertEqual(voices[0].labels["catalog_source"], "voice_library")

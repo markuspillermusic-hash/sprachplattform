@@ -73,18 +73,22 @@ def sync_provider_voices(language=None):
     return synced
 
 
-def sync_curated_voice_library(*, provider=None, activate=False, page_size=20):
+def sync_curated_voice_library(*, provider=None, activate=False, page_size=20, age=None):
     provider = provider or get_tts_provider("elevenlabs")
     synced = {}
     created_count = 0
     for language, accent in CURATED_LIBRARY_SEARCHES:
+        filters = {"age": age} if age else {}
         voices = provider.search_voice_library(
             language=language,
             accent=accent,
             page_size=page_size,
             sort="trending",
+            **filters,
         )
         curated_match = f"{language}:{accent or 'all'}"
+        if age:
+            curated_match += f":{age}"
         for rank, voice in enumerate(voices, start=1):
             catalog_voice, created = _store_voice(
                 provider,

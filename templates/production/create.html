@@ -2,17 +2,14 @@
 {% block title %}Hörspiel mit Assistent erstellen · Sprachplattform{% endblock %}
 {% block head %}<link rel="stylesheet" href="{% static 'css/production.css' %}">{% endblock %}
 {% block content %}
-<section class="page-shell production-shell">
-  <header class="page-heading"><div><p class="eyebrow product-section-label">{% include 'components/icon.html' with icon='spark' %}Geführte Produktion</p><h1>Ihr Hörspiel beginnt hier.</h1><p class="lead">Beschreiben Sie den Unterrichtsauftrag. Der Assistent bereitet Skript, Sprache und Klanggestaltung vor. Sie prüfen jeden entscheidenden Schritt.</p></div><a class="button button-secondary" href="{% url 'projects:list' %}">Meine Hörtexte</a></header>
+<section class="page-shell production-shell create-flow">
+  <header class="create-heading"><a class="back-link" href="{% url 'projects:list' %}">← Alle Hörtexte</a><p class="eyebrow">KI-Unterstützung</p><h1>Ihr Hörspiel beginnt hier.</h1><p class="lead">Beschreiben Sie den Unterrichtsauftrag. Der Assistent bereitet Skript, Sprache und Klanggestaltung vor. Sie prüfen jeden entscheidenden Schritt.</p></header>
   <div class="production-layout">
-    <form class="production-panel production-brief" method="post" data-production-brief>{% csrf_token %}
-      <h2>Unterrichtsauftrag</h2><p>Der erste Schritt erzeugt einen Skriptentwurf über Ihr KI-Kontingent. Audios entstehen erst nach Ihrer Freigabe.</p>
-      {{ form.non_field_errors }}
-      <div class="production-fields">
-        {% for field in form %}{% if field.name|slice:':6' != 'voice_' %}<div class="field{% if field.name == 'topic' or field.name == 'additional_instructions' or field.name == 'music_wishes' or field.name == 'effects_wishes' %} production-wide{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}{% if field.help_text %}<p class="field-help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}</div>{% endif %}{% endfor %}
-      </div>
-      <details class="production-cue"{% if voice_errors %} open{% endif %}><summary>Stimmen vorab auswählen (optional)</summary><p>Die Reihenfolge entspricht den Rollen im Entwurf. Ohne Auswahl ordnet der Assistent passende Stimmen zu. Sie können die Zuordnung danach ändern.</p><div class="production-fields">{% for field in form %}{% if field.name|slice:':6' == 'voice_' %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}{% if field.help_text %}<p class="field-help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}</div>{% endif %}{% endfor %}</div></details>
-      <button class="button button-primary" type="submit">Skriptentwurf vorbereiten</button>
+    <form class="assistant-brief-card production-brief" method="post" data-production-brief novalidate>{% csrf_token %}
+      <div class="assistant-brief-intro"><div><p class="eyebrow">KI-Unterstützung</p><h2>Was möchten Sie hören?</h2></div><p>Die Pflichtangaben reichen für einen ersten Entwurf. Audios entstehen erst nach Ihrer Freigabe.</p></div>
+      {% include 'components/assistant_brief_fields.html' with brief_form=form production_brief=True %}
+      <button class="button button-primary button-wide" type="submit">Entwurf erstellen</button>
+      <p class="form-help">Sie prüfen zuerst das Skript und können Änderungen wünschen. Danach folgen Sprachfassung und Klanggestaltung.</p>
     </form>
     <aside class="production-sidebar"><div class="production-panel"><p class="eyebrow">Ihre Freigaben</p><ol class="production-route"><li><strong>Skript</strong><span>Lesen, ändern und Stimmen prüfen.</span></li><li><strong>Hörtext</strong><span>Anhören und die Sprachfassung freigeben.</span></li><li><strong>Klanggestaltung</strong><span>Musik und Geräusche planen und mischen lassen.</span></li><li><strong>Fertiges Hörspiel</strong><span>Mischung prüfen und MP3 oder WAV exportieren.</span></li></ol></div><p>Alle Zwischenstände bleiben gespeichert. Sie können später weiterarbeiten.</p></aside>
   </div>

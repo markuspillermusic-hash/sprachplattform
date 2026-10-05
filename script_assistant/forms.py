@@ -11,12 +11,6 @@ class AssistantBriefForm(forms.Form):
         ("announcement", "Durchsage"),
         ("story", "Erzählung"),
     )
-    DURATION_CHOICES = (
-        (30, "etwa 30 Sekunden"),
-        (60, "etwa 1 Minute"),
-        (120, "etwa 2 Minuten"),
-        (180, "etwa 3 Minuten"),
-    )
     SPEAKER_CHOICES = tuple((count, str(count)) for count in range(1, 5))
     ENGLISH_ACCENT_CHOICES = (
         ("unspecified", "Automatisch passend auswählen"),
@@ -43,11 +37,13 @@ class AssistantBriefForm(forms.Form):
             attrs={"rows": 3, "placeholder": "Zum Beispiel: Zwei Freunde planen einen Kinobesuch."}
         ),
     )
-    duration_seconds = forms.TypedChoiceField(
-        choices=DURATION_CHOICES,
-        coerce=int,
+    duration_seconds = forms.IntegerField(
+        min_value=30,
+        max_value=600,
         label="Ungefähre Länge",
         initial=60,
+        widget=forms.NumberInput(attrs={"type": "range", "min": 30, "max": 600, "step": 15, "data-duration-slider": "true"}),
+        help_text="30 Sekunden bis 10 Minuten in 15-Sekunden-Schritten. Die tatsächliche Audiodauer kann abweichen.",
     )
     speaker_count = forms.TypedChoiceField(
         choices=SPEAKER_CHOICES,
@@ -74,7 +70,7 @@ class AssistantBriefForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Optional: Kundin und Verkäufer, zwei Jugendliche …"}),
     )
     voice_preferences = forms.CharField(
-        label="Stimmenwünsche",
+        label="Stimmenwünsche je Rolle (optional)",
         max_length=1_000,
         required=False,
         widget=forms.Textarea(
@@ -83,7 +79,7 @@ class AssistantBriefForm(forms.Form):
                 "placeholder": "Optional: Lehrerin erwachsen und ruhig; Schüler jugendlich und locker …",
             }
         ),
-        help_text="Die KI übersetzt diese Wünsche in Alter, Rolle, Geschlecht, Akzent und Stimmstil.",
+        help_text="Beschreiben Sie jede Stimme mit Rollenname oder Nummer, zum Beispiel: Rolle 1 / Lehrerin: erwachsen und ruhig; Rolle 2 / Schüler: jugendlich und locker. Die Reihenfolge gilt auch für die Stimmenauswahl.",
     )
     additional_instructions = forms.CharField(
         label="Was ist sonst noch wichtig?",
@@ -91,6 +87,12 @@ class AssistantBriefForm(forms.Form):
         required=False,
         widget=forms.Textarea(attrs={"rows": 3, "placeholder": "Optional: Ton, Lernziel oder besondere Vorgaben"}),
     )
+
+    def clean_duration_seconds(self):
+        duration = self.cleaned_data["duration_seconds"]
+        if duration % 15:
+            raise forms.ValidationError("Wählen Sie die Länge in 15-Sekunden-Schritten.")
+        return duration
 
     def clean(self):
         cleaned = super().clean()

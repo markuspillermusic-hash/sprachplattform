@@ -107,6 +107,16 @@ class TTSConfigurationAdminTests(TestCase):
         self.assertNotContains(change, "sk_elevenlabs-test-9876")
 
     @patch("tts.admin.sync_curated_voice_library", return_value=([object(), object()], 2))
+    def test_admin_action_imports_young_voices_with_age_filter(self, sync):
+        configuration = TTSConfiguration.objects.create(active=True)
+        configuration.set_api_key("sk-library-test")
+        configuration.save()
+        response = self.client.post(reverse("admin:tts_ttsconfiguration_changelist"),
+            {"action": "import_young_voice_library", "_selected_action": [str(configuration.pk)], "index": "0"}, follow=True)
+        self.assertContains(response, "zunächst deaktiviert")
+        self.assertEqual(sync.call_args.kwargs["age"], "young")
+
+    @patch("tts.admin.sync_curated_voice_library", return_value=([object(), object()], 2))
     def test_admin_action_imports_library_voices_as_review_queue(self, sync):
         configuration = TTSConfiguration.objects.create(active=True)
         configuration.set_api_key("sk-library-test")

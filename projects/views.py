@@ -1,9 +1,9 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models.deletion import RestrictedError
 from django.db.models import Count, Q, Sum
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -28,7 +28,7 @@ from .forms import (
 )
 from .models import Project, ScriptSegment, Speaker
 from .lifecycle import ProjectContentError, delete_project
-from .services import duplicate_project, ensure_demo_projects, move_segment, next_position
+from .services import duplicate_project, ensure_demo_projects, insert_segment, move_segment, next_position
 
 
 def visible_projects(user):
@@ -334,17 +334,16 @@ def speaker_delete(request, project_id, speaker_id):
 @login_required
 def segment_add(request, project_id):
     project = owned_project(request, project_id)
-    speaker = project.speakers.first()
-    if speaker is None:
+    before = None
+    if request.POST.get("before"):
+        try:
+            before = get_object_or_404(project.segments, pk=request.POST["before"])
+        except ValidationError:
+            raise Http404 from None
+    segment = insert_segment(project, before=before)
+    if segment is None:
         messages.error(request, "Legen Sie zuerst mindestens einen Sprecher an.")
         return redirect("projects:editor", project_id=project.pk)
-    else:
-        segment = ScriptSegment.objects.create(
-            project=project,
-            speaker=speaker,
-            position=next_position(project.segments),
-            text="",
-        )
     editor_url = reverse("projects:editor", args=[project.pk])
     return redirect(f"{editor_url}#segment-{segment.pk}")
 

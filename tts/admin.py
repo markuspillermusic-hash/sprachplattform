@@ -50,7 +50,7 @@ class TTSConfigurationAdmin(admin.ModelAdmin):
     form = TTSConfigurationForm
     list_display = ("name", "active", "model", "configured", "updated_at")
     readonly_fields = ("base_url", "api_key_hint", "updated_at")
-    actions = ("test_elevenlabs_connection", "import_curated_voice_library")
+    actions = ("test_elevenlabs_connection", "import_curated_voice_library", "import_young_voice_library")
     fieldsets = (
         (
             "ElevenLabs",
@@ -110,6 +110,13 @@ class TTSConfigurationAdmin(admin.ModelAdmin):
 
     @admin.action(description="Kuratierte ElevenLabs-Stimmenbibliothek importieren")
     def import_curated_voice_library(self, request, queryset):
+        self._import_voice_library(request, queryset)
+
+    @admin.action(description="Junge ElevenLabs-Stimmen für alle Unterrichtssprachen importieren")
+    def import_young_voice_library(self, request, queryset):
+        self._import_voice_library(request, queryset, age="young")
+
+    def _import_voice_library(self, request, queryset, *, age=None):
         configuration = queryset.first()
         if not configuration or not configuration.is_configured:
             self.message_user(
@@ -125,7 +132,8 @@ class TTSConfigurationAdmin(admin.ModelAdmin):
             estimated_eur_per_1000_characters=configuration.estimated_eur_per_1000_characters,
         )
         try:
-            voices, created = sync_curated_voice_library(provider=provider)
+            filters = {"age": age} if age else {}
+            voices, created = sync_curated_voice_library(provider=provider, **filters)
         except (ProviderError, ValueError) as exc:
             self.message_user(request, str(exc), level=messages.ERROR)
             return

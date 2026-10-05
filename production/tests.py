@@ -93,6 +93,28 @@ class ProductionTests(TestCase):
             self.assertContains(response, "Ein reiner Sprechtext")
             self.assertContains(response, "Sprechtexte mit Musik und Geräuschen")
 
+    def test_inserted_script_lines_save_in_submitted_order_without_audio(self):
+        payload, lines = script_forms(self.production)
+        original = self.form_data(lines.forms[0])
+        data = {"action": "save_script", "revision": 0, **self.form_data(lines.management_form), "script-TOTAL_FORMS": 3}
+        for index, text in enumerate(("Ein vergessener Anfang.", self.segment.text, "Ein neuer Schluss.")):
+            for key, value in original.items():
+                data[key.replace("script-0-", f"script-{index}-")] = value
+            data[f"script-{index}-text"] = text
+        response = self.client.post(reverse("production:action", args=[self.project.pk]), data)
+        self.assertEqual(response.status_code, 302)
+        self.production.refresh_from_db()
+        self.assertEqual([s["text"] for s in self.production.draft["segments"]],
+                         ["Ein vergessener Anfang.", self.segment.text, "Ein neuer Schluss."])
+        self.assertEqual(self.project.segments.count(), 1)
+        self.assertFalse(self.project.production_runs.exists())
+
+    def test_production_accepts_duration_between_previous_presets(self):
+        form = ProductionBriefForm({"language": "de", "format": "dialogue", "topic": "Wald", "speaker_count": 2,
+                                    "duration_seconds": 255, "target_group": "Klasse 7"}, user=self.user)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["duration_seconds"], 255)
+
     def test_optional_level_and_initial_voice_are_saved_without_audio_generation(self):
         voice = self.voice()
         response = self.client.post(reverse("production:create"), {"language": "de", "format": "monologue", "duration_seconds": 30,
