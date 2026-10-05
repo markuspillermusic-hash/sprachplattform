@@ -20,7 +20,7 @@ from script_assistant.providers.openai import OpenAIScriptAssistantProvider
 from .exports import export_docx, export_pdf
 from .models import Worksheet
 from .sample import BRIEF, PAYLOAD, SOURCE, sample_worksheet
-from .schema import validate_payload, WorksheetValidationError
+from .schema import ground_generated_payload, validate_payload, WorksheetValidationError
 from .services import generate_worksheet, is_stale, queue_worksheet, script_source
 
 
@@ -43,6 +43,15 @@ class WorksheetTests(TestCase):
                 payload["exercises"][1][field] = value
                 with self.assertRaises(WorksheetValidationError):
                     validate_payload(payload, SOURCE)
+
+    def test_generated_evidence_is_copied_from_original_including_multiple_passages(self):
+        payload = deepcopy(PAYLOAD)
+        payload["exercises"][1]["evidence"] = "Eine ungenaue KI-Abschrift."
+        payload["exercises"][1]["source_segments"] = [1, 2]
+        grounded = ground_generated_payload(payload, SOURCE)
+        self.assertEqual(grounded["exercises"][1]["evidence"], SOURCE["segments"][0]["text"] + "\n\n" + SOURCE["segments"][1]["text"])
+        validate_payload(grounded, SOURCE)
+        self.assertEqual(payload["exercises"][1]["evidence"], "Eine ungenaue KI-Abschrift.")
 
     def test_teacher_can_open_and_student_and_other_teacher_cannot(self):
         routes = [reverse("worksheets:detail", args=[self.sheet.pk]), reverse("worksheets:status", args=[self.sheet.pk]),

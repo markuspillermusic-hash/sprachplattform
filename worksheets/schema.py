@@ -55,6 +55,24 @@ class WorksheetValidationError(ValueError):
     pass
 
 
+def ground_generated_payload(payload, source):
+    """Copy quoted evidence from the referenced original passages, never from AI prose."""
+    result = deepcopy(payload)
+    if not isinstance(result, dict) or not isinstance(result.get("exercises"), list):
+        return result
+    for item in result["exercises"]:
+        if not isinstance(item, dict):
+            continue
+        refs = item.get("source_segments")
+        if isinstance(refs, list) and refs and len(refs) <= 10 and all(
+            type(ref) is int and 1 <= ref <= len(source["segments"]) for ref in refs
+        ):
+            passages = [source["segments"][ref - 1]["text"] for ref in refs]
+            complete = "\n\n".join(passages)
+            item["evidence"] = complete if len(complete) <= 600 else passages[0][:600]
+    return result
+
+
 def validate_payload(payload, source, *, expected_count=None):
     if not isinstance(payload, dict) or set(payload) != set(WORKSHEET_SCHEMA["required"]):
         raise WorksheetValidationError("Der Arbeitsblattentwurf hat ein ungültiges Format.")
@@ -96,7 +114,8 @@ def validate_payload(payload, source, *, expected_count=None):
             raise WorksheetValidationError(f"Aufgabe {number}: Hörverstehen benötigt einen Skriptbeleg.")
         if item["evidence"]:
             evidence = " ".join(item["evidence"].split())
-            if not refs or not any(evidence in " ".join(source["segments"][ref - 1]["text"].split()) for ref in refs):
+            passages = [" ".join(source["segments"][ref - 1]["text"].split()) for ref in refs]
+            if not refs or not (any(evidence in passage for passage in passages) or evidence == " ".join(passages)):
                 raise WorksheetValidationError(f"Aufgabe {number}: Das Zitat steht nicht in den angegebenen Beiträgen.")
     if set(phase_order) != {0, 1, 2} or phase_order != sorted(phase_order):
         raise WorksheetValidationError("Bitte ordnen Sie die Aufgaben vor, während und nach dem Hören.")

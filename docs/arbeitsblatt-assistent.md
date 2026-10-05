@@ -2,7 +2,7 @@
 
 Lehrkräfte öffnen „Arbeitsblatt entwickeln“ im Hörtext-Editor oder beim abgeschlossenen Hörspiel. Der Assistent verwendet das gespeicherte Skript, Sprache und Niveau. Zielgruppe, Lernziel, Umfang, Aufgabensprache und Schwerpunkte lassen sich einstellen.
 
-Ein Entwurf umfasst drei, sechs oder neun Aufgaben vor, während und nach dem Hören. Aufgaben, Antwortmöglichkeiten, Schreibflächen, Lösungen und Skriptbelege sind einzeln bearbeitbar. Für Hörverstehensaufgaben werden die Belege auf wörtliche Übereinstimmung mit den angegebenen Sprechbeiträgen geprüft. Die fachliche Prüfung der Aufgaben und Lösungen bleibt bei der Lehrkraft.
+Ein Entwurf umfasst drei, sechs oder neun Aufgaben vor, während und nach dem Hören. Aufgaben, Antwortmöglichkeiten, Schreibflächen, Lösungen und Skriptbelege sind einzeln bearbeitbar. Die Aufgabenanzahl ist im Antwortformat verbindlich festgelegt. Textbelege werden direkt aus den von der KI zugeordneten Originalbeiträgen übernommen; bei langen Beiträgen erscheint ein Auszug, die vollständige Textgrundlage folgt im Lehrkräfteblatt. Bearbeitete Belege werden auf wörtliche Übereinstimmung mit den angegebenen Sprechbeiträgen geprüft. Die fachliche Prüfung der Aufgaben, Lösungen und Quellenzuordnung bleibt bei der Lehrkraft.
 
 Die Schülerfassung enthält keine Lösungsfelder oder Textgrundlage. Die Lehrkräftefassung enthält Lösungen, Belege und das nummerierte Skript. Beide Fassungen stehen als PDF und editierbare DOCX-Datei zur Verfügung. Der Umfang ist eine Orientierung; lange Aufgaben können zusätzliche Seiten benötigen.
 

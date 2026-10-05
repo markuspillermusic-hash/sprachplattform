@@ -9,7 +9,7 @@ from django.utils import timezone
 from script_assistant.workflows import _provider_request
 from usage_control.models import UsageEvent
 from .models import Worksheet
-from .schema import validate_payload
+from .schema import ground_generated_payload, validate_payload
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,8 @@ def generate_worksheet(worksheet_id):
         provider_brief = {**worksheet.brief, "exercise_count": int(worksheet.brief["pages"]) * 3}
         result = _provider_request({"task": "worksheet", "brief": provider_brief, "script": numbered_source},
                                    worksheet.created_by, feature=UsageEvent.Feature.WORKSHEET)
-        payload = validate_payload(result.payload, worksheet.source, expected_count=int(worksheet.brief["pages"]) * 3)
+        payload = validate_payload(ground_generated_payload(result.payload, worksheet.source), worksheet.source,
+                                   expected_count=int(worksheet.brief["pages"]) * 3)
         Worksheet.objects.filter(pk=worksheet.pk, status="running").update(payload=payload, status="ready", updated_at=timezone.now())
     except Exception as exc:
         from script_assistant.providers import AssistantProviderError
