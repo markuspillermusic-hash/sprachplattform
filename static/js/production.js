@@ -10,12 +10,6 @@
         const select = brief.querySelector(`[name=voice_${index}]`);
         select.closest('.field').hidden = index > roles;
         select.disabled = index > roles;
-        for (const option of select.options) {
-          const languages = JSON.parse(option.dataset.languages || '[]');
-          option.disabled = languages.length > 0 && !languages.includes(language.value);
-          option.hidden = option.disabled;
-        }
-        if (select.selectedOptions[0]?.disabled) select.value = '';
       }
     };
     [language, count, format].forEach(field => field.addEventListener('change', updateVoices));

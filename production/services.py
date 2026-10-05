@@ -15,6 +15,7 @@ from generation.models import AudioAsset, GenerationJob
 from generation.services import GenerationValidationError, create_generation_job, run_generation_job
 from generation.services import build_project_snapshot
 from projects.models import Project
+from projects.forms import voice_supports_language
 from script_assistant.models import AssistantProposal
 from script_assistant.providers import AssistantProviderError
 from script_assistant.schema import ProposalValidationError, validate_script_proposal
@@ -113,7 +114,7 @@ def _apply_draft(production, user):
         selected = production.brief.get("voice_choices", {}).get(speaker.name)
         if selected:
             voice = ProviderVoice.objects.filter(pk=selected, active=True).first()
-            if not voice or voice.languages and production.project.language not in voice.languages:
+            if not voice or not voice_supports_language(voice, production.project.language):
                 raise ProductionError("Eine ausgewählte Stimme ist nicht mehr für diese Sprache verfügbar. Bitte wählen Sie die Stimme erneut.")
             speaker.provider, speaker.model, speaker.voice_id = voice.provider, voice.model, voice.voice_id
             speaker.save(update_fields=["provider", "model", "voice_id"])
@@ -138,7 +139,7 @@ def save_draft(project, user, revision, payload, *, apply=False, voice_choices=N
         for voice_id in voice_choices.values():
             if voice_id:
                 voice = ProviderVoice.objects.filter(pk=voice_id, active=True).first()
-                if not voice or voice.languages and production.draft["language"] not in voice.languages:
+                if not voice or not voice_supports_language(voice, production.draft["language"]):
                     raise ProductionError("Eine ausgewählte Stimme ist für die Zielsprache nicht freigegeben.")
         production.brief["voice_choices"] = voice_choices
     if apply:

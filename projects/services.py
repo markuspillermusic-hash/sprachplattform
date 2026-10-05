@@ -6,6 +6,7 @@ from django.db.models import Max
 from tts.models import ProviderVoice
 
 from .models import Project, ScriptSegment, Speaker
+from .forms import voice_supports_language
 
 
 DEMO_PROJECTS = (
@@ -196,7 +197,7 @@ def _demo_voices(language, preferred_voice_ids):
     compatible = [
         voice
         for voice in ProviderVoice.objects.filter(active=True).order_by("display_name")
-        if not voice.languages or language in voice.languages
+        if voice_supports_language(voice, language)
     ]
     by_voice_id = {voice.voice_id: voice for voice in compatible}
     selected = [

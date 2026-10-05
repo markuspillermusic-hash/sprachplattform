@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -6,18 +7,10 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .models import ProviderVoice, VoiceFavorite
+from projects.models import Project
 
 
-LANGUAGE_NAMES = {
-    "de": "Deutsch",
-    "en": "Englisch",
-    "fr": "Französisch",
-    "es": "Spanisch",
-    "it": "Italienisch",
-    "tr": "Türkisch",
-    "ru": "Russisch",
-    "ar": "Arabisch",
-}
+LANGUAGE_NAMES = dict(Project.Language.choices)
 
 GENDER_NAMES = {
     "female": "Weiblich",
@@ -60,6 +53,17 @@ def _label(voice, key):
 
 def _display_label(value):
     return value.replace("_", " ").strip().title()
+
+
+def _language_codes(voice):
+    codes = list(voice.languages)
+    primary = _label(voice, "language").lower()
+    if not primary:
+        primary = (voice.labels.get("curated_matches") or [""])[0].split(":", 1)[0]
+    if primary in codes:
+        codes.remove(primary)
+        codes.insert(0, primary)
+    return codes
 
 
 @login_required
@@ -122,13 +126,17 @@ def voice_catalog(request):
             voice.display_name.casefold(),
         )
     )
+    page = Paginator(filtered, 24).get_page(request.GET.get("page"))
+    paging_query = request.GET.copy()
+    paging_query.pop("page", None)
+    paging_query = paging_query.urlencode()
     cards = [
         {
             "voice": voice,
             "is_favorite": voice.pk in favorite_ids,
             "languages": [
                 LANGUAGE_NAMES.get(str(code).lower(), str(code).upper())
-                for code in voice.languages
+                for code in _language_codes(voice)
             ],
             "gender": GENDER_NAMES.get(
                 _label(voice, "gender").lower(),
@@ -152,7 +160,7 @@ def voice_catalog(request):
                 else "ElevenLabs-Konto"
             ),
         }
-        for voice in filtered
+        for voice in page
     ]
 
     language_codes = sorted(
@@ -184,7 +192,9 @@ def voice_catalog(request):
         {
             "cards": cards,
             "total_count": len(voices),
-            "result_count": len(cards),
+            "result_count": len(filtered),
+            "page_obj": page,
+            "paging_query": paging_query,
             "favorite_count": len(favorite_ids),
             "language_options": [
                 (code, LANGUAGE_NAMES.get(code, code.upper()))

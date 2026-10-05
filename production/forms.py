@@ -1,20 +1,15 @@
-import json
-
 from django import forms
 from django.forms import formset_factory
 
 from projects.models import ScriptSegment
-from projects.forms import VoiceChoiceField, compatible_voice_queryset, user_favorite_voice_ids
+from projects.forms import VoiceChoiceField, compatible_voice_queryset, user_favorite_voice_ids, voice_supports_language
 from script_assistant.forms import AssistantBriefForm
 from tts.models import ProviderVoice
+from tts.widgets import VoiceSelect
 
 
-class VoiceLanguageSelect(forms.Select):
-    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
-        option = super().create_option(name, value, label, selected, index, subindex, attrs)
-        if getattr(value, "instance", None) is not None:
-            option["attrs"]["data-languages"] = json.dumps(value.instance.languages)
-        return option
+class VoiceLanguageSelect(VoiceSelect):
+    pass
 
 
 class ProductionBriefForm(AssistantBriefForm):
@@ -44,7 +39,7 @@ class ProductionBriefForm(AssistantBriefForm):
             voice = cleaned.get(field)
             if index > cleaned.get("speaker_count", 0):
                 cleaned[field] = None
-            elif voice and voice.languages and cleaned.get("language") not in voice.languages:
+            elif voice and not voice_supports_language(voice, cleaned.get("language")):
                 self.add_error(field, "Diese Stimme ist für die gewählte Zielsprache nicht freigegeben.")
         return cleaned
 
@@ -59,6 +54,7 @@ class SpeakerVoiceForm(forms.Form):
         favorites = user_favorite_voice_ids(user)
         self.fields["voice"].queryset = compatible_voice_queryset(project, favorite_ids=favorites)
         self.fields["voice"].favorite_ids = favorites
+        self.fields["voice"].widget.attrs["data-project-language"] = project.language
 
 
 SpeakerVoices = formset_factory(SpeakerVoiceForm, extra=0, max_num=10, validate_max=True, absolute_max=10)

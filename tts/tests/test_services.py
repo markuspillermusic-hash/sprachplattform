@@ -48,6 +48,8 @@ class VoiceLibrarySyncTests(TestCase):
 
         self.assertEqual(len(provider.calls), len(CURATED_LIBRARY_SEARCHES))
         self.assertTrue(all(call["page_size"] == 12 for call in provider.calls))
+        self.assertTrue(all(call["category"] == "high_quality" for call in provider.calls))
+        self.assertTrue(all(call["sort"] == "usage_character_count_1y" for call in provider.calls))
         self.assertEqual(len(voices), 1)
         self.assertEqual(created, 1)
         stored = ProviderVoice.objects.get(voice_id="shared-voice")

@@ -136,6 +136,7 @@ class ProductionTests(TestCase):
 
     def test_initial_voice_rejects_incompatible_language_and_inactive_catalog_entry(self):
         voice = self.voice(languages=["en"])
+        voice.provider = "other"; voice.save()
         data = {"language": "de", "format": "monologue", "duration_seconds": 30, "speaker_count": 1,
                 "target_group": "Klasse 7", "topic": "Wald", "voice_1": voice.pk}
         form = ProductionBriefForm(data, user=self.user)
@@ -143,6 +144,18 @@ class ProductionTests(TestCase):
         self.assertIn("voice_1", form.errors)
         voice.active = False; voice.save()
         self.assertFalse(ProductionBriefForm(data, user=self.user).is_valid())
+
+    def test_multilingual_voice_can_be_selected_and_applied_to_german_draft(self):
+        from production.services import save_draft
+        voice = self.voice(languages=["en"])
+        form = ProductionBriefForm({"language": "de", "format": "monologue", "duration_seconds": 30,
+            "speaker_count": 1, "target_group": "Klasse 7", "topic": "Wald", "voice_1": voice.pk}, user=self.user)
+        self.assertTrue(form.is_valid(), form.errors)
+        payload = project_payload(self.project)
+        choices = {speaker["name"]: str(voice.pk) for speaker in payload["speakers"]}
+        save_draft(self.project, self.user, self.production.revision, payload, apply=True, voice_choices=choices)
+        speaker = self.project.speakers.get()
+        self.assertEqual(speaker.voice_id, voice.voice_id)
 
     def test_editor_handoff_loads_draft_unsaved_text_and_selected_voice_without_audio(self):
         voice = self.voice()

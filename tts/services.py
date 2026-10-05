@@ -2,6 +2,7 @@ from django.db import transaction
 
 from .models import ProviderVoice
 from .providers import get_tts_provider
+from projects.models import Project
 
 
 CURATED_LIBRARY_SEARCHES = (
@@ -16,7 +17,7 @@ CURATED_LIBRARY_SEARCHES = (
     ("tr", None),
     ("ru", None),
     ("ar", None),
-)
+) + tuple((code, None) for code in Project.Language.values if code not in {"en", "de", "fr", "es", "it", "tr", "ru", "ar"})
 
 
 def _store_voice(
@@ -83,7 +84,8 @@ def sync_curated_voice_library(*, provider=None, activate=False, page_size=20, a
             language=language,
             accent=accent,
             page_size=page_size,
-            sort="trending",
+            sort="usage_character_count_1y",
+            category="high_quality",
             **filters,
         )
         curated_match = f"{language}:{accent or 'all'}"

@@ -174,6 +174,12 @@ def _role_kind(profile):
 def _voice_score(voice, profile, *, project_language, favorite_ids):
     labels = voice.labels or {}
     score = 25 if voice.pk in favorite_ids else 0
+    if labels.get("language") == project_language or any(
+        match.split(":", 1)[0] == project_language for match in labels.get("curated_matches", [])
+    ):
+        score += 25
+    elif project_language in voice.languages:
+        score += 15
 
     requested_gender = profile.get("gender", "unspecified")
     actual_gender = labels.get("gender")

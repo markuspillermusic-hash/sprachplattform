@@ -195,13 +195,8 @@ class VoiceLanguageFilter(admin.SimpleListFilter):
     parameter_name = "language"
 
     def lookups(self, request, model_admin):
-        return (
-            ("de", "Deutsch"),
-            ("en", "Englisch"),
-            ("fr", "Französisch"),
-            ("es", "Spanisch"),
-            ("it", "Italienisch"),
-        )
+        from projects.models import Project
+        return Project.Language.choices
 
     def queryset(self, request, queryset):
         language = self.value()

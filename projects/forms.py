@@ -3,6 +3,7 @@ from django.db.models import Case, IntegerField, Value, When
 from django.db.models.functions import Lower
 
 from tts.models import ProviderVoice, VoiceFavorite
+from tts.widgets import VoiceSelect
 
 from .models import Project, ScriptSegment, Speaker
 
@@ -18,15 +19,22 @@ def user_favorite_voice_ids(user):
     )
 
 
+def voice_supports_language(voice, language):
+    # Language metadata describes training/verification, not model capability.
+    if voice.provider == "elevenlabs" and voice.model in {"eleven_v4", "eleven_v3"}:
+        return language in Project.Language.values
+    return not voice.languages or language in voice.languages
+
+
 def compatible_voice_queryset(project, *, user=None, favorite_ids=None):
-    active_voices = ProviderVoice.objects.filter(active=True).only("pk", "languages")
+    active_voices = ProviderVoice.objects.filter(active=True).only("pk", "languages", "provider", "model")
     if project is None:
         queryset = ProviderVoice.objects.filter(active=True)
     else:
         compatible_ids = [
             voice.pk
             for voice in active_voices
-            if not voice.languages or project.language in voice.languages
+            if voice_supports_language(voice, project.language)
         ]
         queryset = ProviderVoice.objects.filter(active=True, pk__in=compatible_ids)
 
@@ -35,18 +43,24 @@ def compatible_voice_queryset(project, *, user=None, favorite_ids=None):
         if favorite_ids is None
         else favorite_ids
     )
-    if favorite_ids:
+    queryset = queryset.annotate(
+        favorite_order=Case(
+            When(pk__in=favorite_ids, then=Value(0)),
+            default=Value(1), output_field=IntegerField(),
+        )
+    )
+    if project is not None:
+        preferred_ids = [voice.pk for voice in active_voices if project.language in voice.languages]
         queryset = queryset.annotate(
-            favorite_order=Case(
-                When(pk__in=favorite_ids, then=Value(0)),
-                default=Value(1),
-                output_field=IntegerField(),
-            )
-        ).order_by("favorite_order", Lower("display_name"))
+            language_order=Case(When(pk__in=preferred_ids, then=Value(0)), default=Value(1), output_field=IntegerField())
+        ).order_by("favorite_order", "language_order", Lower("display_name"))
+    else:
+        queryset = queryset.order_by("favorite_order", Lower("display_name"))
     return queryset
 
 
 class VoiceChoiceField(forms.ModelChoiceField):
+    widget = VoiceSelect
     favorite_ids = frozenset()
 
     def label_from_instance(self, voice):
@@ -114,6 +128,8 @@ class SpeakerForm(forms.ModelForm):
         )
         self.fields["voice"].favorite_ids = favorite_ids
         self.fields["voice"].widget.attrs["data-voice-select"] = "true"
+        if self.project:
+            self.fields["voice"].widget.attrs["data-project-language"] = self.project.language
         if self.instance.pk and self.instance.voice_id:
             self.fields["voice"].initial = ProviderVoice.objects.filter(
                 provider=self.instance.provider,
@@ -124,7 +140,7 @@ class SpeakerForm(forms.ModelForm):
 
     def clean_voice(self):
         voice = self.cleaned_data["voice"]
-        if voice and self.project and voice.languages and self.project.language not in voice.languages:
+        if voice and self.project and not voice_supports_language(voice, self.project.language):
             raise forms.ValidationError("Diese Stimme ist für die gewählte Zielsprache nicht freigegeben.")
         return voice
 

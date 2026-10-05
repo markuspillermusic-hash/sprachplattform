@@ -152,8 +152,11 @@ class ElevenLabsProviderTests(SimpleTestCase):
         self.assertEqual(captured["query"]["accent"], "british")
         self.assertEqual(captured["query"]["age"], "young")
         self.assertEqual(captured["query"]["include_custom_rates"], "false")
+        self.assertEqual(captured["query"]["category"], "high_quality")
+        self.assertEqual(captured["query"]["sort"], "usage_character_count_1y")
         self.assertEqual(voices[0].labels["gender"], "male")
         self.assertEqual(voices[0].labels["catalog_source"], "voice_library")
+        self.assertEqual(voices[0].labels["quality"], "studio")
         self.assertEqual(voices[0].languages, ("en",))
 
     def test_rendered_direction_tags_count_toward_provider_limit(self):

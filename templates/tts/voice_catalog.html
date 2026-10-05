@@ -22,7 +22,7 @@
       <input id="voice-search" name="q" type="search" value="{{ filters.q }}" placeholder="Name, Akzent oder Beschreibung">
     </div>
     <div class="field">
-      <label for="voice-language">Sprache</label>
+      <label for="voice-language">Für Sprache empfohlen</label>
       <select id="voice-language" name="language">
         <option value="">Alle Sprachen</option>
         {% for value, label in language_options %}
@@ -91,6 +91,7 @@
     <p><strong>{{ result_count }}</strong> {% if result_count == 1 %}Stimme{% else %}Stimmen{% endif %} gefunden</p>
     <p class="muted" data-favorite-status role="status">Favoriten erscheinen nach dem nächsten Laden zuerst – auch in der Stimmenauswahl.</p>
   </div>
+  <p class="muted">Die Sprachangaben zeigen, wofür eine Stimme trainiert oder geprüft wurde. ElevenLabs-Stimmen können auch in anderen Projektsprachen eingesetzt werden; Aussprache und Akzent können abweichen.</p>
 
   {% if cards %}
     <div class="voice-grid">
@@ -118,10 +119,11 @@
           </header>
 
           <div class="voice-tags" aria-label="Sprachen und Kategorien">
-            {% for language in card.languages %}<span>{{ language }}</span>{% endfor %}
+            {% for language in card.languages|slice:":3" %}<span>{{ language }}</span>{% endfor %}
             {% if card.gender %}<span>{{ card.gender }}</span>{% endif %}
             {% if card.use_case %}<span>{{ card.use_case }}</span>{% endif %}
           </div>
+          {% if card.languages|length > 3 %}<details class="voice-more-languages"><summary>Weitere Sprachprofile</summary><p>{{ card.languages|slice:"3:"|join:", " }}</p></details>{% endif %}
 
           {% if card.age or card.accent %}
             <dl class="voice-facts">
@@ -148,6 +150,13 @@
       <p>Ändern Sie die Filter oder setzen Sie sie zurück, um wieder alle freigegebenen Stimmen zu sehen.</p>
       <a class="button button-secondary" href="{% url 'tts:catalog' %}">Alle Stimmen anzeigen</a>
     </div>
+  {% endif %}
+  {% if page_obj.has_other_pages %}
+    <nav class="catalog-pagination" aria-label="Seiten im Stimmenkatalog">
+      {% if page_obj.has_previous %}<a class="button button-secondary" href="?{% if paging_query %}{{ paging_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">← Vorherige Seite</a>{% endif %}
+      <span>Seite {{ page_obj.number }} von {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}<a class="button button-secondary" href="?{% if paging_query %}{{ paging_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Nächste Seite →</a>{% endif %}
+    </nav>
   {% endif %}
 </section>
 {% endblock %}

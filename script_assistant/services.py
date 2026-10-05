@@ -3,6 +3,7 @@ from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 
 from projects.models import ScriptSegment, Speaker
+from projects.forms import voice_supports_language
 from projects.services import next_position
 from tts.models import ProviderVoice, VoiceFavorite
 
@@ -63,7 +64,7 @@ def assign_compatible_voices(project, user, speaker_profiles=None):
     voices = [
         voice
         for voice in ProviderVoice.objects.filter(active=True).order_by("display_name")
-        if not voice.languages or project.language in voice.languages
+        if voice_supports_language(voice, project.language)
     ]
     if not voices:
         return []

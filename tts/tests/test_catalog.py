@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from projects.models import Project
-from projects.forms import SpeakerForm
+from projects.forms import SpeakerForm, ProjectCreateForm
 from tts.models import ProviderVoice, VoiceFavorite
 
 
@@ -175,3 +175,36 @@ class VoiceCatalogTests(TestCase):
         self.assertEqual(choices[1][0].value, self.french_voice.pk)
         self.assertEqual(choices[1][1], "★ Camille")
         self.assertEqual(choices[2][0].value, second_french_voice.pk)
+
+    def test_large_catalog_paginates_and_retains_filters(self):
+        ProviderVoice.objects.bulk_create([
+            ProviderVoice(provider="elevenlabs", model="eleven_v4", voice_id=f"large-{i}",
+                          display_name=f"Studio {i:03d}", languages=["de"], active=True)
+            for i in range(60)
+        ])
+        first = self.client.get(self.url, {"q": "Studio", "language": "de"})
+        second = self.client.get(self.url, {"q": "Studio", "language": "de", "page": 2})
+        self.assertEqual(first.context["result_count"], 60)
+        self.assertEqual(len(first.context["cards"]), 24)
+        self.assertEqual(first.context["page_obj"].paginator.num_pages, 3)
+        self.assertFalse({c["voice"].pk for c in first.context["cards"]} & {c["voice"].pk for c in second.context["cards"]})
+        self.assertContains(first, "q=Studio&amp;language=de&amp;page=2")
+        self.assertContains(second, "Vorherige Seite")
+        self.assertEqual(self.client.get(self.url, {"q": "missing", "page": 900}).status_code, 200)
+
+    def test_english_elevenlabs_voice_is_selectable_for_german(self):
+        voice = ProviderVoice.objects.create(provider="elevenlabs", model="eleven_v4", voice_id="english-only",
+            display_name="English narrator", languages=["en"], active=True, labels={"age": "young", "gender": "male"})
+        project = Project.objects.create(owner=self.user, title="Deutsch", language="de")
+        form = SpeakerForm({"name": "Erzähler", "color": "forest", "voice": voice.pk}, project=project, user=self.user)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["voice"], voice)
+        self.assertIn('data-voice-picker="true"', str(form["voice"]))
+        self.assertIn('data-age="young"', str(form["voice"]))
+        self.assertIn('data-project-language="de"', str(form["voice"]))
+        voice.active = False; voice.save()
+        self.assertFalse(SpeakerForm({"name": "Erzähler", "color": "forest", "voice": voice.pk}, project=project, user=self.user).is_valid())
+
+    def test_additional_project_language_is_available(self):
+        form = ProjectCreateForm({"title": "Portugiesischer Dialog", "language": "pt", "level": "A2"})
+        self.assertTrue(form.is_valid(), form.errors)

@@ -96,11 +96,13 @@ class ElevenLabsProvider(TTSProvider):
         accent=None,
         age=None,
         page_size=20,
-        sort="trending",
+        sort="usage_character_count_1y",
+        category="high_quality",
     ):
         params = {
             "page_size": max(1, min(int(page_size), 100)),
             "sort": sort,
+            "category": category,
             "include_custom_rates": "false",
             "include_live_moderated": "false",
             "min_notice_period_days": 30,
@@ -137,7 +139,12 @@ class ElevenLabsProvider(TTSProvider):
                 catalog_source="voice_library",
                 description=str(item.get("description") or "").strip(),
                 notice_period_days=str(item.get("notice_period") or ""),
+                language=str(item.get("language") or ""),
+                quality="studio" if category == "high_quality" else "unverified",
             )
+            for key in ("usage_character_count_1y", "cloned_by_count"):
+                if item.get(key) is not None:
+                    labels[key] = str(item[key])
             voices.append(
                 VoiceInfo(
                     voice_id=item["voice_id"],

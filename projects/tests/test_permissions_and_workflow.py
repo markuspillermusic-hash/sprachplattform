@@ -111,7 +111,7 @@ class ProjectWorkflowTests(TestCase):
             self.assertEqual(response.status_code, 404)
         self.assertEqual(self.project.segments.count(), 1)
 
-    def test_speaker_form_only_offers_active_voices_for_project_language(self):
+    def test_speaker_form_offers_active_multilingual_voices_and_prioritizes_project_language(self):
         french_voice = ProviderVoice.objects.create(
             provider="elevenlabs",
             model="eleven_v3",
@@ -140,7 +140,7 @@ class ProjectWorkflowTests(TestCase):
 
         form = SpeakerForm(project=self.project)
 
-        self.assertEqual(list(form.fields["voice"].queryset), [french_voice])
+        self.assertEqual(list(form.fields["voice"].queryset.values_list("display_name", flat=True)), ["Camille", "Hanna"])
         self.assertEqual(form.fields["voice"].widget.attrs["data-voice-select"], "true")
         self.assertNotIn("accent", form.fields)
 
@@ -183,7 +183,7 @@ class ProjectWorkflowTests(TestCase):
             voice_id="voice-de",
             display_name="Hanna",
             languages=["de"],
-            active=True,
+            active=False,
         )
 
         response = self.client.post(
