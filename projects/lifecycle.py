@@ -28,6 +28,8 @@ def _check_idle(project):
             or project.studio_jobs.filter(status__in=("queued", "running")).exists()
             or ProductionRun.objects.filter(project=project, status__in=("queued", "running")).exists()):
         raise ProjectContentError("Für diesen Hörtext läuft noch eine Audioerzeugung oder ein Export. Bitte warten Sie bis zum Abschluss und versuchen Sie es dann erneut.")
+    if project.worksheets.filter(status__in=("queued", "running")).exists():
+        raise ProjectContentError("Für diesen Hörtext wird noch ein Arbeitsblatt erstellt. Bitte warten Sie bis zum Abschluss.")
 
 
 def _copy_file(raw, folder, created_files):

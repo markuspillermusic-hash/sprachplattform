@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "audio_studio",
     "script_assistant",
     "production",
+    "worksheets",
     "usage_control",
     "core",
 ]

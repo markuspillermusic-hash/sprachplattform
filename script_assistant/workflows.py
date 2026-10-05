@@ -19,7 +19,7 @@ from usage_control.services import (
 )
 
 
-def _provider_request(data, user):
+def _provider_request(data, user, *, feature=UsageEvent.Feature.SCRIPT_ASSISTANT):
     request_data = dict(data)
     request_data["_user_id"] = user.pk
     provider = get_script_assistant_provider()
@@ -55,7 +55,7 @@ def _provider_request(data, user):
     usage_event = reserve_usage(
         user=user,
         provider=UsageEvent.Provider.OPENAI,
-        feature=UsageEvent.Feature.SCRIPT_ASSISTANT,
+        feature=feature,
         model=model,
         estimated_cost=estimated_cost,
         currency=currency,

@@ -217,6 +217,7 @@
           {% if request.user.is_staff %}{% if assistant_configuration %}<a class="button button-secondary button-wide" href="{% url 'admin:script_assistant_assistantconfiguration_change' assistant_configuration.id %}">KI-Anbindung einrichten</a>{% else %}<a class="button button-secondary button-wide" href="{% url 'admin:script_assistant_assistantconfiguration_add' %}">KI-Anbindung einrichten</a>{% endif %}{% endif %}
         {% endif %}
       </div>{% endif %}
+      {% include 'components/worksheet_entry.html' %}
       <div class="sidebar-card usage-card">
         <p class="eyebrow">{% if request.user.role == 'student' %}Kontingent dieses Zugangs{% else %}Nutzung diesen Monat{% endif %}</p>
         <strong>{{ usage_used }} von {{ usage_limit }} Zeichen</strong>

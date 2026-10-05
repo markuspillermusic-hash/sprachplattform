@@ -130,6 +130,7 @@ class UsageEvent(models.Model):
         MUSIC = "music", "Musikerzeugung"
         SOUND_EFFECTS = "sound_effects", "Geräuscherzeugung"
         SCRIPT_ASSISTANT = "script_assistant", "KI-Hörtextassistent"
+        WORKSHEET = "worksheet", "Arbeitsblatt-Assistent"
 
     class Status(models.TextChoices):
         RESERVED = "reserved", "Reserviert"
