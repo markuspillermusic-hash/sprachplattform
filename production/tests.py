@@ -115,6 +115,35 @@ class ProductionTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["duration_seconds"], 255)
 
+    def test_twenty_minute_ten_speaker_brief_preserves_last_role_voice(self):
+        from copy import deepcopy
+        voice = self.voice()
+        response = self.client.post(reverse("production:create"), {"language": "de", "format": "dialogue",
+            "duration_seconds": 1200, "speaker_count": 10, "target_group": "Klasse 7", "topic": "Wald",
+            "level": "", "voice_10": voice.pk})
+        self.assertEqual(response.status_code, 302)
+        project = Project.objects.exclude(pk=self.project.pk).get()
+        self.assertEqual(project.production.brief["speaker_count"], 10)
+        self.assertEqual(project.production.brief["duration_seconds"], 1200)
+        self.assertEqual(project.production.brief["initial_voice_choices"], {"10": str(voice.pk)})
+        self.assertNotIn("voice_10", project.production.brief)
+        draft = project_payload(self.project)
+        draft["speakers"] = [{**deepcopy(draft["speakers"][0]), "name": f"Rolle {index}"} for index in range(1, 11)]
+        draft["segments"] = [{**deepcopy(draft["segments"][0]), "speaker": f"Rolle {index}"} for index in range(1, 11)]
+        with patch("production.services._provider_request", return_value=SimpleNamespace(payload=draft)):
+            run_production(project.production_runs.get().pk)
+        project.production.refresh_from_db()
+        self.assertEqual(project.production.brief["voice_choices"], {"Rolle 10": str(voice.pk)})
+        self.assertEqual(len(project.production.draft["speakers"]), 10)
+        self.assertFalse(GenerationJob.objects.filter(version__project=project).exists())
+
+    def test_inactive_voice_for_tenth_role_is_rejected(self):
+        voice = self.voice(); voice.active = False; voice.save()
+        form = ProductionBriefForm({"language": "de", "format": "dialogue", "duration_seconds": 1200,
+            "speaker_count": 10, "target_group": "Klasse 7", "topic": "Wald", "voice_10": voice.pk}, user=self.user)
+        self.assertFalse(form.is_valid())
+        self.assertIn("voice_10", form.errors)
+
     def test_optional_level_and_initial_voice_are_saved_without_audio_generation(self):
         voice = self.voice()
         response = self.client.post(reverse("production:create"), {"language": "de", "format": "monologue", "duration_seconds": 30,

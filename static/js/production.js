@@ -6,11 +6,11 @@
     const format = brief.querySelector('[name=format]');
     const updateVoices = () => {
       const roles = format.value === 'monologue' ? 1 : Number(count.value);
-      for (let index = 1; index <= 4; index++) {
-        const select = brief.querySelector(`[name=voice_${index}]`);
+      brief.querySelectorAll('select[name^="voice_"]').forEach(select => {
+        const index = Number(select.name.slice(6));
         select.closest('.field').hidden = index > roles;
         select.disabled = index > roles;
-      }
+      });
     };
     [language, count, format].forEach(field => field.addEventListener('change', updateVoices));
     updateVoices();

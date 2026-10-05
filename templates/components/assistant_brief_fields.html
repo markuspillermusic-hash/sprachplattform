@@ -24,7 +24,7 @@
       <h3>Stimmen vorab auswählen (optional)</h3>
       <p class="form-help">Rolle 1, Rolle 2 usw. beziehen sich auf Ihre Angaben oben. Ohne Auswahl ordnet der Assistent passende Stimmen zu. Die Zuordnung bleibt danach bearbeitbar.</p>
       <div class="assistant-detail-fields">
-        {% for field in brief_form %}{% if field.name == 'voice_1' or field.name == 'voice_2' or field.name == 'voice_3' or field.name == 'voice_4' %}{% include 'components/brief_field.html' with field=field %}{% endif %}{% endfor %}
+        {% for field in brief_form.role_voice_fields %}{% include 'components/brief_field.html' with field=field %}{% endfor %}
       </div>
     {% endif %}
   </details>

@@ -4,6 +4,8 @@ from projects.models import Project
 
 
 class AssistantBriefForm(forms.Form):
+    MAX_DURATION_SECONDS = 1_200
+    MAX_SPEAKERS = 10
     FORMAT_CHOICES = (
         ("dialogue", "Dialog"),
         ("monologue", "Monolog"),
@@ -11,7 +13,7 @@ class AssistantBriefForm(forms.Form):
         ("announcement", "Durchsage"),
         ("story", "Erzählung"),
     )
-    SPEAKER_CHOICES = tuple((count, str(count)) for count in range(1, 5))
+    SPEAKER_CHOICES = tuple((count, str(count)) for count in range(1, MAX_SPEAKERS + 1))
     ENGLISH_ACCENT_CHOICES = (
         ("unspecified", "Automatisch passend auswählen"),
         ("british", "Britisches Englisch"),
@@ -39,11 +41,11 @@ class AssistantBriefForm(forms.Form):
     )
     duration_seconds = forms.IntegerField(
         min_value=30,
-        max_value=600,
+        max_value=MAX_DURATION_SECONDS,
         label="Ungefähre Länge",
         initial=60,
-        widget=forms.NumberInput(attrs={"type": "range", "min": 30, "max": 600, "step": 15, "data-duration-slider": "true"}),
-        help_text="30 Sekunden bis 10 Minuten in 15-Sekunden-Schritten. Die tatsächliche Audiodauer kann abweichen.",
+        widget=forms.NumberInput(attrs={"type": "range", "min": 30, "max": MAX_DURATION_SECONDS, "step": 15, "data-duration-slider": "true"}),
+        help_text="30 Sekunden bis 20 Minuten in 15-Sekunden-Schritten. Die tatsächliche Audiodauer kann abweichen.",
     )
     speaker_count = forms.TypedChoiceField(
         choices=SPEAKER_CHOICES,

@@ -27,14 +27,18 @@ class ProductionBriefForm(AssistantBriefForm):
         self.fields["duration_seconds"].initial = 120
         favorites = user_favorite_voice_ids(user)
         voices = compatible_voice_queryset(None, favorite_ids=favorites)
-        for index in range(1, 5):
+        for index in range(1, self.MAX_SPEAKERS + 1):
             field = VoiceChoiceField(queryset=voices, required=False, label=f"Stimme für Rolle {index}", empty_label="Automatisch passend auswählen", widget=VoiceLanguageSelect)
             field.favorite_ids = favorites
             self.fields[f"voice_{index}"] = field
 
+    @property
+    def role_voice_fields(self):
+        return [self[f"voice_{index}"] for index in range(1, self.MAX_SPEAKERS + 1)]
+
     def clean(self):
         cleaned = super().clean()
-        for index in range(1, 5):
+        for index in range(1, self.MAX_SPEAKERS + 1):
             field = f"voice_{index}"
             voice = cleaned.get(field)
             if index > cleaned.get("speaker_count", 0):

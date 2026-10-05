@@ -78,14 +78,27 @@ class AssistantWorkflowTests(TestCase):
         }
 
     def test_duration_interval_accepts_intermediate_steps_and_rejects_invalid_values(self):
-        for seconds in (30, 45, 75, 255, 600):
+        for seconds in (30, 45, 75, 255, 600, 615, 1185, 1200):
             form = AssistantBriefForm({**self.assistant_form_data(), "duration_seconds": seconds})
             self.assertTrue(form.is_valid(), form.errors)
             self.assertEqual(form.cleaned_data["duration_seconds"], seconds)
-        for seconds in (0, 29, 31, 601, "invalid", "45.5"):
+        for seconds in (0, 29, 31, 601, 1201, 1215, "invalid", "45.5"):
             form = AssistantBriefForm({**self.assistant_form_data(), "duration_seconds": seconds})
             self.assertFalse(form.is_valid())
             self.assertIn("duration_seconds", form.errors)
+
+    def test_speaker_count_accepts_ten_and_rejects_outside_supported_range(self):
+        for count in (1, 4, 5, 10):
+            form = AssistantBriefForm({**self.assistant_form_data(), "speaker_count": count})
+            self.assertTrue(form.is_valid(), form.errors)
+            self.assertEqual(form.cleaned_data["speaker_count"], count)
+        for count in (0, 11):
+            form = AssistantBriefForm({**self.assistant_form_data(), "speaker_count": count})
+            self.assertFalse(form.is_valid())
+            self.assertIn("speaker_count", form.errors)
+        form = AssistantBriefForm({**self.assistant_form_data(), "speaker_count": 10, "format": "monologue"})
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["speaker_count"], 1)
 
     @patch("script_assistant.workflows.get_script_assistant_provider", return_value=FakeProvider())
     def test_assisted_creation_is_previewed_then_applied_with_favorite_voice_first(self, provider):

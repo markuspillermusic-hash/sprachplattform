@@ -101,14 +101,14 @@ def create(request):
         from django.db import transaction
         with transaction.atomic():
             brief = dict(form.cleaned_data)
-            brief["initial_voice_choices"] = {str(index): str(brief[f"voice_{index}"].pk) for index in range(1, 5) if brief.get(f"voice_{index}")}
-            for index in range(1, 5):
+            brief["initial_voice_choices"] = {str(index): str(brief[f"voice_{index}"].pk) for index in range(1, form.MAX_SPEAKERS + 1) if brief.get(f"voice_{index}")}
+            for index in range(1, form.MAX_SPEAKERS + 1):
                 brief.pop(f"voice_{index}", None)
             project = Project.objects.create(owner=request.user, title="Hörspiel-Entwurf", language=brief["language"], level=brief["level"])
             production = Production.objects.create(project=project, brief=brief)
             start_run(project, request.user, "script", production.revision)
         return redirect("production:detail", project_id=project.pk)
-    return render(request, "production/create.html", {"form": form, "voice_errors": any(form[f"voice_{index}"].errors for index in range(1, 5))})
+    return render(request, "production/create.html", {"form": form, "voice_errors": any(form[f"voice_{index}"].errors for index in range(1, form.MAX_SPEAKERS + 1))})
 
 
 @login_required
