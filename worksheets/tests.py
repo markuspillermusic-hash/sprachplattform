@@ -160,3 +160,6 @@ class WorksheetTests(TestCase):
         self.assertEqual(captured["text"]["format"]["name"], "arbeitsblatt")
         self.assertTrue(captured["text"]["format"]["strict"])
         self.assertFalse(captured["store"])
+        self.assertEqual(captured["text"]["format"]["schema"]["properties"]["exercises"]["minItems"], 6)
+        provider.generate_proposal({"task": "worksheet", "brief": {**BRIEF, "pages": 1}, "script": SOURCE})
+        self.assertEqual(captured["text"]["format"]["schema"]["properties"]["exercises"]["maxItems"], 3)

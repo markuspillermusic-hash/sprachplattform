@@ -73,7 +73,8 @@ def generate_worksheet(worksheet_id):
             raise ValueError("Dieser Zugang darf keine Arbeitsblätter erzeugen.")
         numbered_source = {**worksheet.source, "segments": [
             {**segment, "number": number} for number, segment in enumerate(worksheet.source["segments"], 1)]}
-        result = _provider_request({"task": "worksheet", "brief": worksheet.brief, "script": numbered_source},
+        provider_brief = {**worksheet.brief, "exercise_count": int(worksheet.brief["pages"]) * 3}
+        result = _provider_request({"task": "worksheet", "brief": provider_brief, "script": numbered_source},
                                    worksheet.created_by, feature=UsageEvent.Feature.WORKSHEET)
         payload = validate_payload(result.payload, worksheet.source, expected_count=int(worksheet.brief["pages"]) * 3)
         Worksheet.objects.filter(pk=worksheet.pk, status="running").update(payload=payload, status="ready", updated_at=timezone.now())

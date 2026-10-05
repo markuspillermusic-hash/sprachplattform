@@ -1,5 +1,6 @@
 import hashlib
 import json
+from copy import deepcopy
 
 import httpx
 
@@ -117,7 +118,10 @@ class OpenAIScriptAssistantProvider(ScriptAssistantProvider):
             instructions, schema, schema_name = PLAN_PROMPT, PLAN_SCHEMA, "hoerspiel_klangplan"
         if isinstance(request_payload, dict) and request_payload.get("task") == "worksheet":
             from worksheets.schema import WORKSHEET_PROMPT, WORKSHEET_SCHEMA
-            instructions, schema, schema_name = WORKSHEET_PROMPT, WORKSHEET_SCHEMA, "arbeitsblatt"
+            instructions, schema, schema_name = WORKSHEET_PROMPT, deepcopy(WORKSHEET_SCHEMA), "arbeitsblatt"
+            count = int(request_payload["brief"]["pages"]) * 3
+            schema["properties"]["exercises"]["minItems"] = count
+            schema["properties"]["exercises"]["maxItems"] = count
         body = {
             "model": self.configuration.model,
             "reasoning": {"effort": self.configuration.effective_reasoning_effort},
