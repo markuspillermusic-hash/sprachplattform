@@ -131,7 +131,9 @@ def build_generation_parts(snapshot, max_characters=2_000):
 def _period_usage(user, today):
     month_start = today.replace(day=1)
     year_start = today.replace(month=1, day=1)
-    user_month = UsageLedger.objects.filter(user=user, billing_period=month_start).aggregate(total=Sum("character_count"))["total"] or 0
+    from usage_control.reporting import audio_usage
+    totals = audio_usage(user, today)
+    user_month = totals['committed'] + totals['reserved']
     organization_month = UsageLedger.objects.filter(billing_period=month_start).aggregate(total=Sum("character_count"))["total"] or 0
     organization_year = UsageLedger.objects.filter(created_at__date__gte=year_start).aggregate(total=Sum("character_count"))["total"] or 0
     return user_month, organization_month, organization_year

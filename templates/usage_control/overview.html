@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% load static %}
+{% block title %}Kontingent · Sprachplattform{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/quota.css' %}">{% endblock %}
+{% block content %}
+<section class="page-shell quota-page" aria-labelledby="quota-title">
+  <header class="page-heading"><div><p class="eyebrow">Nutzung und Verfügbarkeit</p><h1 id="quota-title">Ihr Kontingent</h1><p class="lead">{% if quota.lifetime %}Dieses Kontingent gilt für die gesamte Zugangslaufzeit; es wird nicht jeden Monat erneuert.{% if quota.expires %} Zugang gültig bis {{ quota.expires|date:'d.m.Y, H:i' }} Uhr.{% endif %}{% else %}{{ quota.month|date:'F Y' }} · Die persönlichen Monatskontingente werden am {{ quota.reset|date:'d.m.Y' }} um 00:00 Uhr erneuert.{% endif %}</p></div></header>
+  {% if platform_cards %}{% include 'usage_control/platform.html' %}{% endif %}
+  <section class="quota-overview" aria-labelledby="personal-quota-title">
+    <header class="quota-section-heading"><div><h2 id="personal-quota-title">{% if quota.lifetime %}Kontingent dieses Zugangs{% else %}Ihre persönlichen Kontingente{% endif %}</h2><p>Laufende Aufträge reservieren einen Teil des Rahmens. Freigegebene Reservierungen zählen nicht mehr zum Verbrauch.</p></div></header>
+    <div class="quota-grid">{% for card in quota.cards %}{% include 'usage_control/meter.html' %}{% endfor %}</div>
+  </section>
+  <p class="quota-note">Bearbeiten, Anhören, Bibliotheksklänge verwenden und lokal verlängern verbraucht kein neues Generierungskontingent. Angaben und Rücksetzzeitpunkte verwenden die Zeitzone Europe/Berlin.</p>
+  <a class="button button-secondary" href="{% url 'projects:list' %}">Zu meinen Hörtexten</a>
+</section>
+{% endblock %}

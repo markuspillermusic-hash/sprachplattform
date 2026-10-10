@@ -1,0 +1,4 @@
+<section class="quota-overview quota-compact" aria-label="Ihr Kontingent">
+  <header class="quota-section-heading"><div><h2>{% if quota.lifetime %}Kontingent dieses Zugangs{% else %}Ihr Monatskontingent{% endif %}</h2><p>{% if quota.lifetime %}Gilt für die gesamte Zugangslaufzeit; kein monatlicher Reset.{% else %}{{ quota.month|date:'F Y' }} · Neues Kontingent am {{ quota.reset|date:'d.m.Y' }}{% endif %}</p></div><a href="{% url 'usage_control:overview' %}">Alle Kontingente ansehen</a></header>
+  <div class="quota-grid">{% for card in quota.compact_cards %}{% include 'usage_control/meter.html' with compact=True %}{% endfor %}</div>
+</section>

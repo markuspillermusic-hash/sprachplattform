@@ -1,0 +1,10 @@
+{% load l10n %}
+<article class="quota-meter quota-{{ card.state }}" data-quota="{{ card.key }}">
+  <div class="quota-meter-heading"><h3 id="quota-{{ card.key }}">{{ card.label }}</h3><span>{% if card.state == 'disabled' %}Nicht verfügbar{% else %}{{ card.percent|floatformat:0 }} %{% endif %}</span></div>
+  <p class="quota-amount"><strong>{{ card.total|floatformat:card.number_format }}</strong> von {{ card.limit|floatformat:card.number_format }} {{ card.unit }}</p>
+  <progress aria-labelledby="quota-{{ card.key }}" value="{{ card.progress|unlocalize }}" max="100">{{ card.percent|floatformat:0 }} %</progress>
+  <p class="quota-breakdown">{{ card.committed|floatformat:card.number_format }} verbraucht{% if card.reserved %} · {{ card.reserved|floatformat:card.number_format }} für laufende Aufträge reserviert{% endif %}</p>
+  {% if card.state != 'disabled' %}<p class="quota-remaining">{{ card.remaining|floatformat:card.number_format }} {{ card.unit }} verbleiben{% if card.state == 'exhausted' %} · Kontingent erreicht{% elif card.state == 'warning' %} · Fast ausgeschöpft{% endif %}</p>{% endif %}
+  {% if card.reset %}<p class="quota-reset">Rücksetzung: <time datetime="{{ card.reset|date:'Y-m-d' }}">{{ card.reset|date:'d.m.Y' }}</time></p>{% endif %}
+  {% if card.note and not compact %}<p class="quota-note">{{ card.note }}</p>{% endif %}
+</article>

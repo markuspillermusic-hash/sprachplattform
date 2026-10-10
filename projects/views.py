@@ -15,6 +15,7 @@ from script_assistant.providers import AssistantProviderError, AssistantProvider
 from script_assistant.schema import ProposalValidationError
 from script_assistant.workflows import begin_assisted_project
 from usage_control.services import QuotaExceeded
+from usage_control.reporting import audio_usage, personal_snapshot
 from audio_studio.demos import ensure_audio_drama_demo
 from audio_studio.services import live_assets
 from tts.providers import tts_provider_is_configured
@@ -92,6 +93,7 @@ def project_list(request):
     projects = projects.select_related("owner").prefetch_related("segments", "speakers")
     return render(request, "projects/project_list.html", {
         "projects": projects, "admin_view": admin_view, "owner_options": owner_options,
+        "quota": personal_snapshot(request.user),
         "owner_filter": owner_filter, "content_filter": content_filter,
         "project_count": projects.count(),
         "drama_demo": drama_demo,
@@ -158,11 +160,9 @@ def project_editor(request, project_id):
         favorite_ids=favorite_voice_ids,
     )
     speaker_form_voices = list(speaker_form_voice_queryset)
-    month_start = timezone.localdate().replace(day=1)
-    usage_queryset = UsageLedger.objects.filter(user=request.user)
-    if request.user.role != request.user.Role.STUDENT:
-        usage_queryset = usage_queryset.filter(billing_period=month_start)
-    usage_used = usage_queryset.aggregate(total=Sum("character_count"))["total"] or 0
+    quota_totals = audio_usage(request.user)
+    usage_used = quota_totals['committed'] + quota_totals['reserved']
+    quota = personal_snapshot(request.user)
     last_applied_proposal = project.assistant_proposals.filter(
         status=AssistantProposal.Status.APPLIED,
     ).first()
@@ -229,6 +229,7 @@ def project_editor(request, project_id):
             "latest_jobs": latest_jobs,
             "usage_used": usage_used,
             "usage_limit": request.user.character_limit,
+            "quota": quota,
             "usage_percent": min(100, round(usage_used / request.user.character_limit * 100)) if request.user.character_limit else 100,
             "provider_configured": tts_provider_is_configured(),
             "assistant_configuration": assistant_configuration,

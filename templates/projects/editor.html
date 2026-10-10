@@ -221,7 +221,9 @@
       <div class="sidebar-card usage-card">
         <p class="eyebrow">{% if request.user.role == 'student' %}Kontingent dieses Zugangs{% else %}Nutzung diesen Monat{% endif %}</p>
         <strong>{{ usage_used }} von {{ usage_limit }} Zeichen</strong>
-        <progress value="{{ usage_used }}" max="{{ usage_limit }}">{{ usage_percent }} %</progress>
+        <progress aria-label="Sprachkontingent" value="{{ usage_percent }}" max="100">{{ usage_percent }} %</progress>
+        {% if quota.reset %}<p>Rücksetzung: {{ quota.reset|date:'d.m.Y' }}</p>{% else %}<p>Gilt für die gesamte Zugangslaufzeit; kein monatlicher Reset.</p>{% endif %}
+        <a href="{% url 'usage_control:overview' %}">Alle Kontingente ansehen</a>
         {% if usage_percent >= 100 %}<p class="limit-warning">Ihr Limit ist erreicht.</p>{% elif usage_percent >= 80 %}<p class="limit-warning">Ihr Limit ist fast erreicht.</p>{% endif %}
       </div>
 

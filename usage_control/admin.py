@@ -138,6 +138,7 @@ class UsageEventAdmin(admin.ModelAdmin):
         return f"{event.effective_cost:.4f} {event.currency}"
 
     def changelist_view(self, request, extra_context=None):
+        from .reporting import can_view_platform, platform_snapshot
         month_start = current_month_start()
         month_events = UsageEvent.objects.filter(
             billing_period=month_start,
@@ -193,6 +194,7 @@ class UsageEventAdmin(admin.ModelAdmin):
             "usage_month": month_start,
             "usage_totals": totals,
             "usage_user_rows": user_rows,
+            "platform_cards": platform_snapshot() if can_view_platform(request.user) else [],
         }
         return super().changelist_view(request, extra_context=extra_context)
 

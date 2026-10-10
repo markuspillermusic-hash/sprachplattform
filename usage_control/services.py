@@ -68,6 +68,8 @@ def _check_user_quota(user, provider, character_count, input_tokens, output_toke
         output_tokens=Coalesce(Sum("output_tokens"), 0),
     )
     if provider == UsageEvent.Provider.ELEVENLABS:
+        from .reporting import legacy_characters
+        totals["characters"] += legacy_characters(user, today, is_temporary_student)
         if totals["characters"] + character_count > user.character_limit:
             if is_temporary_student:
                 raise QuotaExceeded("Das Audio-Kontingent dieses Schülerzugangs ist erreicht.")

@@ -1,10 +1,12 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load static %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/quota.css' %}">{% endblock %}
 {% block title %}Meine Hörtexte · Sprachplattform{% endblock %}
 {% block content %}
 <section class="page-shell" aria-labelledby="projects-title">
   <header class="page-heading">
     <div><p class="eyebrow">Arbeitsbereich</p><h1 id="projects-title">Meine Hörtexte</h1><p class="lead">{% if admin_view %}Standardmäßig sehen Sie Ihre eigenen Hörtexte ohne Demos. Als Admin können Sie auch die Hörtexte anderer Nutzer auswählen.{% else %}Dialoge und Hörtexte bleiben in Ihrem persönlichen Bereich. Die markierten Demos können Sie frei verändern oder duplizieren.{% endif %}</p></div>
   </header>
+  {% include 'usage_control/compact.html' %}
   {% include 'projects/creation_options.html' %}
 
   {% if admin_view %}

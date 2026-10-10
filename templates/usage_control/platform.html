@@ -1,0 +1,11 @@
+<section class="quota-overview" aria-labelledby="platform-quota-title">
+  <header class="quota-section-heading"><div><p class="eyebrow">Administration</p><h2 id="platform-quota-title">Gemeinsames Plattformkontingent</h2><p>Alle Plattformnutzer teilen sich diese Anbieterrahmen. Persönliche Limits gelten zusätzlich.</p></div></header>
+  <div class="quota-grid">
+  {% for card in platform_cards %}
+    <div class="quota-provider">{% include 'usage_control/meter.html' %}
+      <p class="quota-provider-detail">{% if not card.active %}{% if card.scheduled %}Beginn: {{ card.starts|date:'d.m.Y' }} · {% else %}Der Anbieterrahmen ist nicht aktiv. {% endif %}{% endif %}Gesamtrahmen: {{ card.gross_limit|floatformat:card.number_format }} {{ card.unit }} · Sicherheitsreserve: {{ card.reserve_percent|floatformat:0 }} % · Laufzeit bis {{ card.expires|date:'d.m.Y' }}.</p>
+    </div>
+  {% endfor %}
+  </div>
+  <p class="quota-note">Gezählt wird ausschließlich die Nutzung über diese Sprachplattform. Verbrauch in anderen Anwendungen und zusätzlich übertragene Anbietercredits sind hier nicht enthalten. Geldbeträge sind Schätzungen, sofern der Anbieter keine tatsächlichen Kosten meldet.</p>
+</section>

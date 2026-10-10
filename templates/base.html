@@ -25,6 +25,7 @@
       {% if request.user.is_authenticated %}
         <a class="nav-link" href="{% url 'projects:list' %}"{% if request.resolver_match.app_name == 'projects' or request.resolver_match.app_name == 'production' or request.resolver_match.app_name == 'audio_studio' or request.resolver_match.app_name == 'script_assistant' %} aria-current="page"{% endif %}>{% include 'components/icon.html' with icon='script' %}Meine Hörtexte</a>
         <a class="nav-link" href="{% url 'tts:catalog' %}"{% if request.resolver_match.app_name == 'tts' %} aria-current="page"{% endif %}>{% include 'components/icon.html' with icon='voices' %}Stimmen</a>
+        <a class="nav-link" href="{% url 'usage_control:overview' %}"{% if request.resolver_match.app_name == 'usage_control' %} aria-current="page"{% endif %}>Kontingent</a>
         {% if request.user.is_staff or request.user.role == 'admin' or request.user.role == 'teacher' %}<a class="nav-link" href="{% url 'accounts:student_access_list' %}"{% if request.resolver_match.url_name|slice:':7' == 'student' %} aria-current="page"{% endif %}>{% include 'components/icon.html' with icon='access' %}Schülerzugänge</a>{% endif %}
         <span class="account-name">{{ request.user.username }}</span>
         {% if request.user.is_staff %}<a href="{% url 'admin:index' %}">Verwaltung</a>{% endif %}
