@@ -4,10 +4,12 @@ Stand: 10. Oktober 2026. Alle 16 Quellen wurden mit ElevenLabs Sound Effects v2 
 
 ## Vorgehen
 
+**Direkt auf dem Server:** [Alle 16 Geräusche anhören und einzeln freigeben](https://sprachplattform.markuspiller.de/admin/audio_studio/soundlibraryasset/hoerpruefung/). Mit dem Adminzugang anmelden. Jede Karte bietet die vollständige Audiofassung; nach der Prüfung die Bestätigung setzen und „Diesen Klang freigeben“ wählen. Freigegebene Fassungen stehen sofort im Studio und im Assistentenkatalog bereit. Die lokalen Dateien unten bleiben zusätzlich verfügbar.
+
 1. Jeden Sound vollständig anhören: passt er zur Beschreibung, enthält er verständliche Wörter, Musik oder störende dominante Ereignisse?
 2. Atmosphären besonders bei 28–32, 58–62 und 88–92 Sekunden anhören: Knackser, hörbarer Übergang, unnatürliche Wiederholung?
 3. Mit einem gesprochenen Dialog bei empfohlenem Clippegel prüfen; Sprachverständlichkeit und Fades beurteilen.
-4. In der Verwaltung Herkunft/Nutzungsfreigabe prüfen, bei Atmosphären „Wiederholung akustisch geprüft“ markieren und geeignete Fassungen freigeben. Ungeeignete Takes als Entwurf belassen; keine automatische kostenpflichtige Wiederholung.
+4. Herkunft/Nutzungsfreigabe prüfen, auf der Hörprüfseite die Prüfbestätigung einschließlich Wiederholungsübergängen bei Atmosphären setzen und geeignete Fassungen einzeln freigeben. Ungeeignete Takes als Entwurf belassen; keine automatische kostenpflichtige Wiederholung.
 
 ## Dateien zum Vorhören
 
