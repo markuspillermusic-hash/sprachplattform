@@ -28,6 +28,55 @@ from usage_control.models import UsageEvent
 
 @skipUnless(shutil.which('ffmpeg'), 'FFmpeg is required')
 class SoundLibraryTests(StudioFixture):
+    def admin_data(self, entry):
+        url = reverse('admin:audio_studio_soundlibraryasset_change', args=[entry.pk])
+        form = self.client.get(url).context['adminform'].form
+        return {name: form[name].value() if form[name].value() is not None else ''
+                for name in form.fields if name != 'audio'}
+
+    def test_admin_saves_unchanged_draft_and_published_metadata(self):
+        self.user.is_staff = True; self.user.is_superuser = True; self.user.save()
+        for role in ('atmosphere', 'oneshot'):
+            entry = self.source(role=role, publish=False)
+            url = reverse('admin:audio_studio_soundlibraryasset_change', args=[entry.pk])
+            for status in ('draft', 'published'):
+                if status == 'published':
+                    entry.status = status; entry.loop_verified = role == 'atmosphere'
+                    entry.full_clean(); entry.save()
+                data = self.admin_data(entry)
+                # Browsers omit unchecked checkbox inputs.
+                if not data['loop_verified']:
+                    del data['loop_verified']
+                with self.subTest(role=role, status=status):
+                    self.assertEqual(self.client.post(url, data).status_code, 302)
+                    entry.refresh_from_db()
+                    self.assertEqual(entry.status, status)
+                    data['gain_db'] = '-18.5'
+                    self.assertEqual(self.client.post(url, data).status_code, 302)
+                    entry.refresh_from_db(); self.assertEqual(entry.gain_db, -18.5)
+        self.assertFalse(UsageEvent.objects.exists())
+
+    def test_admin_identifies_missing_acoustic_confirmation_without_publishing(self):
+        self.user.is_staff = True; self.user.is_superuser = True; self.user.save()
+        entry = self.source(publish=False)
+        url = reverse('admin:audio_studio_soundlibraryasset_change', args=[entry.pk])
+        data = self.admin_data(entry)
+        data['status'] = 'published'; data.pop('loop_verified', None)
+        page = self.client.post(url, data)
+        self.assertEqual(page.status_code, 200)
+        self.assertIn('loop_verified', page.context['adminform'].form.errors)
+        self.assertNotIn('provenance', page.context['adminform'].form.errors)
+        entry.refresh_from_db(); self.assertEqual(entry.status, 'draft')
+        data['loop_verified'] = 'on'; data['provenance'] = ''
+        page = self.client.post(url, data)
+        self.assertIn('provenance', page.context['adminform'].form.errors)
+        self.assertNotIn('loop_verified', page.context['adminform'].form.errors)
+        data['provenance'] = entry.provenance
+        self.assertEqual(self.client.post(url, data).status_code, 302)
+        entry.refresh_from_db(); self.assertEqual(entry.status, 'published')
+        self.assertTrue(entry.loop_verified)
+        self.assertFalse(UsageEvent.objects.exists())
+
     def test_listening_review_has_full_audio_and_explicit_idempotent_approval(self):
         entry = self.source(publish=False)
         url = reverse('admin:audio_studio_soundlibraryasset_listening_review')

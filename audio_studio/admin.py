@@ -83,6 +83,10 @@ class LibraryForm(forms.ModelForm):
     class Meta:
         model = SoundLibraryAsset
         fields = "__all__"
+        help_texts = {
+            "status": "Metadaten lassen sich als Entwurf speichern. „Freigegeben“ macht den Klang im Studio und Assistenten verfügbar und verlangt Herkunft sowie bei Atmosphären die bestätigte Wiederholungsprüfung.",
+            "loop_verified": "Bei Atmosphären vor der Freigabe erforderlich: vollständige Fassung und Wiederholungsübergänge anhören. Für Einzelgeräusche nicht erforderlich.",
+        }
 
     def clean_audio(self):
         from .media import INPUT_FORMATS
@@ -151,7 +155,9 @@ class SoundLibraryAdmin(admin.ModelAdmin):
     def audio_preview(self, obj):
         if not obj.preview_path:
             return "Noch keine Audiodatei vorbereitet."
-        return format_html('<p>Vollständige Fassung zur Hörprüfung – insbesondere die Übergänge der Wiederholungen prüfen.</p><audio controls preload="none" src="{}?full=1"></audio>', reverse("audio_studio:library_preview", args=[obj.pk]))
+        return format_html('<p>Vollständige Fassung zur Hörprüfung – insbesondere die Übergänge der Wiederholungen prüfen.</p><audio controls preload="none" src="{}?full=1"></audio><p><a href="{}#sound-{}">Zur Hörprüfung und Freigabe</a></p>',
+                           reverse("audio_studio:library_preview", args=[obj.pk]),
+                           reverse("admin:audio_studio_soundlibraryasset_listening_review"), obj.pk)
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)

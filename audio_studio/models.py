@@ -134,8 +134,13 @@ class SoundLibraryAsset(models.Model):
                     stored_path(path)
             except StudioError:
                 raise ValidationError("Vor der Freigabe eine Audiodatei vorbereiten.") from None
-            if not self.provenance.strip() or (self.role == "atmosphere" and not self.loop_verified):
-                raise ValidationError("Vor der Freigabe Herkunft eintragen und Atmosphären akustisch prüfen.")
+            errors = {}
+            if not self.provenance.strip():
+                errors["provenance"] = "Für die Freigabe Herkunft und Nutzungsfreigabe eintragen."
+            if self.role == "atmosphere" and not self.loop_verified:
+                errors["loop_verified"] = "Für die Freigabe einer Atmosphäre die Wiederholungsübergänge anhören und diese Prüfung bestätigen. Zum Speichern ohne Freigabe den Status „Entwurf“ wählen."
+            if errors:
+                raise ValidationError(errors)
         old = type(self).objects.filter(pk=self.pk).first()
         if old and old.status != self.Status.DRAFT:
             if self.status == self.Status.DRAFT:
