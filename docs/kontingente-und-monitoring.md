@@ -1,5 +1,7 @@
 # Kontingente und Nutzungsmonitoring
 
+Seit 10. Oktober 2026 zeigt der Menüpunkt **Kontingent** persönliche Verbrauchsbalken mit Restmengen und Rücksetzterminen. Berechtigte Administratoren sehen zusätzlich die gemeinsamen Anbieterrahmen. Eine wöchentliche Codex-Prüfung wertet Modelle, Nutzung und mögliche Limitänderungen aus. Der aktuelle Berechnungs- und Veröffentlichungsstand steht in [Kontingentanzeige und Wochenprüfung](kontingent-und-wochenpruefung.md).
+
 Die Sprachplattform führt für OpenAI und ElevenLabs ein gemeinsames, internes Verbrauchsbuch. Vor jeder Anbieteranfrage wird das erwartete Budget reserviert. Nach der Antwort wird die Reservierung mit den tatsächlichen Tokens beziehungsweise den von ElevenLabs gemeldeten Credits abgeglichen. Nicht ausgeführte Anfragen werden freigegeben.
 
 ## Anbieterbudgets einrichten
