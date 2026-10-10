@@ -10,6 +10,8 @@ Die Validierung benennt jetzt das konkret fehlende Feld: fehlende Herkunft am He
 
 Regression: unverändertes Speichern und Pegeländerung funktionieren für Atmosphären und Einzelgeräusche jeweils als Entwurf und als freigegebene Quelle. Fehlende Prüfbestätigung verhindert weiterhin die Veröffentlichung; eine anschließend bewusst bestätigte Freigabe funktioniert. Keine zusätzliche Verbrauchsbuchung. Die 16 Bibliothekstests bestehen lokal.
 
+Die Korrektur ist als Anwendungscode `03e708e` produktiv veröffentlicht. Dieselben 16 Tests bestehen im finalen Produktionsimage (50,672 Sekunden). Zusätzliche Prüfung mit den echten Servereinträgen: alle 16 unveränderten Adminformulare erfolgreich speicherbar; der Versuch erfolgt innerhalb einer anschließend zurückgenommenen Datenbanktransaktion, damit keine Metadaten, Nutzerfreigaben oder Adminprotokolle verändert bleiben. Keine neue Verbrauchsbuchung. Die neuen Hinweise und der direkte Hörprüflink wurden im angemeldeten Browser auf der öffentlichen Domain geprüft. Webdienst gesund und Worker antwortet mit `pong`; keine Schemaänderung erforderlich.
+
 ## Messung der vorhandenen Atmosphären
 
 Verglichen wurden die echten 30-Sekunden-Anbieterquellen mit den FLAC-Mastern sowie den ersten 30 Sekunden der 120-Sekunden-Standardfassungen. Verfahren: FFmpeg-Decodierung in Stereo bei 44.100 Hz, 4.096 Samples je nicht überlappendem Hann-Fenster, gemittelte spektrale Energie beider Kanäle. Die angegebenen Prozentwerte sind relative Signalenergie in 20–20.000 Hz und keine wahrgenommene Lautheit oder Qualitätsnote.
