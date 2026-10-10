@@ -46,7 +46,7 @@ def probe(path):
         raise StudioError("Die Datei enthält keine lesbare Audiospur.") from None
     if not any(s.get("codec_type") == "audio" for s in info.get("streams", [])):
         raise StudioError("Die Datei enthält keine Audiospur.")
-    if not math.isfinite(duration) or not 0 < duration <= settings.AUDIO_STUDIO_MAX_DURATION:
+    if not math.isfinite(duration) or not 0 < duration <= settings.AUDIO_STUDIO_MAX_DURATION + .08:
         raise StudioError("Audiodateien dürfen höchstens 30 Minuten lang sein.")
     return duration
 
@@ -60,17 +60,22 @@ def waveform(path):
     return [round(min(1, max(samples[i:i + step])), 4) for i in range(0, len(samples), step)]
 
 
+def peak_filter(source, target_peak=.6):
+    data = run(["ffmpeg", "-v", "error", *input_options(source), "-vn", "-t",
+                str(settings.AUDIO_STUDIO_MAX_DURATION), "-ac", "2", "-ar", "44100", "-f", "f32le", "pipe:1"])
+    peak = max((abs(x[0]) for x in struct.iter_unpack("<f", data)), default=0)
+    # Leave silence untouched; never boost more than 30 dB.
+    factor = min(10 ** (30 / 20), target_peak / peak) if peak > .0001 else 1
+    # Match the channel conversion used while measuring; mono-to-stereo applies gain.
+    return f"aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,volume={factor:.8f},alimiter=limit=0.7:level=0:latency=1"
+
+
 def normalize(source, target, *, target_peak=None):
     probe(source)
     command = ["ffmpeg", "-v", "error", *input_options(source), "-vn", "-map_metadata", "-1",
                "-t", str(settings.AUDIO_STUDIO_MAX_DURATION), "-ar", "44100", "-ac", "2"]
     if target_peak:
-        data = run(["ffmpeg", "-v", "error", *input_options(source), "-vn", "-t",
-                    str(settings.AUDIO_STUDIO_MAX_DURATION), "-ac", "2", "-ar", "44100", "-f", "f32le", "pipe:1"])
-        peak = max((abs(x[0]) for x in struct.iter_unpack("<f", data)), default=0)
-        # Leave silence untouched; never boost more than 30 dB.
-        factor = min(10 ** (30 / 20), target_peak / peak) if peak > .0001 else 1
-        command += ["-af", f"volume={factor:.8f},alimiter=limit=0.7:level=0:latency=1"]
+        command += ["-af", peak_filter(source, target_peak)]
     run(command + ["-c:a", "libmp3lame", "-b:a", "192k", "-y", str(target)])
     return probe(target), waveform(target)
 

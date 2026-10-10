@@ -3,7 +3,7 @@
 {% block title %}Hörspiel-Produktion · {{ project.title }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{% static 'css/audio-studio.css' %}">
-<script src="{% static 'js/audio-studio.js' %}?v=20261002-3" defer></script>
+<script src="{% static 'js/audio-studio.js' %}?v=20261010-library" defer></script>
 {% endblock %}
 {% block content %}
 <section class="studio" id="audio-studio"
@@ -12,6 +12,10 @@
  data-upload-url="{% url 'audio_studio:upload' project.id %}"
  data-import-url="{% url 'audio_studio:import' project.id %}"
  data-generate-url="{% url 'audio_studio:generate' project.id %}"
+ data-catalog-url="{% url 'audio_studio:library_catalog' project.id %}"
+ data-prepare-url="{% url 'audio_studio:library_prepare' project.id %}"
+ data-request-url="{% url 'audio_studio:library_request' project.id %}"
+ data-library-enabled="{% if user.role != 'student' %}true{% else %}false{% endif %}"
  data-export-url="{% url 'audio_studio:export' project.id %}"
  data-jobs-url="{% url 'audio_studio:jobs' project.id %}">
  <header class="studio-heading">
@@ -73,6 +77,7 @@
     <button type="button" class="button button-quiet" id="studio-clip-play">Clip anhören</button>
     <button type="button" class="button button-quiet" id="studio-split" aria-keyshortcuts="T">An Abspielposition teilen · T</button>
     <button type="button" class="button button-quiet" id="studio-duplicate">Duplizieren</button>
+    <button type="button" class="button button-quiet" id="studio-change-duration" hidden>Dauer der Atmosphäre ändern …</button>
     <button type="button" class="button button-danger" id="studio-remove">Clip entfernen</button>
    </div>
   </form>
@@ -97,9 +102,24 @@
   <section class="studio-panel" aria-labelledby="generate-title">
    <p class="eyebrow">Musik und Atmosphäre</p><h2 id="generate-title">Audio erzeugen</h2>
    <p>Klicken Sie in eine freie Stelle der Spur oder erzeugen Sie Audio an der aktuellen Abspielposition.</p>
-   <div class="studio-actions"><button type="button" class="button button-secondary" data-studio-generate="music" disabled>＋ Musik / Jingle</button><button type="button" class="button button-secondary" data-studio-generate="effects" disabled>＋ Geräusch / Atmosphäre</button></div>
+   <div class="studio-actions"><button type="button" class="button button-secondary" data-studio-generate="music" disabled>＋ Musik / Jingle</button>{% if user.role != 'student' %}<button type="button" class="button button-primary" id="studio-open-sounds">＋ Geräusch hinzufügen</button>{% endif %}<button type="button" class="button button-secondary" data-studio-generate="effects" disabled>Neu generieren …</button></div>
   </section>
  </div>
+ <dialog id="studio-sounds-dialog" class="studio-dialog studio-sounds-dialog" aria-labelledby="studio-sounds-title" aria-describedby="studio-sounds-position">
+  <div class="studio-dialog-heading"><h2 id="studio-sounds-title">Geräusch hinzufügen</h2><button type="button" class="button button-quiet" id="studio-sounds-close" aria-label="Geräuschbibliothek schließen">✕</button></div>
+  <p id="studio-sounds-position" class="studio-hint"></p>
+  <p id="studio-sounds-error" class="studio-message" role="alert" hidden></p>
+  <label>Suchen <input type="search" id="studio-sounds-search" maxlength="120" placeholder="Zum Beispiel Wald, Schulhof oder Verkehr"></label>
+  <div class="studio-sound-filters" role="group" aria-label="Geräuschart"><button type="button" data-sound-role="atmosphere" aria-pressed="true">Atmosphären</button><button type="button" data-sound-role="oneshot" aria-pressed="false">Einzelgeräusche</button><button type="button" data-sound-role="project" aria-pressed="false">Eigene Projektdateien</button></div>
+  <label>Kategorie <select id="studio-sounds-category"><option value="">Alle Kategorien</option></select></label>
+  <div id="studio-sounds-list" class="studio-sounds-list" aria-live="polite"></div>
+  <form id="studio-sounds-form">
+   <div class="studio-inline"><label>Dauer <select id="studio-sounds-duration"><option value="speech">Bis Sprachende</option><option value="30">30 Sekunden</option><option value="60">1 Minute</option><option value="120">2 Minuten</option><option value="natural">Natürliche Dauer</option><option value="custom">Eigene Dauer</option></select></label><label id="studio-sounds-custom-label" hidden>Eigene Dauer (s) <input id="studio-sounds-custom" type="number" min="0.01" max="1800" step="0.01" value="120"></label><label>Lautstärke <select id="studio-sounds-level"><option value="quiet">Leise – empfohlen</option><option value="normal">Deutlicher</option></select></label></div>
+   <p id="studio-sounds-selection" class="studio-hint"></p>
+   <button type="submit" class="button button-primary" id="studio-sounds-insert" disabled>In Geräuschespur einfügen</button>
+  </form>
+  <div class="studio-sound-footer"><span>Nichts Passendes dabei?</span><button type="button" class="button button-secondary" id="studio-sounds-generate">Neu generieren …</button><button type="button" class="button button-quiet" id="studio-sounds-request">Fehlenden Wunsch merken</button></div>
+ </dialog>
  <dialog id="studio-generate-dialog" class="studio-dialog" aria-labelledby="studio-dialog-title" aria-describedby="studio-generation-placement">
   <div class="studio-dialog-heading"><div><p class="eyebrow">Musik und Atmosphäre</p><h2 id="studio-dialog-title">Audio an dieser Stelle erzeugen</h2></div><button type="button" class="button button-quiet" id="studio-dialog-close" aria-label="Fenster schließen">✕</button></div>
   <p id="studio-generation-placement" class="studio-hint"></p>
@@ -109,6 +129,7 @@
     <label>Beschreibung <textarea name="prompt" rows="3" maxlength="4100" required placeholder="Zum Beispiel: ruhige instrumentale Hintergrundmusik für einen französischen Café-Dialog"></textarea></label>
     <div class="studio-inline"><label>Dauer (s) <input name="duration" type="number" min="3" max="600" step="0.5" value="15" required></label>
      <label id="studio-loop-label" hidden><input name="loop" type="checkbox"> Nahtlos wiederholbares Geräusch</label></div>
+    <label id="studio-generation-length-label" hidden>Gewünschte Abspieldauer (s, optional) <input name="playback_duration" type="number" min="0.5" max="1800" step="0.5" placeholder="Leer: Länge der erzeugten Quelle"></label>
     <p id="studio-generation-info" class="studio-hint"></p>
     <div class="studio-actions"><button type="submit" class="button button-primary" id="studio-generate" disabled>Erzeugen und hier einfügen</button><button type="button" class="button button-secondary" id="studio-dialog-cancel">Abbrechen</button></div>
    </form>

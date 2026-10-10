@@ -102,6 +102,9 @@ class PlanItemForm(forms.Form):
     title = forms.CharField(label="Name", max_length=120)
     kind = forms.ChoiceField(label="Audioart", choices=[("music", "Musik"), ("effects", "Geräusch")])
     asset_id = forms.ChoiceField(label="Vorhandenes Audio", required=False)
+    library_id = forms.ChoiceField(label="Gemeinsame Geräuschbibliothek (ohne neue Credits)", required=False)
+    generation_duration = forms.FloatField(label="Neue Quelldauer (s, optional)", min_value=0, max_value=600, required=False,
+        help_text="Für lange neue Atmosphären: 20–30 s Quelle, oben die gewünschte Abspieldauer; Wiederholung einschalten.")
     prompt = forms.CharField(label="Beschreibung für neue Erzeugung", max_length=4100, required=False, widget=forms.Textarea(attrs={"rows": 2}))
     duration = forms.FloatField(label="Dauer (Sekunden)", min_value=.01, max_value=1800)
     start = forms.FloatField(label="Start (Sekunden)", min_value=0, max_value=1800)
@@ -113,6 +116,8 @@ class PlanItemForm(forms.Form):
     def __init__(self, *args, assets, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["asset_id"].choices = [("", "Neues Audio erzeugen")] + [(str(a.pk), a.title) for a in assets]
+        from audio_studio.library import catalog
+        self.fields["library_id"].choices = [("", "Keine Bibliotheksquelle")] + [(str(a.pk), f"{a.get_category_display()} · {a.title}") for a in catalog()]
         if self.empty_permitted:
             self.initial = {"kind": "music", "duration": 15, "start": 0, "gain_db": -18, "fade_in": 0, "fade_out": 0, **self.initial}
 
@@ -120,7 +125,7 @@ class PlanItemForm(forms.Form):
         # The browser submits default choices even inside a closed optional row.
         # Only a name, generation description or selected audio starts a new row.
         if self.empty_permitted and self.is_bound and not any(
-                str(self.data.get(self.add_prefix(key), "")).strip() for key in ("title", "prompt", "asset_id")):
+                str(self.data.get(self.add_prefix(key), "")).strip() for key in ("title", "prompt", "asset_id", "library_id")):
             return False
         return super().has_changed()
 

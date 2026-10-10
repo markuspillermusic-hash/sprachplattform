@@ -17,6 +17,31 @@
   }
   const root = document.querySelector('[data-production]');
   if (!root) return;
+  const soundData = document.getElementById('production-sound-library');
+  if (soundData) {
+    const sounds = new Map(JSON.parse(soundData.textContent).map(a => [a.id, a]));
+    root.querySelectorAll('select[name$="-library_id"]').forEach(select => {
+      const cue = select.closest('.production-cue'), prefix = select.name.slice(0, -'library_id'.length);
+      const audio = document.createElement('audio'); audio.controls = true; audio.preload = 'none'; audio.hidden = true;
+      audio.setAttribute('aria-label', 'Gewähltes Bibliotheksgeräusch vorhören'); select.parentElement.append(audio);
+      const sourceInfo = document.createElement('small'); select.parentElement.append(sourceInfo);
+      const field = name => cue.querySelector(`[name="${prefix}${name}"]`);
+      const update = (changed = false) => {
+        const sound = sounds.get(select.value); audio.pause(); audio.hidden = !sound; sourceInfo.textContent = '';
+        if (!sound) { audio.removeAttribute('src'); return; }
+        audio.src = sound.url; sourceInfo.textContent = `${sound.description} · ${sound.loopable ? 'verlängerbar' : 'einmalig'} · keine neuen Audio-Credits`;
+        if (changed) {
+          field('asset_id').value = ''; field('prompt').value = ''; field('generation_duration').value = '0'; field('kind').value = 'effects';
+          field('title').value = sound.title; field('duration').value = sound.loopable ? 120 : sound.duration;
+          field('gain_db').value = sound.gain_db; field('fade_in').value = sound.fade_in; field('fade_out').value = sound.fade_out;
+        }
+      };
+      select.addEventListener('change', () => update(true));
+      field('asset_id').addEventListener('change', () => { if (field('asset_id').value) { select.value = ''; update(); } });
+      audio.addEventListener('play', () => root.querySelectorAll('audio').forEach(other => { if (other !== audio) other.pause(); }));
+      update();
+    });
+  }
   const scriptForm = root.querySelector('#production-script-form');
   if (scriptForm) {
     const container = scriptForm.querySelector('[data-script-lines]');

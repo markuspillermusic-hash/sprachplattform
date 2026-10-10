@@ -49,7 +49,8 @@ def asset_data(asset):
     return {"id": str(asset.pk), "title": asset.title, "kind": asset.kind, "duration": asset.duration,
             "waveform": asset.waveform, "expires_at": None if asset.is_demo_sample else asset.expires_at.isoformat(),
             "url": reverse("audio_studio:asset", args=[asset.project_id, asset.pk]),
-            "download_url": reverse("audio_studio:asset", args=[asset.project_id, asset.pk]) + "?download=1"}
+            "download_url": reverse("audio_studio:asset", args=[asset.project_id, asset.pk]) + "?download=1",
+            "library_id": str(asset.library_source_id) if asset.library_source_id else "", "loopable": asset.loopable}
 
 
 def job_data(job):
@@ -57,6 +58,8 @@ def job_data(job):
             "label": job.get_status_display(), "error": job.error_message,
             "revision": job.input_data.get("revision"),
             "placement": job.input_data.get("placement"),
+            "duration": job.input_data.get("playback_duration", job.duration),
+            "replace_clip_id": job.input_data.get("replace_clip_id"),
             "asset": asset_data(job.asset) if job.asset and job.asset.deleted_at is None
             and (job.asset.is_demo_sample or job.asset.expires_at > timezone.now()) else None}
 
@@ -79,14 +82,14 @@ def state(request, project_id):
                                        expires_at__gt=timezone.now()).select_related("version")[:30]
     return JsonResponse({"revision": session.revision if session else 0,
                          "state": session.state if session else empty_state(),
-                         "assets": [asset_data(a) for a in live_assets(project)[:200]],
+                         "assets": [asset_data(a) for a in studio_assets(project, session)],
                          "speech": [{"id": str(a.pk), "title": f"Sprachversion {a.version.number}"} for a in speech],
                          "history": [{"number": r.number, "state": r.state, "created_at": r.created_at.isoformat()}
                                      for r in session.revisions.all()[:20]] if session else [],
                          "jobs": [job_data(j) for j in project.studio_jobs.select_related("asset")[:20]],
                          "generation": {kind: {"enabled": provider_ready(config, kind),
                                                 "rate": str(getattr(config, f"{kind}_eur_per_minute", 0)),
-                                                "credits_per_second": getattr(config, "effects_credits_per_second", 20)
+                                                "credits_per_second": getattr(config, "effects_credits_per_second", 40)
                                                 if kind == "effects" else getattr(config, "music_credits_per_minute", 1500) / 60,
                                                 "seconds_limit": getattr(config, f"{kind}_seconds_per_user_month", 0)}
                                         for kind in ("music", "effects")},
@@ -197,3 +200,73 @@ def asset(request, project_id, asset_id):
                             content_type="audio/wav" if audio.format == "wav" else "audio/mpeg")
     response["Cache-Control"] = "private, no-store"
     return response
+
+
+def studio_assets(project, session):
+    """Always include current/history references beyond the recent-file window."""
+    ids = {c["asset_id"] for c in session.state.get("clips", [])} if session else set()
+    if session:
+        for revision in session.revisions.all()[:20]:
+            ids.update(c["asset_id"] for c in revision.state.get("clips", []))
+    rows = {str(a.pk): a for a in live_assets(project).select_related("library_source")[:200]}
+    rows.update({str(a.pk): a for a in live_assets(project).filter(pk__in=ids).select_related("library_source")})
+    return rows.values()
+
+
+def library_data(source):
+    return {"id": str(source.pk), "title": source.title, "description": source.description,
+        "category": source.category, "category_label": source.get_category_display(), "role": source.role,
+        "tags": source.tags, "duration": source.duration, "loopable": source.role == "atmosphere" and source.loop_verified,
+        "gain_db": source.gain_db, "fade_in": source.fade_in, "fade_out": source.fade_out,
+        "url": reverse("audio_studio:library_preview", args=[source.pk])}
+
+
+@require_GET
+@login_required
+def library_catalog(request, project_id):
+    from .library import authorize_library, catalog
+    from .models import SoundLibraryAsset
+    owned_project(request, project_id)
+    authorize_library(request.user)
+    return JsonResponse({"sounds": [library_data(a) for a in catalog()], "categories": dict(SoundLibraryAsset.Category.choices)})
+
+
+@require_GET
+@login_required
+def library_preview(request, asset_id):
+    from .library import authorize_library
+    from .models import SoundLibraryAsset
+    authorize_library(request.user)
+    rows = SoundLibraryAsset.objects.all() if request.user.is_staff else SoundLibraryAsset.objects.filter(status="published")
+    source = get_object_or_404(rows, pk=asset_id)
+    try:
+        path = stored_path(source.file_path if request.user.is_staff and request.GET.get("full") == "1" else source.preview_path)
+    except StudioError:
+        raise Http404("Hörprobe noch nicht verfügbar.") from None
+    response = FileResponse(path.open("rb"), content_type="audio/mpeg")
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+@require_POST
+@login_required
+@api_errors
+def library_prepare(request, project_id):
+    from .library import create_preparation
+    return dispatch(create_preparation(owned_project(request, project_id), request.user, body(request)))
+
+
+@require_POST
+@login_required
+@api_errors
+def library_request(request, project_id):
+    from .library import authorize_library, record_request
+    authorize_library(request.user)
+    project = owned_project(request, project_id)
+    data = body(request)
+    if data.get("asset_id"):
+        source = get_object_or_404(live_assets(project), pk=identifier(data["asset_id"]), kind__in=("effects", "upload"))
+        result = record_request(project, request.user, "suggestion", data.get("label") or source.title, asset=source)
+    else:
+        result = record_request(project, request.user, "missing", data.get("label", ""))
+    return JsonResponse({"id": result.pk, "message": "Der Wunsch wurde für die Bibliotheksverwaltung vorgemerkt."})

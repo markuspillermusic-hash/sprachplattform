@@ -16,6 +16,9 @@
   let clipClipboard = null, activeTrack = "speech", generationPlacement = null, dragging = false, generationSubmitting = false, menuScrollLeft = 0;
   let generationKind = "music";
   const generationDrafts = new Map();
+  const hasLibrary = root.dataset.libraryEnabled === "true";
+  let soundCatalog = [], soundRole = "atmosphere", soundChoice = null, soundStart = 0, soundReplace = null, soundBusy = false, soundToken = 0;
+  let soundOpener = null;
   const pendingKey = `studio-generation:${root.dataset.stateUrl}`;
   let pendingInsertions = new Map();
   try { pendingInsertions = new Map(JSON.parse(sessionStorage.getItem(pendingKey) || "[]")); } catch {}
@@ -306,6 +309,7 @@
     const c = state.clips.find(c => c.id === selected);
     $("clip-form").hidden = !c;
     $("clip-title").textContent = c ? (assets.get(c.asset_id)?.title || "Abgelaufene Audiodatei") : "Clip auf der Zeitachse auswählen";
+    $("change-duration").hidden = !hasLibrary || !c || !assets.get(c.asset_id)?.loopable;
     if (!c) return;
     for (const field of ["track", "start", "trim_start", "trim_end", "gain_db", "fade_in", "fade_out"]) {
       $("clip-form").elements[field].value = c[field];
@@ -343,7 +347,7 @@
         input.addEventListener("change", () => change(() => { state.tracks[name][key] = input.checked; })); l.append(input, document.createTextNode(text)); controls.append(l);
       }
       label.append(controls);
-      if (name !== "speech") label.append(action(`＋ ${names[name]}`, () => openGeneration(name, position), "button button-quiet studio-track-add"));
+      if (name !== "speech") label.append(action(name === "effects" && hasLibrary ? "＋ Geräusch hinzufügen" : `＋ ${names[name]}`, () => name === "effects" && hasLibrary ? openSounds(position) : openGeneration(name, position), "button button-quiet studio-track-add"));
       const volume = el("label", "Pegel (dB)"); const input = el("input");
       input.dataset.trackControl = `${name}-gain`; input.setAttribute("aria-label", `Pegel (dB) · ${names[name]}`);
       input.type = "number"; input.min = -60; input.max = 12; input.value = state.tracks[name].gain_db;
@@ -356,7 +360,8 @@
         if (e.target.closest(".studio-clip") || dragging) return;
         closeMenu(); activeTrack = name;
         const target = clamp((e.clientX - lane.getBoundingClientRect().left) / zoom, 0, 1800);
-        if (name !== "speech") openGeneration(name, target);
+        if (name === "effects" && hasLibrary) openSounds(target);
+        else if (name !== "speech") openGeneration(name, target);
         else seek(target);
       });
       lane.addEventListener("contextmenu", e => {
@@ -398,7 +403,7 @@
         button.addEventListener("contextmenu", e => { e.preventDefault(); e.stopPropagation(); select(c.id); showClipMenu(e.clientX, e.clientY); });
         lane.append(button); row.append(label, lane); $("timeline").append(row); drawWave(canvas, c, w);
       }
-      if (!clips.length) lane.append(el("span", name === "speech" ? "Sprachfassung übernehmen oder Audio hochladen." : `Hier klicken, um ${names[name]} zu erzeugen.`, "studio-empty-lane"));
+      if (!clips.length) lane.append(el("span", name === "speech" ? "Sprachfassung übernehmen oder Audio hochladen." : name === "effects" && hasLibrary ? "Hier klicken: Atmosphäre oder Geräusch auswählen." : `Hier klicken, um ${names[name]} zu erzeugen.`, "studio-empty-lane"));
       lane.style.height = `${Math.max(150, placed.length * 76 + 20)}px`;
       lane.append(el("div", null, "studio-playhead")); row.append(label, lane); $("timeline").append(row);
     }
@@ -511,11 +516,12 @@
     const choice = $("add-track").value;
     const track = placement?.track || (choice === "auto" ? (names[asset.kind] ? asset.kind : "effects") : choice);
     const start = placement?.start ?? position;
-    const remaining = Math.min(asset.duration, 1800 - start);
+    const remaining = Math.min(placement?.duration ?? asset.duration, asset.duration, 1800 - start);
     if (remaining < .01) throw new Error("Setzen Sie die Abspielposition vor das Ende der 30 Minuten.");
     change(() => {
-      const c = {id: crypto.randomUUID(), asset_id: asset.id, track, start, trim_start: 0, trim_end: remaining,
-        gain_db: track === "music" ? -16 : track === "effects" ? -10 : 0, fade_in: 0, fade_out: 0};
+      const c = {id: placement?.clip_id || crypto.randomUUID(), asset_id: asset.id, track, start, trim_start: 0, trim_end: remaining,
+        gain_db: placement?.gain_db ?? (track === "music" ? -16 : track === "effects" ? -10 : 0), fade_in: placement?.fade_in || 0, fade_out: placement?.fade_out || 0};
+      fitFades(c);
       state.clips.push(c); selected = c.id; activeTrack = track;
     });
     renderLibrary();
@@ -531,6 +537,7 @@
       const availability = a.expires_at ? `verfügbar bis ${new Date(a.expires_at).toLocaleDateString("de-DE")}` : "Dauerhaftes Demo-Hörbeispiel";
       info.append(el("strong", a.title), el("small", `${names[a.kind] || "Eigene Datei"} · ${a.duration.toFixed(1)} s · ${availability}`));
       item.append(info, action("＋ Einfügen", () => addAsset(a), "button button-secondary"));
+      if (hasLibrary && ["effects", "upload"].includes(a.kind) && !a.library_id) item.append(action("Für Bibliothek vorschlagen", async () => { const result = await api("request", {asset_id: a.id, label: a.title}); message(result.message); }));
       const audio = el("audio"); audio.controls = true; audio.preload = "none"; audio.src = a.url;
       audio.setAttribute("aria-label", a.title); audio.addEventListener("play", () => stop()); item.append(audio); $("library").append(item);
     }
@@ -593,6 +600,10 @@
   function showLaneMenu(x, y, track, start) {
     const entries = [["Hier einfügen", "Strg+V", () => pasteClip(track, start), Boolean(clipClipboard)]];
     if (track !== "speech") entries.unshift([`${names[track]} hier erzeugen …`, "", () => openGeneration(track, start)]);
+    if (track === "effects" && hasLibrary) entries.unshift(
+      ["Atmosphären auswählen …", "", () => openSounds(start, "atmosphere")],
+      ["Einzelgeräusche auswählen …", "", () => openSounds(start, "oneshot")],
+      ["Eigene Projektdateien …", "", () => openSounds(start, "project")]);
     showMenu(x, y, entries);
   }
   function openGeneration(track, start) {
@@ -613,13 +624,20 @@
       if (pendingInsertions.has(job.id) && ["succeeded", "failed"].includes(job.status)) {
         const placement = pendingInsertions.get(job.id); pendingInsertions.delete(job.id); rememberInsertions();
         if (job.status === "failed") message(job.error || "Die Audioerzeugung wurde nicht abgeschlossen. Ihr Prompt bleibt im Erzeugungsfenster erhalten.");
-        if (job.asset && job.status === "succeeded" && !state.clips.some(c => c.asset_id === job.asset.id)) {
-          try { addAsset(job.asset, placement); message(`${names[placement.track]} wurde bei ${time(placement.start)} eingefügt. Speichern Sie Ihren Stand.`); }
+        if (job.asset && job.status === "succeeded" && !state.clips.some(c => placement.clip_id ? c.id === placement.clip_id : c.asset_id === job.asset.id)) {
+          try {
+            if (placement.replace) {
+              const current = state.clips.find(c => c.id === placement.replace.id);
+              assets.set(job.asset.id, job.asset);
+              if (!current || JSON.stringify(current) !== JSON.stringify(placement.replace)) throw new Error("Der Clip wurde inzwischen geändert. Die verlängerte Datei bleibt in den Projektdateien.");
+              change(() => { current.asset_id = job.asset.id; current.trim_end = current.trim_start + placement.duration; fitFades(current); });
+            } else addAsset(job.asset, placement);
+            message(`${names[placement.track]} wurde bei ${time(placement.start)} eingefügt. Speichern Sie Ihren Stand.`); }
           catch (error) { message(`${error.message} Das fertige Audio bleibt in der Bibliothek und kann später eingefügt werden.`); }
         }
       }
       const row = el("div", null, "studio-job");
-      row.append(el("strong", `${job.kind === "export" ? `Mix · Stand ${job.revision}` : names[job.kind]} · ${job.label}`));
+      row.append(el("strong", `${job.kind === "export" ? `Mix · Stand ${job.revision}` : job.kind === "library_prepare" ? "Bibliotheksaudio · keine neuen Credits" : names[job.kind]} · ${job.label}`));
       if (job.error) row.append(el("p", job.error, "job-error"));
       if (job.asset) {
         assets.set(job.asset.id, job.asset);
@@ -627,7 +645,7 @@
           const audio = el("audio"); audio.controls = true; audio.preload = "none"; audio.src = job.asset.url;
           audio.setAttribute("aria-label", job.asset.title); audio.addEventListener("play", () => stop()); row.append(audio);
           const link = el("a", "Mix herunterladen", "button button-secondary"); link.href = job.asset.download_url; row.append(link);
-        } else row.append(action(job.placement ? `Bei ${time(job.placement.start)} einfügen` : "In Spur einfügen", () => addAsset(job.asset, job.placement)));
+        } else row.append(action(job.placement ? `Bei ${time(job.placement.start)} einfügen` : "In Spur einfügen", () => addAsset(job.asset, {...job.placement, duration: job.duration})));
       }
       $("jobs").append(row);
     }
@@ -658,6 +676,7 @@
     form.elements.duration.max = maximum;
     if (maximum >= Number(form.elements.duration.min)) form.elements.duration.value = clamp(Number(form.elements.duration.value), Number(form.elements.duration.min), maximum);
     $("loop-label").hidden = kind !== "effects";
+    $("generation-length-label").hidden = kind !== "effects" || !form.elements.loop.checked;
     $("generate").disabled = generationSubmitting || !config?.enabled || maximum < Number(form.elements.duration.min);
     if (generationPlacement) {
       generationPlacement.track = kind;
@@ -665,7 +684,7 @@
     }
     root.querySelectorAll("[data-studio-generate]").forEach(button => { button.disabled = !ready; });
     $("generation-info").textContent = config?.enabled
-      ? `Geschätzter Verbrauch: ${Math.ceil(Number(form.elements.duration.value) * config.credits_per_second).toLocaleString("de-DE")} Credits · persönliches Monatskontingent: ${(config.seconds_limit / 60).toLocaleString("de-DE")} min.${creditBudget ? ` Gemeinsamer Rahmen beim Laden: ${Math.floor(creditBudget.remaining).toLocaleString("de-DE")} Credits verfügbar.` : ""} ${kind === "effects" ? "Für längere Atmosphäre den Clip duplizieren." : "Musik wird ohne Gesang erzeugt."}`
+      ? `Geschätzter Verbrauch: ${Math.ceil(Number(form.elements.duration.value) * config.credits_per_second).toLocaleString("de-DE")} Credits · ca. ${(Number(form.elements.duration.value) / 60 * Number(config.rate)).toLocaleString("de-DE", {maximumFractionDigits: 4})} EUR · persönliches Monatskontingent: ${(config.seconds_limit / 60).toLocaleString("de-DE")} min.${creditBudget ? ` Gemeinsamer Rahmen beim Laden: ${Math.floor(creditBudget.remaining).toLocaleString("de-DE")} Credits verfügbar.` : ""} ${kind === "effects" ? "Nur die erzeugte Quelle wird berechnet. Wiederholbare Atmosphäre kann lokal verlängert werden." : "Musik wird ohne Gesang erzeugt."}`
       : "Die Administration muss diese Audioart unter Verwaltung → Musik- und Geräuschanbindung freigeben und einen Tarifwert hinterlegen.";
     if (maximum < Number(form.elements.duration.min)) $("generation-info").textContent = "An dieser Position ist nicht genug Platz. Setzen Sie den Cursor vor das Ende der 30 Minuten.";
   }
@@ -771,7 +790,7 @@
   }
   $("split").addEventListener("click", safe(splitSelected));
   window.addEventListener("keydown", e => {
-    if (!ready || e.isComposing || $("generate-dialog").open || dragging) return;
+    if (!ready || e.isComposing || $("generate-dialog").open || $("sounds-dialog").open || dragging) return;
     if (e.target.closest("input, textarea, select, audio, [contenteditable]:not([contenteditable=false])")) return;
     const key = e.key.toLowerCase();
     if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
@@ -823,6 +842,7 @@
   })));
   $("generate-form").elements.kind.addEventListener("change", generationInfo);
   $("generate-form").elements.duration.addEventListener("input", generationInfo);
+  $("generate-form").elements.loop.addEventListener("change", generationInfo);
   root.querySelectorAll("[data-studio-generate]").forEach(button => button.addEventListener("click", () => openGeneration(button.dataset.studioGenerate, position)));
   $("dialog-close").addEventListener("click", () => $("generate-dialog").close());
   $("dialog-cancel").addEventListener("click", () => $("generate-dialog").close());
@@ -833,14 +853,115 @@
     try {
       if (state.clips.length >= 60) throw new Error("Es sind höchstens 60 Clips möglich. Entfernen Sie zuerst einen Clip oder erzeugen Sie das Audio später.");
       const result = await api("generate", {kind: form.elements.kind.value, prompt: form.elements.prompt.value,
-        duration: Number(form.elements.duration.value), loop: form.elements.kind.value === "effects" && form.elements.loop.checked, placement});
-      pendingInsertions.set(result.job.id, placement); rememberInsertions(); jobs.unshift(result.job);
+        duration: Number(form.elements.duration.value), loop: form.elements.kind.value === "effects" && form.elements.loop.checked,
+        playback_duration: form.elements.kind.value === "effects" && form.elements.loop.checked && form.elements.playback_duration.value ? Number(form.elements.playback_duration.value) : Number(form.elements.duration.value), placement});
+      pendingInsertions.set(result.job.id, {...placement, duration: result.job.duration}); rememberInsertions(); jobs.unshift(result.job);
       $("generate-dialog").close(); message(`Audio wird für „${names[placement.track]}“ bei ${time(placement.start)} erzeugt und anschließend dort eingefügt.`);
       renderJobs(); renderLibrary();
     } catch (error) {
       $("generation-error").textContent = error.message; $("generation-error").hidden = false;
       if (!$("generate-dialog").open) message(error.message);
     } finally { generationSubmitting = false; generationInfo(); }
+  });
+  function soundDuration() {
+    const mode = $("sounds-duration").value;
+    if (mode === "natural") return soundChoice?.duration || 0;
+    if (mode === "custom") return Number($("sounds-custom").value);
+    if (mode === "speech") return Math.max(0, ...state.clips.filter(c => c.track === "speech").map(c => c.start + length(c))) - soundStart;
+    return Number(mode);
+  }
+  function updateSoundSelection() {
+    $("sounds-custom-label").hidden = $("sounds-duration").value !== "custom";
+    const seconds = soundDuration();
+    $("sounds-insert").disabled = soundBusy || !soundChoice || !Number.isFinite(seconds) || seconds < .01 || soundStart + seconds > 1800 || (!soundChoice.loopable && seconds > soundChoice.duration + .001);
+    $("sounds-selection").textContent = soundChoice ? `${soundChoice.title} · ${Number.isFinite(seconds) ? seconds.toFixed(2) : "–"} Sekunden · ${soundRole === "project" ? "vorhandene Projektdatei" : "Bibliothek"} · keine neue Geräuschgenerierung` : "Eine Quelle auswählen und bei Bedarf vorhören.";
+    if (soundReplace) $("sounds-insert").textContent = "Dauer übernehmen";
+    else $("sounds-insert").textContent = "In Geräuschespur einfügen";
+  }
+  function chooseSound(sound) {
+    soundChoice = sound;
+    if (!soundReplace) {
+      const speechEnd = Math.max(0, ...state.clips.filter(c => c.track === "speech").map(c => c.start + length(c)));
+      $("sounds-duration").value = sound.loopable ? (speechEnd > soundStart ? "speech" : "120") : "natural";
+    }
+    renderSounds();
+  }
+  function renderSounds() {
+    const list = $("sounds-list"); list.replaceChildren();
+    const query = $("sounds-search").value.trim().toLocaleLowerCase("de-DE"), category = $("sounds-category").value;
+    const options = soundRole === "project" ? [...assets.values()].filter(a => ["effects", "upload"].includes(a.kind)) : soundCatalog.filter(a => a.role === soundRole);
+    const items = options.filter(a => (!category || soundRole === "project" || a.category === category) && `${a.title} ${a.description || ""} ${a.tags || ""} ${a.category_label || ""}`.toLocaleLowerCase("de-DE").includes(query));
+    if (!items.length) list.append(el("p", "Kein passendes Geräusch gefunden. Kategorie ändern, neu generieren oder den fehlenden Wunsch vormerken.", "studio-hint"));
+    for (const sound of items) {
+      const row = el("article", null, `studio-sound-row${soundChoice?.id === sound.id ? " is-selected" : ""}`);
+      const choice = action(sound.title, () => chooseSound(sound), "studio-sound-choice");
+      choice.setAttribute("aria-pressed", String(soundChoice?.id === sound.id));
+      const info = el("div"); info.append(choice, el("p", sound.description || "Audio aus diesem Projekt"), el("small", `${sound.duration.toFixed(1)} s${sound.loopable ? " · verlängerbar" : " · einmalig"}`));
+      const audio = el("audio"); audio.controls = true; audio.preload = "none"; audio.src = sound.url; audio.setAttribute("aria-label", `${sound.title} vorhören`);
+      audio.addEventListener("play", () => { stop(); $("sounds-list").querySelectorAll("audio").forEach(other => { if (other !== audio) other.pause(); }); });
+      row.append(info, audio); list.append(row);
+    }
+    root.querySelectorAll("[data-sound-role]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.soundRole === soundRole)));
+    updateSoundSelection();
+  }
+  async function openSounds(start, role = "atmosphere", replace = null) {
+    if (!ready || dragging || !hasLibrary || soundBusy) return;
+    closeMenu(); soundOpener = document.activeElement; soundStart = clamp(start, 0, 1800); soundRole = role; soundReplace = replace ? clone(replace) : null; soundChoice = null;
+    $("sounds-error").hidden = true; $("sounds-search").value = ""; $("sounds-category").value = "";
+    $("sounds-insert").disabled = true;
+    $("sounds-title").textContent = replace ? "Dauer der Atmosphäre ändern" : "Geräusch hinzufügen";
+    if (replace) { soundChoice = assets.get(replace.asset_id); $("sounds-duration").value = "custom"; $("sounds-custom").value = length(replace); }
+    $("sounds-position").textContent = `Geräuschespur bei ${time(soundStart)} (${soundStart.toFixed(2)} s). Die Einfügestelle bleibt während des Vorhörens erhalten.`;
+    const token = ++soundToken;
+    if (!$("sounds-dialog").open) $("sounds-dialog").showModal();
+    $("sounds-search").focus();
+    $("sounds-list").replaceChildren(el("p", "Geräusche werden geladen …"));
+    try {
+      const data = await api("catalog"); if (token !== soundToken || !$("sounds-dialog").open) return;
+      soundCatalog = data.sounds;
+      $("sounds-category").replaceChildren(el("option", "Alle Kategorien")); $("sounds-category").firstChild.value = "";
+      Object.entries(data.categories).forEach(([key, title]) => { const option = el("option", title); option.value = key; $("sounds-category").append(option); });
+      renderSounds();
+    } catch (error) { $("sounds-error").textContent = error.message; $("sounds-error").hidden = false; $("sounds-list").replaceChildren(); }
+  }
+  function closeSounds() { $("sounds-dialog").close(); }
+  $("sounds-dialog").addEventListener("close", () => { soundToken++; $("sounds-list").querySelectorAll("audio").forEach(a => a.pause()); soundOpener?.focus?.({preventScroll: true}); });
+  $("open-sounds")?.addEventListener("click", safe(() => openSounds(position)));
+  $("sounds-close").addEventListener("click", closeSounds);
+  $("sounds-search").addEventListener("input", renderSounds);
+  $("sounds-category").addEventListener("change", renderSounds);
+  $("sounds-duration").addEventListener("change", updateSoundSelection);
+  $("sounds-custom").addEventListener("input", updateSoundSelection);
+  root.querySelectorAll("[data-sound-role]").forEach(button => button.addEventListener("click", () => { if (soundReplace) return; soundRole = button.dataset.soundRole; soundChoice = null; renderSounds(); }));
+  $("change-duration").addEventListener("click", safe(() => { const clip = state.clips.find(c => c.id === selected); if (clip) return openSounds(clip.start, "project", clip); }));
+  $("sounds-generate").addEventListener("click", () => { const prompt = $("sounds-search").value, start = soundStart; closeSounds(); openGeneration("effects", start); if (prompt) $("generate-form").elements.prompt.value = prompt; });
+  $("sounds-request").addEventListener("click", async () => {
+    try { const result = await api("request", {label: $("sounds-search").value}); $("sounds-selection").textContent = result.message; $("sounds-error").hidden = true; }
+    catch (error) { $("sounds-error").textContent = error.message; $("sounds-error").hidden = false; }
+  });
+  $("sounds-form").addEventListener("submit", async event => {
+    event.preventDefault(); if (soundBusy || $("sounds-insert").disabled) return;
+    const seconds = soundDuration(), source = soundChoice, replace = soundReplace, requestId = crypto.randomUUID();
+    const placement = {track: "effects", start: soundStart, duration: seconds, clip_id: requestId,
+      gain_db: (source.gain_db ?? (source.loopable ? -20 : -10)) + ($("sounds-level").value === "normal" ? 6 : 0),
+      fade_in: source.fade_in ?? (source.loopable ? 1 : 0), fade_out: source.fade_out ?? (source.loopable ? 2 : 0)};
+    $("sounds-error").hidden = true; soundBusy = true; updateSoundSelection();
+    try {
+      if (!replace && state.clips.length >= 60) throw new Error("Höchstens 60 Clips möglich. Zuerst einen Clip entfernen.");
+      if (soundRole === "project" && !replace && seconds <= source.duration + .001) { addAsset(source, placement); closeSounds(); return; }
+      if (replace && seconds + replace.trim_start <= source.duration + .001) {
+        const current = state.clips.find(c => c.id === replace.id);
+        if (!current || JSON.stringify(current) !== JSON.stringify(replace)) throw new Error("Der Clip wurde inzwischen geändert. Bitte erneut auswählen.");
+        change(() => { current.trim_end = current.trim_start + seconds; fitFades(current); }); closeSounds(); return;
+      }
+      const request = {request_id: requestId, duration: seconds + (replace?.trim_start || 0), placement: {track: "effects", start: soundStart}};
+      if (soundRole === "project") request.asset_id = source.id; else request.library_id = source.id;
+      if (replace) { request.replace_clip_id = replace.id; request.trim_start = replace.trim_start; placement.replace = replace; }
+      const result = await api("prepare", request);
+      pendingInsertions.set(result.job.id, placement); rememberInsertions(); jobs.unshift(result.job);
+      closeSounds(); renderJobs(); renderLibrary(); message("Die Atmosphäre wird lokal vorbereitet. Es werden keine neuen Anbieter-Credits verbraucht.");
+    } catch (error) { $("sounds-error").textContent = error.message; $("sounds-error").hidden = false; }
+    finally { soundBusy = false; updateSoundSelection(); }
   });
   $("export-form").addEventListener("submit", safe(async () => {
     $("export").disabled = true;

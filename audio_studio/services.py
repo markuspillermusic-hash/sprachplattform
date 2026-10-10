@@ -102,6 +102,10 @@ def save_state(project, user, revision, state):
     session.revision += 1
     session.save()
     StudioRevision.objects.create(session=session, number=session.revision, state=session.state, created_by=user)
+    from .library import record_request
+    source_ids = {clip["asset_id"] for clip in session.state["clips"]}
+    for asset in live_assets(project).filter(pk__in=source_ids, library_source__isnull=False).select_related("library_source"):
+        record_request(project, user, "used", asset.title, library_asset=asset.library_source)
     return session
 
 
@@ -144,11 +148,14 @@ def create_generation(project, user, data):
     loop = data.get("loop", False)
     if type(loop) is not bool:
         raise StudioError("Ungültige Loop-Einstellung.")
+    playback_duration = number(data.get("playback_duration", duration), duration, 1800)
+    if playback_duration > duration and (kind != "effects" or not loop):
+        raise StudioError("Nur wiederholbare Geräusche können lokal verlängert werden.")
     placement = data.get("placement")
     if placement is not None:
         if not isinstance(placement, dict) or set(placement) != {"track", "start"} or placement["track"] != kind:
             raise StudioError("Die Einfügeposition passt nicht zur gewählten Audioart.")
-        placement = {"track": kind, "start": number(placement["start"], 0, 1800 - duration)}
+        placement = {"track": kind, "start": number(placement["start"], 0, 1800 - playback_duration)}
     locked_user = get_user_model().objects.select_for_update().get(pk=user.pk)
     month = timezone.localdate().replace(day=1)
     used = StudioJob.objects.filter(requested_by=user, kind=kind,
@@ -168,9 +175,11 @@ def create_generation(project, user, data):
     job = StudioJob.objects.create(project=project, requested_by=user, kind=kind, duration=duration, usage_event=event,
                                    input_data={"prompt": prompt.strip(), "duration": duration, "loop": loop,
                                                "model": model, "configuration_id": config.pk})
+    if playback_duration > duration:
+        job.input_data["playback_duration"] = playback_duration
     if placement is not None:
         job.input_data["placement"] = placement
-        job.save(update_fields=["input_data"])
+    job.save(update_fields=["input_data"])
     event.reference = f"studio:{job.pk}"
     event.save(update_fields=("reference",))
     return job
@@ -220,7 +229,16 @@ def run_job(job_id, provider=None):
     attempted = False
     try:
         folder = asset_folder(job.project)
-        if job.kind == "export":
+        if job.kind == "library_prepare":
+            from .library import extend_asset, library_source, materialize
+            if job.input_data.get("library_id"):
+                asset = materialize(job.project, library_source(job.input_data["library_id"]), job.input_data["duration"])
+            else:
+                source = live_assets(job.project).filter(pk=job.input_data["asset_id"]).first()
+                if not source:
+                    raise StudioError("Die Atmosphäre ist abgelaufen. Bitte erneut hinzufügen.")
+                asset = extend_asset(job.project, source, job.input_data["duration"])
+        elif job.kind == "export":
             state = validate_state(job.project, job.input_data["state"])
             assets = {str(a.pk): a for a in live_assets(job.project)}
             fmt = job.input_data["format"]
@@ -248,6 +266,14 @@ def run_job(job_id, provider=None):
             temporary = folder / f"source-{job.pk}.mp3"
             temporary.write_bytes(result.audio)
             asset = create_asset(job.project, temporary, job.input_data["prompt"], job.kind)
+            asset.loopable = job.kind == "effects" and job.input_data["loop"]
+            asset.source_duration = job.duration
+            asset.save(update_fields=["loopable", "source_duration"])
+            if job.input_data.get("playback_duration"):
+                from .library import render_length
+                asset.duration, asset.waveform = render_length(stored_path(asset.original_path), Path(asset.file_path), job.input_data["playback_duration"], True, normalize_peak=True)
+                asset.size_bytes = Path(asset.file_path).stat().st_size
+                asset.save(update_fields=["duration", "waveform", "size_bytes"])
         job.asset = asset
         job.status = StudioJob.Status.SUCCEEDED
         job.error_message = ""

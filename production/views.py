@@ -55,6 +55,8 @@ def voice_forms(production, user, data=None):
 
 
 def render_detail(request, production, *, lines=None, voices=None, settings_form=None, items=None, wishes=None, refinement=None, code=200):
+    from audio_studio.library import catalog
+    from audio_studio.views import library_data
     project = production.project
     recover_stale_runs(project)
     run = busy(production)
@@ -86,6 +88,7 @@ def render_detail(request, production, *, lines=None, voices=None, settings_form
         "dirty_script": dirty_script, "dirty_mix": dirty_mix,
         "character_count": chars, "speech_cost": round(chars / 1000 * float(rate), 4),
         "mix_estimate": estimate_mix(production), "provider_configured": tts_provider_is_configured(),
+        "sound_library": [library_data(a) for a in catalog()],
         "assistant_configured": bool(config and config.is_configured),
         "history": list(project.production_runs.all()[:12]),
         "audio_versions": AudioAsset.objects.filter(version__project=project, deleted_at__isnull=True, expires_at__gt=timezone.now()).select_related("version")[:8],

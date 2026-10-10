@@ -464,6 +464,33 @@ class ProductionTests(TestCase):
         generate.assert_not_called()
         self.assertEqual(UsageEvent.objects.count(), before)
 
+    def test_shared_library_plan_and_mix_never_generate_sfx(self):
+        from audio_studio.library import prepare_source
+        from audio_studio.models import SoundLibraryAsset
+        from production.services import estimate_mix
+        source = Path(self.folder.name) / 'qa-ambience.wav'
+        source.write_bytes(wav_bytes(.8))
+        entry = SoundLibraryAsset.objects.create(key='qa-forest', title='QA Wald', description='Testdatei',
+            category='nature', role='atmosphere', provenance='Nur Test', loop_verified=True)
+        prepare_source(entry, source)
+        entry.status = 'published'; entry.full_clean(); entry.save()
+        self.plan['items'] = [dict(self.plan['items'][1], library_id=str(entry.pk), prompt='',
+            duration=135, start=0, gain_db=-20, loop=True, generation_duration=0)]
+        self.speech()
+        with patch('production.services._provider_request', return_value=SimpleNamespace(payload=self.plan)) as provider:
+            self.run_phase('plan')
+        self.assertEqual(provider.call_args.args[0]['sound_library'][0]['library_id'], str(entry.pk))
+        self.assertEqual(estimate_mix(self.production)['credits'], 0)
+        before = UsageEvent.objects.count()
+        with patch('audio_studio.services.ElevenLabsAudioProvider.generate') as generate:
+            self.run_phase('mix')
+        generate.assert_not_called()
+        self.assertEqual(UsageEvent.objects.count(), before)
+        session = StudioSession.objects.get(project=self.project)
+        effect = next(c for c in session.state['clips'] if c['track'] == 'effects')
+        self.assertEqual(effect['trim_end'], 135)
+        self.assertAlmostEqual(self.production.mix_asset.duration, 135, delta=.08)
+
     def test_partial_music_success_is_reused_after_effect_failure(self):
         self.approve_audio()
         self.production.refresh_from_db()

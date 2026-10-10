@@ -29,7 +29,7 @@ class StudioConfiguration(models.Model):
     music_seconds_per_user_month = models.PositiveIntegerField("Musiksekunden je Benutzer und Monat", default=1800)
     effects_seconds_per_user_month = models.PositiveIntegerField("Geräuschsekunden je Benutzer und Monat", default=1800)
     music_credits_per_minute = models.PositiveIntegerField("Musik: geschätzte Credits pro Minute", default=1500)
-    effects_credits_per_second = models.PositiveIntegerField("Geräusche: geschätzte Credits pro Sekunde", default=20)
+    effects_credits_per_second = models.PositiveIntegerField("Geräusche: geschätzte Credits pro Sekunde", default=40)
     # Optional separate key; otherwise reuse the existing encrypted TTS key.
     encrypted_api_key = models.TextField(blank=True, editable=False)
     api_key_hint = models.CharField(max_length=16, blank=True, editable=False)
@@ -77,6 +77,74 @@ class StudioRevision(models.Model):
         constraints = [models.UniqueConstraint(fields=("session", "number"), name="unique_studio_revision")]
 
 
+class SoundLibraryAsset(models.Model):
+    class Category(models.TextChoices):
+        SCHOOL = "school", "Schule & Alltag"
+        CITY = "city", "Stadt & Verkehr"
+        NATURE = "nature", "Natur & Wetter"
+        INDOORS = "indoors", "Innenräume & Begegnung"
+        ACTIONS = "actions", "Bewegung & Gegenstände"
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Entwurf"
+        PUBLISHED = "published", "Freigegeben"
+        RETIRED = "retired", "Zurückgezogen"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.SlugField("Bibliotheksschlüssel", max_length=80)
+    version = models.PositiveIntegerField("Version", default=1)
+    title = models.CharField("Name", max_length=120)
+    description = models.CharField("Beschreibung", max_length=500)
+    category = models.CharField("Kategorie", max_length=16, choices=Category.choices)
+    role = models.CharField("Verwendung", max_length=16, choices=[("atmosphere", "Atmosphäre"), ("oneshot", "Einzelgeräusch")])
+    tags = models.CharField("Suchbegriffe / Synonyme", max_length=500, blank=True)
+    status = models.CharField("Status", max_length=16, choices=Status.choices, default=Status.DRAFT)
+    master_path = models.CharField(max_length=500, blank=True, editable=False)
+    file_path = models.CharField(max_length=500, blank=True, editable=False)
+    preview_path = models.CharField(max_length=500, blank=True, editable=False)
+    duration = models.FloatField(default=0, editable=False)
+    source_duration = models.FloatField(default=0, editable=False)
+    waveform = models.JSONField(default=list, editable=False)
+    loop_verified = models.BooleanField("Wiederholung akustisch geprüft", default=False)
+    gain_db = models.FloatField("Empfohlener Clippegel (dB)", default=-20)
+    fade_in = models.FloatField("Einblenden (s)", default=1)
+    fade_out = models.FloatField("Ausblenden (s)", default=2)
+    provenance = models.CharField("Herkunft / Nutzungsfreigabe", max_length=500, blank=True)
+    generation_prompt = models.TextField("Erzeugungsbeschreibung", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("category", "title", "-version")
+        constraints = [models.UniqueConstraint(fields=("key", "version"), name="unique_library_version")]
+        verbose_name = "Bibliotheksgeräusch"
+        verbose_name_plural = "Geräuschbibliothek"
+
+    def __str__(self):
+        return f"{self.title} · Version {self.version}"
+
+    def clean(self):
+        import math
+        from django.core.exceptions import ValidationError
+        if any(v is None for v in (self.gain_db, self.fade_in, self.fade_out)) or not all(math.isfinite(v) for v in (self.gain_db, self.fade_in, self.fade_out)) or not -60 <= self.gain_db <= 12 or min(self.fade_in, self.fade_out) < 0:
+            raise ValidationError("Pegel und Fades sind ungültig.")
+        if self.status == self.Status.PUBLISHED:
+            from .media import stored_path, StudioError
+            try:
+                for path in (self.master_path, self.file_path, self.preview_path):
+                    stored_path(path)
+            except StudioError:
+                raise ValidationError("Vor der Freigabe eine Audiodatei vorbereiten.") from None
+            if not self.provenance.strip() or (self.role == "atmosphere" and not self.loop_verified):
+                raise ValidationError("Vor der Freigabe Herkunft eintragen und Atmosphären akustisch prüfen.")
+        old = type(self).objects.filter(pk=self.pk).first()
+        if old and old.status != self.Status.DRAFT:
+            if self.status == self.Status.DRAFT:
+                raise ValidationError("Für eine neue Audiofassung eine neue Entwurfsversion anlegen.")
+            protected = ("key", "version", "master_path", "file_path", "preview_path", "role", "source_duration", "duration")
+            if any(getattr(old, f) != getattr(self, f) for f in protected):
+                raise ValidationError("Freigegebene Audiofassungen bleiben unverändert. Eine neue Version anlegen.")
+
+
 class StudioAsset(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey("projects.Project", on_delete=models.CASCADE, related_name="studio_assets")
@@ -93,6 +161,10 @@ class StudioAsset(models.Model):
     expires_at = models.DateTimeField()
     deleted_at = models.DateTimeField(null=True, blank=True)
     is_demo_sample = models.BooleanField(default=False, editable=False)
+    library_source = models.ForeignKey(SoundLibraryAsset, null=True, blank=True, on_delete=models.PROTECT)
+    variant_key = models.CharField(max_length=64, blank=True, db_index=True)
+    loopable = models.BooleanField(default=False)
+    source_duration = models.FloatField(default=0)
 
     class Meta:
         ordering = ("-created_at",)
@@ -108,13 +180,13 @@ class StudioJob(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey("projects.Project", on_delete=models.SET_NULL, related_name="studio_jobs", null=True, blank=True)
     requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
-    kind = models.CharField(max_length=16, choices=[("music", "Musik"), ("effects", "Geräusche"), ("export", "Export")])
+    kind = models.CharField(max_length=16, choices=[("music", "Musik"), ("effects", "Geräusche"), ("export", "Export"), ("library_prepare", "Bibliothek vorbereiten")])
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
     # Immutable generation request or render snapshot, independent of later edits.
     input_data = models.JSONField()
     duration = models.FloatField(default=0)
     usage_event = models.OneToOneField("usage_control.UsageEvent", null=True, blank=True, on_delete=models.PROTECT)
-    asset = models.OneToOneField(StudioAsset, null=True, blank=True, on_delete=models.SET_NULL)
+    asset = models.ForeignKey(StudioAsset, null=True, blank=True, on_delete=models.SET_NULL)
     provider_request_id = models.CharField(max_length=160, blank=True)
     provider_received = models.BooleanField(default=False)
     provider_attempted = models.BooleanField(default=False)
@@ -125,3 +197,21 @@ class StudioJob(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+
+
+class SoundLibraryRequest(models.Model):
+    project = models.ForeignKey("projects.Project", null=True, on_delete=models.SET_NULL)
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    asset = models.ForeignKey(StudioAsset, null=True, blank=True, on_delete=models.SET_NULL)
+    library_asset = models.ForeignKey(SoundLibraryAsset, null=True, blank=True, on_delete=models.SET_NULL)
+    kind = models.CharField("Art", max_length=16, choices=[("used", "Verwendet"), ("missing", "Fehlender Wunsch"), ("suggestion", "Zur Prüfung vorgeschlagen")])
+    label = models.CharField("Geräuschwunsch", max_length=120)
+    key = models.CharField(max_length=140)
+    status = models.CharField("Bearbeitungsstand", max_length=16, default="open", choices=[("open", "Offen"), ("reviewed", "Geprüft")])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [models.UniqueConstraint(fields=("project", "kind", "key"), name="unique_sound_demand_project")]
+        verbose_name = "Geräuschbedarf / Vorschlag"
+        verbose_name_plural = "Geräuschbedarf und Vorschläge"

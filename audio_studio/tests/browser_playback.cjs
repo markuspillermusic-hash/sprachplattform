@@ -103,6 +103,8 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:8097';
   await clip(music.id).click({button: 'right', position: {x: 25, y: 25}}); await remainsPlaying(previous);
   await page.keyboard.press('Escape');
   await page.locator('.studio-lane[data-track=effects]').click({position: {x: 360, y: 135}});
+  await remainsPlaying(previous); assert(await page.locator('#studio-sounds-dialog').evaluate(n => n.open));
+  await page.locator('#studio-sounds-generate').click();
   await remainsPlaying(previous); assert(await page.locator('#studio-generate-dialog').evaluate(n => n.open));
   assert((await page.locator('#studio-generation-placement').innerText()).includes('30.00 s'));
   await page.locator('#studio-dialog-cancel').click();

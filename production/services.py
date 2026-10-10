@@ -169,11 +169,15 @@ def save_plan(project, user, revision, plan):
 
 
 def estimate_mix(production):
+    from audio_studio.library import estimate_source
     config = StudioConfiguration.objects.order_by("pk").first()
-    new_items = [item for item in production.plan.get("items", []) if not available_material(production, item)]
-    credits = sum(item["duration"] * (config.music_credits_per_minute / 60 if item["kind"] == "music"
-                                      else config.effects_credits_per_second) for item in new_items) if config else 0
-    return {"credits": round(credits), "new": len(new_items), "reused": len(production.plan.get("items", [])) - len(new_items)}
+    items = production.plan.get("items", [])
+    candidates = [item for item in items if not item.get("library_id") and not available_material(production, item)]
+    new_items = list({material_key(item): item for item in candidates}.values())
+    costs = [estimate_source(config, i["kind"], i.get("generation_duration") or i["duration"]) for i in new_items]
+    return {"credits": round(sum(c["credits"] for c in costs), 4), "eur": round(sum(c["eur"] for c in costs), 4),
+        "source_seconds": sum(c["source_seconds"] for c in costs), "library": sum(bool(i.get("library_id")) for i in items),
+        "new": len(new_items), "reused": len(items) - len(new_items)}
 
 
 def _dispatch(run):
@@ -327,10 +331,14 @@ def run_production(run_id):
             speech = speech_asset(production)
             library = [{"asset_id": str(a.pk), "title": a.title, "kind": a.kind, "duration": a.duration}
                        for a in live_assets(run.project).filter(kind__in=("music", "effects"))[:100]]
+            from audio_studio.library import catalog
+            sound_library = [{"library_id": str(a.pk), "title": a.title, "description": a.description,
+                "category": a.get_category_display(), "tags": a.tags, "role": a.role, "duration": a.duration,
+                "loopable": a.role == "atmosphere" and a.loop_verified, "gain_db": a.gain_db} for a in catalog()[:100]]
             result = _provider_request({"task": "sound_plan", "brief": production.brief,
                 "workflow_context": {"speech_approved": True, "operation": "draft_sound_plan",
                                      "plan_approval_required_for": "generate_audio_and_mix"},
-                "speech_duration": speech.duration, "script": project_payload(run.project), "library": library,
+                "speech_duration": speech.duration, "script": project_payload(run.project), "library": library, "sound_library": sound_library,
                 "previous_plan": run.input_data["previous_plan"], "change_request": run.input_data.get("instruction", "")}, user)
             plan = validate_plan(run.project, result.payload, speech.duration)
             updates = {"plan": plan, "stage": Production.Stage.PLAN}
@@ -345,9 +353,15 @@ def run_production(run_id):
                 _check_script(run)
                 _progress(run, f"Musik und Geräusche: Element {index} von {len(production.plan['items'])}.")
                 asset = available_material(production, item)
+                if not asset and item.get("library_id"):
+                    from audio_studio.library import library_source, materialize
+                    asset = materialize(run.project, library_source(item["library_id"]), item["duration"])
+                    production.materials[material_key(item)] = str(asset.pk)
+                    Production.objects.filter(pk=production.pk).update(materials=production.materials)
                 if not asset:
                     job = create_generation(run.project, user, {"kind": item["kind"], "prompt": item["prompt"],
-                                                              "duration": item["duration"], "loop": item["loop"]})
+                        "duration": item.get("generation_duration") or item["duration"], "loop": item["loop"],
+                        "playback_duration": item["duration"]})
                     _progress(run, run.progress, last_material_job=str(job.pk))
                     run_job(job.pk)
                     job.refresh_from_db()

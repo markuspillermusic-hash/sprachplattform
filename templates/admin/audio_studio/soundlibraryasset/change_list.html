@@ -1,0 +1,5 @@
+{% extends "admin/change_list.html" %}
+{% block object-tools-items %}
+<li><a href="{% url 'admin:audio_studio_soundlibraryasset_listening_review' %}">Geräusche anhören und freigeben</a></li>
+{{ block.super }}
+{% endblock %}

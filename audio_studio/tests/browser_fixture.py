@@ -65,3 +65,31 @@ def cleanup_fixture(output):
     if not owner.projects.exists():
         owner.delete()
     target.unlink()
+
+
+def create_library_fixture(output):
+    """Use only in a separate local database: published entries are test tones."""
+    if 'library-browser' not in str(settings.DATABASES['default']['NAME']):
+        raise ValueError('Library QA requires the isolated library-browser database.')
+    from audio_studio.library import prepare_source
+    from audio_studio.models import SoundLibraryAsset
+    create_fixture(output)
+    target = Path(output)
+    data = json.loads(target.read_text(encoding='utf-8'))
+    with TemporaryDirectory() as folder:
+        source = Path(folder) / 'qa.wav'; source.write_bytes(wav_bytes(1))
+        for role, title in [('atmosphere', 'QA Wald'), ('oneshot', 'QA Tür')]:
+            entry = SoundLibraryAsset.objects.create(key=f'qa-{role}-{uuid.uuid4().hex[:8]}', title=title,
+                description='Technischer Testton; keine echte Geräuschquelle', role=role,
+                category='nature' if role == 'atmosphere' else 'actions', tags='Forst Bäume' if role == 'atmosphere' else 'Türe',
+                loop_verified=role == 'atmosphere', provenance='Isolierter Browser-Test',
+                gain_db=-20 if role == 'atmosphere' else -10, fade_in=.02, fade_out=.1)
+            prepare_source(entry, source)
+            entry.status='published'; entry.full_clean(); entry.save()
+            data[role] = str(entry.pk)
+    from production.models import Production
+    Production.objects.create(project_id=data['project'], stage='plan', plan={
+        'summary': 'QA Klangplan', 'speech_start': 0, 'music_duck_db': 4, 'compression': 25,
+        'items': [{'title': 'QA Geräusch', 'kind': 'effects', 'asset_id': '', 'prompt': 'Test',
+            'duration': 3, 'start': 0, 'gain_db': -10, 'fade_in': 0, 'fade_out': 0, 'loop': False}]})
+    target.write_text(json.dumps(data), encoding='utf-8')

@@ -96,3 +96,16 @@
 .studio-clip.is-copying { pointer-events: none; opacity: .85; cursor: copy; }
 @media(max-width: 780px) { .studio-heading { align-items: start; flex-direction: column; }.studio-workspace { grid-template-columns: 1fr; }.studio-fields { grid-template-columns: repeat(2, minmax(0,1fr)); }.studio-transport { gap: .5rem; padding: .7rem; }.studio-track-label { padding: .5rem; }.studio-ruler, .studio-track { grid-template-columns: 130px 1fr; } }
 @media(prefers-reduced-motion: reduce) { .studio * { scroll-behavior: auto; } }
+.studio-sounds-dialog { width: min(780px, calc(100vw - 32px)); }
+.studio-sound-filters { display: flex; gap: .5rem; flex-wrap: wrap; margin: 1rem 0; }
+.studio-sound-filters button { padding: .65rem .85rem; border: 1px solid var(--border, #c9d4dc); border-radius: .5rem; background: var(--surface, #fff); color: inherit; font: inherit; cursor: pointer; }
+.studio-sound-filters button[aria-pressed="true"] { background: #e1f2ed; border-color: #29826f; color: #195f51; }
+.studio-sounds-list { max-height: 340px; overflow-y: auto; margin: 1rem 0; }
+.studio-sound-row { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 1rem; padding: 1rem .7rem; border-bottom: 1px solid var(--border, #c9d4dc); }
+.studio-sound-row.is-selected { background: #edf7f3; box-shadow: inset 3px 0 #29826f; }
+.studio-sound-choice { background: none; border: none; text-align: left; font: inherit; font-weight: 700; color: inherit; cursor: pointer; padding: .3rem 0; }
+.studio-sound-row p { margin: .3rem 0; font-size: .9rem; }
+.studio-sound-row audio { width: 100%; align-self: center; }
+.studio-sound-footer { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; border-top: 1px solid var(--border, #c9d4dc); padding-top: 1rem; margin-top: 1rem; }
+.studio-sound-choice:focus-visible, .studio-sound-filters button:focus-visible { outline: 3px solid #29826f; outline-offset: 3px; }
+@media (max-width: 600px) { .studio-sound-row { grid-template-columns: minmax(0, 1fr); gap: .5rem; } .studio-sounds-list { max-height: 40vh; } }

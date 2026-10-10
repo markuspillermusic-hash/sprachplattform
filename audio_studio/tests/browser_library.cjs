@@ -1,0 +1,138 @@
+// Real local library preparation, no provider requests. Use isolated library-browser DB.
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const {chromium} = require('playwright');
+const fixture = JSON.parse(fs.readFileSync(process.env.STUDIO_TEST_FIXTURE, 'utf8'));
+const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:8097';
+(async () => {
+ const browser = await chromium.launch({headless: true, ...(process.env.STUDIO_TEST_CHANNEL ? {channel:process.env.STUDIO_TEST_CHANNEL} : {})});
+ try {
+  const page = await browser.newPage({viewport: {width: 1366, height: 900}});
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  let providerCalls=0, preparations=0;
+  await page.route('**/generate/', route => {providerCalls++; return route.abort();});
+  page.on('request', request => {if (request.url().endsWith('/library/prepare/')) preparations++;});
+  const studio = `${base}/studio/${fixture.project}/`;
+  await page.goto(studio);
+  await page.locator('[name=username]').fill(fixture.username);
+  await page.locator('[name=password]').fill(fixture.password);
+  await page.getByRole('button', {name:'Sicher anmelden'}).click();
+  await page.waitForFunction(() => !document.getElementById('studio-play').disabled);
+  assert((await page.locator('h1').innerText()).startsWith('QA '));
+  const csrf = await page.locator('#audio-studio [name=csrfmiddlewaretoken]').inputValue();
+  const before = await (await page.request.get(`${studio}state/`)).json();
+  assert((await page.request.post(`${studio}save/`, {headers:{'X-CSRFToken':csrf},data:{revision:before.revision,state:fixture.state}})).ok());
+  await page.reload(); await page.waitForFunction(() => !document.getElementById('studio-play').disabled);
+  async function cursor(seconds) {await page.locator('#studio-position').fill(String(seconds)); await page.locator('#studio-position').press('Tab');}
+  async function saved() {
+   if(await page.locator('#studio-save').isEnabled()) {
+    await page.locator('#studio-save').click();
+    await page.waitForFunction(() => document.getElementById('studio-save-status').textContent.startsWith('Gespeichert'));
+   }
+   return (await (await page.request.get(`${studio}state/`)).json()).state;
+  }
+  await cursor(12.5); await page.locator('#studio-open-sounds').click();
+  await page.getByRole('button',{name:'QA Wald',exact:true}).waitFor();
+  await page.locator('#studio-sounds-search').fill('Forst');
+  assert.equal(await page.locator('.studio-sound-row').count(),1);
+  await page.getByRole('button',{name:'QA Wald',exact:true}).click();
+  await page.locator('#studio-sounds-duration').selectOption('custom');
+  await page.locator('#studio-sounds-custom').fill('135');
+  const preview = page.locator('#studio-sounds-list audio');
+  await preview.evaluate(async audio => {await audio.play();});
+  assert((await page.locator('#studio-sounds-position').innerText()).includes('12.50'));
+  await page.locator('#studio-sounds-insert').dblclick();
+  await page.waitForFunction(() => !document.getElementById('studio-sounds-dialog').open);
+  assert.equal(await page.locator('.studio-clip').count(),3);
+  assert.equal(preparations,1,'Double click must prepare once');
+  const id = await page.locator('.studio-clip.is-selected').getAttribute('data-id');
+  let state = await saved(), inserted = state.clips.find(c => c.id===id);
+  assert.equal(inserted.start,12.5); assert.equal(inserted.trim_end,135); assert.equal(inserted.gain_db,-20);
+  await page.locator('#studio-undo').click(); assert.equal(await page.locator('.studio-clip').count(),2);
+  await page.locator('#studio-redo').click(); assert.equal(await page.locator('.studio-clip').count(),3);
+  await page.locator('#studio-change-duration').click();
+  await page.waitForFunction(() => !document.getElementById('studio-sounds-insert').disabled);
+  await page.locator('#studio-sounds-custom').fill('160.25'); await page.locator('#studio-sounds-insert').click();
+  await page.waitForFunction(() => !document.getElementById('studio-sounds-dialog').open);
+  state = await saved(); assert.equal(state.clips.find(c=>c.id===id).trim_end,160.25);
+  await page.reload(); await page.waitForFunction(() => !document.getElementById('studio-play').disabled);
+  assert.equal(await page.locator('.studio-clip').count(),3,'Reload must not duplicate completed insertions');
+  await page.locator('#studio-zoom').fill('10');
+  await page.locator('.studio-lane[data-track=effects]').click({button:'right',position:{x:400,y:140}});
+  await page.getByRole('menuitem',{name:'Einzelgeräusche auswählen …'}).click();
+  await page.getByRole('button',{name:'QA Tür',exact:true}).click();
+  await page.locator('#studio-sounds-duration').selectOption('120');
+  assert(await page.locator('#studio-sounds-insert').isDisabled());
+  await page.locator('#studio-sounds-duration').selectOption('natural'); await page.locator('#studio-sounds-insert').click();
+  await page.waitForFunction(() => !document.getElementById('studio-sounds-dialog').open);
+  assert.equal(await page.locator('.studio-clip').count(),4); await saved();
+  await cursor(300); await page.locator('#studio-open-sounds').click();
+  await page.getByRole('button',{name:'QA Wald',exact:true}).click();
+  await page.locator('#studio-sounds-duration').selectOption('30'); await page.locator('#studio-sounds-insert').click();
+  await page.waitForFunction(() => !document.getElementById('studio-sounds-dialog').open);
+  state = await saved();
+  assert.equal(state.clips.find(c=>c.start===300).trim_end,30);
+  const reusedSource=state.clips.find(c=>c.start===300).asset_id;
+  await cursor(400); await page.locator('#studio-open-sounds').click();
+  await page.getByRole('button',{name:'QA Wald',exact:true}).click();
+  await page.locator('#studio-sounds-duration').selectOption('30'); await page.locator('#studio-sounds-insert').click();
+  await page.waitForFunction(() => !document.getElementById('studio-sounds-dialog').open);
+  state=await saved(); assert.equal(state.clips.filter(c=>c.asset_id===reusedSource).length,2);
+  await page.locator('#studio-open-sounds').click(); await page.locator('#studio-sounds-search').fill('Regen');
+  await page.locator('#studio-sounds-request').click();
+  await page.waitForFunction(()=>document.getElementById('studio-sounds-selection').textContent.includes('vorgemerkt'));
+  await page.locator('#studio-sounds-generate').click();
+  assert.equal(await page.locator('#studio-generate-form [name=prompt]').inputValue(),'Regen');
+  await page.keyboard.press('Escape');
+  // Return a queued view of an actually prepared file, then reveal its completion.
+  let delayedJob=null, reveal=false;
+  const pendingView=job=>job.id===delayedJob?.id && !reveal ? {...job,status:'queued',label:'Wartet',asset:null} : job;
+  await page.route(`${studio}library/prepare/`,async route=>{
+   const response=await route.fetch(), data=await response.json();
+   assert(response.ok()); delayedJob=data.job;
+   await route.fulfill({response,json:{...data,job:pendingView(data.job)}});
+  });
+  for(const endpoint of ['jobs/','state/']) await page.route(`${studio}${endpoint}`,async route=>{
+   const response=await route.fetch(),data=await response.json();
+   data.jobs=data.jobs.map(pendingView); await route.fulfill({response,json:data});
+  });
+  await cursor(500); await page.locator('#studio-open-sounds').click();
+  await page.getByRole('button',{name:'QA Wald',exact:true}).click();
+  await page.locator('#studio-sounds-duration').selectOption('30'); await page.locator('#studio-sounds-insert').click();
+  await page.waitForFunction(()=>!document.getElementById('studio-sounds-dialog').open);
+  await cursor(600); await page.reload(); await page.waitForFunction(()=>!document.getElementById('studio-play').disabled);
+  reveal=true; await page.waitForFunction(()=>document.getElementById('studio-message').textContent.includes('wurde bei'));
+  state=await saved(); assert.equal(state.clips.filter(c=>c.start===500).length,1);
+  await page.reload(); await page.waitForFunction(()=>!document.getElementById('studio-play').disabled);
+  assert.equal(await page.locator('.studio-clip').count(),state.clips.length);
+  reveal=false;
+  await page.locator(`.studio-clip[data-id="${id}"]`).click({position:{x:25,y:25}});
+  await page.locator('#studio-change-duration').click();
+  await page.waitForFunction(()=>!document.getElementById('studio-sounds-insert').disabled);
+  await page.locator('#studio-sounds-custom').fill('180'); await page.locator('#studio-sounds-insert').click();
+  await page.waitForFunction(()=>!document.getElementById('studio-sounds-dialog').open);
+  await page.locator('#studio-clip-form [name=gain_db]').fill('-18');
+  await page.getByRole('button',{name:'Werte übernehmen'}).click();
+  reveal=true; await page.waitForFunction(()=>document.getElementById('studio-message').textContent.includes('Clip wurde inzwischen geändert'));
+  state=await saved(); const edited=state.clips.find(c=>c.id===id);
+  assert.equal(edited.gain_db,-18); assert.equal(edited.trim_end,160.25,'Late extension must preserve intervening edits');
+  await page.setViewportSize({width:390,height:844}); await page.locator('#studio-open-sounds').click();
+  await page.getByRole('button',{name:'QA Wald',exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  assert(await page.locator('#studio-sounds-insert').isVisible());
+  if(process.env.STUDIO_TEST_SCREENSHOT) await page.screenshot({path:process.env.STUDIO_TEST_SCREENSHOT});
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({width:1366,height:900});
+  await page.goto(`${base}/produktion/${fixture.project}/`);
+  const sourceSelect=page.locator('[name="items-0-library_id"]');
+  await sourceSelect.selectOption(fixture.atmosphere);
+  assert.equal(await page.locator('[name="items-0-prompt"]').inputValue(),'');
+  assert.equal(await page.locator('[name="items-0-duration"]').inputValue(),'120');
+  assert.equal(await page.locator('[name="items-0-gain_db"]').inputValue(),'-20');
+  assert(await sourceSelect.locator('..').locator('audio').isVisible());
+  await sourceSelect.selectOption(fixture.oneshot);
+  assert.equal(Number(await page.locator('[name="items-0-duration"]').inputValue()),1);
+  assert.deepEqual(errors,[]); assert.equal(providerCalls,0);
+  console.log('Library browser: Suche, Vorhören, feste Position, einmaliges Einfügen, Verlängern, Undo/Redo, Neuladen, Rechtsklick, Einzelgeräusche, Wiederverwendung, Wunsch, Promptübergabe und Mobilansicht bestanden; 0 Provideraufrufe.');
+ } finally {await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

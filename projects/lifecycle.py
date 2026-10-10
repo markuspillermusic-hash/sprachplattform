@@ -92,7 +92,9 @@ def duplicate_project(project, owner=None):
                     original_path=_copy_file(asset.original_path, folder, created_files) if asset.original_path else "",
                     format=asset.format, duration=asset.duration, size_bytes=asset.size_bytes,
                     waveform=deepcopy(asset.waveform), source_audio=speech_map.get(asset.source_audio_id),
-                    expires_at=asset.expires_at, is_demo_sample=asset.is_demo_sample)
+                    expires_at=asset.expires_at, is_demo_sample=asset.is_demo_sample,
+                    library_source=asset.library_source, variant_key=asset.variant_key,
+                    loopable=asset.loopable, source_duration=asset.source_duration)
             if session:
                 state = validate_state(duplicate, _remap_state(session.state, asset_map))
                 copied_session = StudioSession.objects.create(project=duplicate, state=state, revision=session.revision)
